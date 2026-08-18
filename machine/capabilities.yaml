@@ -1,0 +1,30 @@
+{
+  "capabilities": [
+    {
+      "capability": "recorded-information",
+      "format": "markdown",
+      "profile": "recorded-information-core",
+      "status": "design-only"
+    },
+    {
+      "capability": "recorded-information",
+      "format": "docx",
+      "profile": "recorded-information-core",
+      "status": "design-only"
+    },
+    {
+      "capability": "recorded-information",
+      "format": "xlsx",
+      "profile": "recorded-information-core",
+      "status": "design-only"
+    },
+    {
+      "capability": "recorded-information",
+      "format": "pdf",
+      "profile": "recorded-information-core",
+      "status": "design-only"
+    }
+  ],
+  "claimPolicy": "No tuple is production-qualified without a qualification receipt and release manifest.",
+  "version": "2.1.0"
+}

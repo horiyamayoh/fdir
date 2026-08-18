@@ -1,0 +1,37 @@
+{
+  "canonicalAuthority": [
+    "machine/logical-model.yaml + tools/generate_contracts.py",
+    "machine/requirements.yaml",
+    "machine/acceptance-tests.yaml",
+    "machine/profiles.yaml",
+    "machine/capabilities.yaml",
+    "machine/adrs/**",
+    "spec/** except spec/generated/**"
+  ],
+  "generatedNormative": [
+    "schemas/fdir.schema.json",
+    "schemas/fdir.cddl",
+    "schemas/fdir.sql",
+    "schemas/context.jsonld",
+    "schemas/generated-manifest.json",
+    "spec/generated/logical-model.md",
+    "matrices/requirements-tests.md",
+    "matrices/requirements-tests.csv"
+  ],
+  "issue": 2,
+  "name": "FDIR Information Independence Final Baseline",
+  "nonCanonicalGenerated": [
+    "dist/**/*.pdf",
+    "dist/**/*.docx",
+    "dist/**/*.png",
+    "dist/**/*.svg",
+    "qualification/**/*.bin",
+    "qualification/**/*.zip",
+    "reports/**",
+    "indexes/**"
+  ],
+  "productImplementationClaim": false,
+  "status": "final",
+  "validation": "python3 tools/validate_baseline.py .",
+  "version": "2.1.0"
+}
