@@ -7,14 +7,28 @@ on:
     paths:
       - .github/workflows/issue2-import.yml
       - .issue2/trigger
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+  workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: issue-2-normative-baseline-import
+  cancel-in-progress: false
 
 jobs:
   import-baseline:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    env:
+      TARGET_BRANCH: agent/issue-2-normative-baseline
     steps:
       - name: Check out dedicated branch
         uses: actions/checkout@v4
@@ -26,6 +40,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          if [[ -f baseline.yaml ]]; then
+            echo "FDIR 2.1 baseline is already imported; nothing to do."
+            exit 0
+          fi
 
           cat .bootstrap/fdir-source-hex/part-* \
             | tr -d '[:space:]' \
@@ -62,17 +81,17 @@ jobs:
 
           git add baseline.yaml machine spec
           git commit -m "Import FDIR 2.1 normative authority (#2)"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git push origin "HEAD:${TARGET_BRANCH}"
 
           git add tools schemas
           git commit -m "Generate FDIR 2.1 contracts from machine authority (#2)"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git push origin "HEAD:${TARGET_BRANCH}"
 
           git add examples fixtures matrices queries
           git commit -m "Add baseline fixtures and traceability validation (#2)"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git push origin "HEAD:${TARGET_BRANCH}"
 
           git add README.md .gitignore .gitattributes references diagrams
           git rm -r --ignore-unmatch .bootstrap .issue2 .github/workflows/issue2-import.yml
           git commit -m "Document baseline authority and remove bootstrap staging (#2)"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git push origin "HEAD:${TARGET_BRANCH}"
