@@ -28,6 +28,18 @@ Every non-trivial change starts from an issue. The issue must identify:
 
 New normative requirements, unowned responsibilities, qualification gaps, and release blockers must be represented by issues and linked into roadmap #4 before final release work proceeds.
 
+### Actionable issue lifecycle
+
+1. **Propose or select the owning issue.** Use the appropriate issue form, link its parent and related work, and define goal, bounded scope, owned paths, dependencies, acceptance criteria, planned evidence, claim impact, and explicit exclusions.
+2. **Triage ownership and dependencies.** Confirm that the issue owns the responsibility it intends to change. Record shared seams, blockers, and any newly discovered normative, qualification, or release gap before implementation starts.
+3. **Create a focused branch.** Start from the current integration branch after required prerequisites are present. Keep unrelated work and paths owned by other issues out of the branch.
+4. **Implement in reviewable commits.** Each commit must be coherent, reference the owning issue, preserve authority boundaries, and keep incomplete or non-success states explicit.
+5. **Produce validation evidence.** Run the exact required commands and relevant positive, negative, parity, security, resource, and qualification checks. Record versions, concise results, and unavailable checks; a check that did not run is not a pass.
+6. **Submit and review the pull request.** Link the owning issue, map the diff to acceptance criteria and owned paths, state authority and production-claim impact, and link every intentionally deferred item to an owning follow-up issue.
+7. **Integrate and close with evidence.** After required review and checks pass, integrate according to repository policy, then post the PR, merge revision, commands, and results to the issue. Close only when every acceptance criterion owned by the issue is evidenced; otherwise keep it open or link a completed replacement that owns the remaining responsibility.
+
+The project-owner exception for a direct `main` commit does not waive issue ownership, bounded scope, validation evidence, or evidence-before-closure requirements.
+
 ## 3. Bounded completion
 
 A leaf issue is complete when its declared responsibility is implemented and its own acceptance criteria are evidenced. A leaf issue does not inherit unlimited whole-product qualification work. Whole-product integration and qualification remain owned by their dedicated roadmap milestones.
