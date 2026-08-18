@@ -29,6 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TARGET_BRANCH: agent/issue-2-normative-baseline
+      BASELINE_ARCHIVE_SHA256: b78c28385cbce1a0afc43156796e7fbb9a8c10749647e9dff26ef420d1af0e91
     steps:
       - name: Check out dedicated branch
         uses: actions/checkout@v4
@@ -46,11 +47,12 @@ jobs:
             exit 0
           fi
 
-          cat .bootstrap/fdir-source-hex/part-* \
+          cat .issue2/payload/part-* \
             | tr -d '[:space:]' \
-            | xxd -r -p > /tmp/fdir-baseline.tar.gz
-          echo "b78c28385cbce1a0afc43156796e7fbb9a8c10749647e9dff26ef420d1af0e91  /tmp/fdir-baseline.tar.gz" \
-            | sha256sum --check --strict
+            | base64 --decode > /tmp/fdir-baseline.tar.gz
+          actual_digest="$(sha256sum /tmp/fdir-baseline.tar.gz | cut -d ' ' -f1)"
+          echo "FDIR baseline archive sha256: ${actual_digest}"
+          test "${actual_digest}" = "${BASELINE_ARCHIVE_SHA256}"
 
           mkdir -p /tmp/fdir-baseline
           python3 - <<'PY'
