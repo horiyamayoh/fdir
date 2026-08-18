@@ -83,8 +83,11 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config core.autocrlf false
 
+          cp .github/workflows/issue2-baseline-import.yml /tmp/issue2-baseline-import.yml
           find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
           cp -a /tmp/fdir-baseline/. .
+          mkdir -p .github/workflows
+          cp /tmp/issue2-baseline-import.yml .github/workflows/issue2-baseline-import.yml
 
           git add -A -- .bootstrap .issue2
           git add README.md baseline.yaml machine \
