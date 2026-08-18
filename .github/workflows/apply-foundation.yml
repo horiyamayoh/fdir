@@ -44,8 +44,9 @@ jobs:
               .foundation-bundle.part02 \
               .foundation-bundle.part03 \
             | base64 --decode > /tmp/fdir-foundation.tar.gz
-          echo '153f333c99e87dc81c45897125df61d7a3a65c2124013f6bdd7a9b6e2a311a17  /tmp/fdir-foundation.tar.gz' \
-            | sha256sum --check --strict
+          actual_sha256="$(sha256sum /tmp/fdir-foundation.tar.gz | awk '{print $1}')"
+          echo "FOUNDATION_BUNDLE_SHA256=${actual_sha256}"
+          test "${actual_sha256}" = '153f333c99e87dc81c45897125df61d7a3a65c2124013f6bdd7a9b6e2a311a17'
           tar -xzf /tmp/fdir-foundation.tar.gz
           rm -f \
             .foundation-bundle.part00 \
