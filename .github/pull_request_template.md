@@ -28,6 +28,8 @@ Commands and results:
 # exact commands and concise result summaries
 ```
 
+- [ ] Local `python3 tools/quality.py --mode full --cache-policy off .` completed, or an unavailable check is explicitly recorded
+- [ ] Required GitHub Actions check `quality / full` passed for this head revision
 - [ ] Generated-contract parity checked when applicable
 - [ ] Positive behavior checked
 - [ ] Negative/non-success behavior checked

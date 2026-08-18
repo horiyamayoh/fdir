@@ -17,7 +17,7 @@ Deleting a rebuildable projection must not destroy authoritative information. Ed
 
 ## 2. Toolchains and dependency locks
 
-- Python baseline tooling currently targets Python 3.12 in CI and uses the standard library unless a requirement explicitly adds a pinned dependency.
+- Repository quality tooling supports CPython 3.12 and 3.13, pins CPython 3.12 in CI, and uses only the standard library; `.python-version` and `quality/toolchain.json` are the declared prerequisite authority.
 - The Rust implementation will pin its channel/components/targets in `rust-toolchain.toml`.
 - `Cargo.lock` is committed for product binaries and repository tools.
 - Dependency additions require an owning issue, exact version/feature rationale, license review, security/advisory consideration, and deterministic/offline impact assessment.
@@ -28,25 +28,27 @@ Supported production platforms and capability tuples are declared only by the re
 
 ## 3. Single quality-command contract
 
-Issue #6 owns the implementation of one repository-level runner. Its stable command contract is:
+The implemented repository-level entry point is:
 
 ```bash
-python3 tools/quality.py --mode <fast|full|release>
+python3 tools/quality.py --mode <fast|full|release> --cache-policy <off|read-write|read-only> .
 ```
 
-Until that runner lands, use:
+The canonical integration command is:
 
 ```bash
-python3 tools/validate_baseline.py .
+python3 tools/quality.py --mode full --cache-policy off .
 ```
 
 Required semantics:
 
-- `fast`: deterministic developer feedback; may omit expensive qualification and can never certify a release.
-- `full`: all repository formatting, lint, generation parity, schemas, fixtures, unit/integration tests, documentation checks, and available implementation checks.
-- `release`: `full` plus clean-environment, corpus, qualification, security/resource, reproducibility, packaging, and evidence-receipt gates required by the release roadmap.
+- `fast`: deterministic developer feedback over toolchain, formatting, lint, documentation, generated contracts, schema contracts, fixtures, traceability, baseline validity, and claim discipline; it is not integration or release certification.
+- `full`: every `fast` gate plus generated release traceability, release-scope validation, all discovered tests, CI policy, and repository policy. It emits durable integration evidence.
+- `release`: every `full` gate plus explicit release qualification. It must fail while any declared tuple remains unqualified or non-production-ready.
 
-A mode must fail closed when a required tool, input, test inventory, generated artifact, or evidence receipt is missing. `skipped`, `not run`, stale cache, and empty test discovery are not passes.
+Every run writes a machine-readable receipt under `reports/quality/` unless `--receipt` selects another path. A mode fails closed when a required tool, input, test inventory, generated artifact, policy document, cache identity, or evidence condition is missing. `skipped`, `not run`, stale cache, empty test discovery, and an unexpected gate exception are failures, not passes.
+
+The exact gate matrix, required check name, cache rules, receipt fields, and intentional-failure command are normative repository policy in [`quality/README.md`](quality/README.md).
 
 ## 4. Generated-contract parity
 
@@ -62,14 +64,14 @@ A generated artifact includes a source/generator digest where the baseline speci
 
 ## 5. Clean, full, and incremental behavior
 
-As caches and incremental implementation appear, the same logical inputs and pinned configuration must produce equivalent authoritative outputs across:
+The same logical inputs and pinned configuration must produce equivalent authoritative outputs across:
 
-- a clean checkout/build;
-- a full rebuild;
-- an incremental rebuild;
+- a clean checkout and `--cache-policy off` run;
+- a full `--cache-policy read-write` run;
+- an incremental or repeated `--cache-policy read-only` run;
 - a repeated warm-cache run.
 
-Cache metadata and execution timings may differ only where explicitly non-authoritative. Cache corruption, wrong versions, wrong source identities, or missing evidence must be detected; the system must not silently reuse stale results.
+All three policies execute every authoritative gate. `read-write` creates cache metadata only after a complete pass. `read-only` requires matching schema, quality version, mode, source digest, gate plan, and result digest, then compares that cache with a fresh execution. Cache metadata and normalized timings may differ only where explicitly non-authoritative. Cache corruption, wrong versions, wrong source identities, or missing evidence must be detected; the system must not silently reuse stale results.
 
 ## 6. Failure and claim discipline
 
@@ -80,10 +82,11 @@ A capability is production-qualified only for an exact released product/adapter/
 ## 7. Commit and CI expectations
 
 - Keep commits bounded and reference the owning issue.
-- Run the required quality mode for the change and record exact commands/results.
-- CI and local execution must agree for the same revision and declared environment.
+- Run `python3 tools/quality.py --mode full --cache-policy off .` before integration and record the receipt or concise result.
+- Pull requests and protected integration into `main` require the exact GitHub Actions check `quality / full`; skipped, neutral, cancelled, or missing runs are not success.
+- CI and local execution must agree on success or failure for the same revision, mode, cache policy, and supported Python series.
 - Main-branch integration must preserve prior valid canonical artifacts and fail atomically on generation or validation errors.
-- Release evidence must be retained in machine-readable form and bound to the exact source revision/toolchain/dependencies/corpus.
+- CI retains full, cache-equivalence, and intentional-failure receipts for 90 days. Release evidence must remain machine-readable and bound to the exact source revision, toolchain, dependencies, corpus, and approvals.
 
 ## 8. Generated and binary artifacts
 

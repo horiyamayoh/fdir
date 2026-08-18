@@ -1,38 +1,54 @@
-name: Issue 6 source export
+name: FDIR quality
 
 on:
   pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: fdir-quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  export:
-    if: github.head_ref == 'agent/issue-6-quality-gates'
-    name: export validated workspace
-    runs-on: ubuntu-latest
+  quality:
+    name: quality / full
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
-      - name: Check out Issue 6 branch
+      - name: Check out source
         uses: actions/checkout@v6.0.2
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
-      - name: Create source archive
+      - name: Set up Python
+        uses: actions/setup-python@v6.0.0
+        with:
+          python-version: "3.12"
+      - name: Record pinned toolchain
         shell: bash
         run: |
           set -euo pipefail
-          tar \
-            --exclude=.git \
-            --exclude=.issue6-export \
-            --exclude=.issue6-import \
-            --exclude=.validation \
-            --exclude=reports \
-            -czf /tmp/fdir-source.tar.gz .
-          sha256sum /tmp/fdir-source.tar.gz
-      - name: Upload source archive
+          python3 --version
+          python3 -c "import json, platform; policy=json.load(open('quality/toolchain.json', encoding='utf-8')); print(platform.python_implementation(), platform.python_version()); print(json.dumps(policy, sort_keys=True))"
+      - name: Run clean full repository quality
+        run: python3 tools/quality.py --mode full --cache-policy off .
+      - name: Demonstrate intentional gate failures
+        run: python3 tools/quality.py --self-test-gates .
+      - name: Build authoritative cache receipt
+        run: python3 tools/quality.py --mode full --cache-policy read-write --receipt reports/quality/full-cache-write.json .
+      - name: Verify read-only cache equivalence
+        run: python3 tools/quality.py --mode full --cache-policy read-only --receipt reports/quality/full-cache-read.json .
+      - name: Archive machine-readable quality receipts
+        if: always()
         uses: actions/upload-artifact@v7.0.1
         with:
-          name: issue-6-source
-          path: /tmp/fdir-source.tar.gz
-          if-no-files-found: error
-          retention-days: 1
+          name: fdir-quality-receipts-${{ github.sha }}
+          path: |
+            reports/quality/*.json
+            .validation/quality-cache.json
+          if-no-files-found: warn
+          retention-days: 90
