@@ -55,22 +55,41 @@ jobs:
           git archive "origin/${SOURCE_BRANCH}" .issue2/payload \
             | tar -x -C /tmp/fdir-source-branch
 
-          mapfile -t payload_paths < <(
-            find /tmp/fdir-source-branch/.issue2/payload \
-              -mindepth 1 -maxdepth 1 -type f -name 'part-*' -print | sort
-          )
-          test "${#payload_paths[@]}" -eq 4
-          for path in "${payload_paths[@]}"; do
-            if grep -q '[^A-Za-z0-9+/=[:space:]]' "${path}"; then
-              echo "::error file=${path}::payload contains a non-base64 character"
-              exit 1
-            fi
-          done
-          cat "${payload_paths[@]}" | base64 --decode > /tmp/fdir-2.1.0-baseline.tar.gz
+          python3 - <<'PY'
+          import base64
+          import hashlib
+          import os
+          from pathlib import Path
 
-          actual_digest="$(sha256sum /tmp/fdir-2.1.0-baseline.tar.gz | cut -d ' ' -f1)"
-          echo "FDIR baseline archive sha256: ${actual_digest}"
-          test "${actual_digest}" = "${BASELINE_ARCHIVE_SHA256}"
+          payload_dir = Path('/tmp/fdir-source-branch/.issue2/payload')
+          parts = sorted(payload_dir.glob('part-*'))
+          print(f'Baseline payload parts: {len(parts)}')
+          if len(parts) != 4:
+              raise SystemExit(f'expected 4 payload parts, found {len(parts)}')
+
+          chunks = []
+          for part in parts:
+              text = part.read_text(encoding='ascii')
+              compact = ''.join(text.split())
+              print(f'{part.name}: {len(text)} bytes, {len(compact)} base64 characters')
+              chunks.append(compact)
+
+          encoded = ''.join(chunks)
+          print(f'Combined base64 characters: {len(encoded)} (mod 4 = {len(encoded) % 4})')
+          try:
+              archive = base64.b64decode(encoded, validate=True)
+          except Exception as exc:
+              raise SystemExit(f'invalid baseline payload: {exc}') from exc
+
+          archive_path = Path('/tmp/fdir-2.1.0-baseline.tar.gz')
+          archive_path.write_bytes(archive)
+          digest = hashlib.sha256(archive).hexdigest()
+          expected = os.environ['BASELINE_ARCHIVE_SHA256']
+          print(f'FDIR baseline archive bytes: {len(archive)}')
+          print(f'FDIR baseline archive sha256: {digest}')
+          if digest != expected:
+              raise SystemExit(f'archive digest mismatch: expected {expected}, got {digest}')
+          PY
 
       - name: Extract and validate source package
         shell: bash
