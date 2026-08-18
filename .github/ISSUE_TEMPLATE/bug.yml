@@ -52,8 +52,22 @@ body:
   - type: textarea
     id: scope
     attributes:
-      label: Suspected scope and owned paths
-      description: Components, formats, profiles, or repository paths likely affected.
+      label: Suspected scope
+      description: Identify the affected components, formats, profiles, capabilities, or behavior boundaries.
+    validations:
+      required: true
+  - type: textarea
+    id: paths
+    attributes:
+      label: Owned / affected paths
+      description: List repository paths or shared seams likely to change, including coordination ownership.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies and related issues
+      description: Link prerequisites, blockers, coordinated work, and the relevant roadmap milestone. Write "none" only after checking roadmap #4.
     validations:
       required: true
   - type: textarea
