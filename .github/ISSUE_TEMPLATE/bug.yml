@@ -1,0 +1,83 @@
+name: Defect report
+description: Report reproducible incorrect behavior without publishing security-sensitive or confidential inputs.
+title: "[Bug] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Security vulnerabilities, credentials, proprietary documents, and exploit samples must use the private route in SECURITY.md, not this form.
+  - type: input
+    id: owner
+    attributes:
+      label: Owning / affected issue
+      description: Link the milestone or implementation issue, or write "untriaged".
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: Correctness goal
+      description: State the behavior that must hold after the defect is fixed.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Revision and environment
+      description: Commit/release, platform, toolchain, adapter/dependency versions, profile, context, and resource policy.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide minimal sanitized steps and inputs. Include exact commands when possible.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+      description: Include expected status, diagnostics, accounting, output identity, or exit code.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: Include observed status and evidence. Do not relabel missing output as success.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Suspected scope and owned paths
+      description: Components, formats, profiles, or repository paths likely affected.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Fix acceptance and regression evidence
+      description: Describe positive, negative, malformed, accounting, determinism, security, or qualification checks required.
+    validations:
+      required: true
+  - type: dropdown
+    id: claim_impact
+    attributes:
+      label: Production-claim impact
+      options:
+        - No released claim exists / no claim impact
+        - Potentially narrows or invalidates a claimed tuple
+        - Qualification or release blocker
+        - Unknown; requires triage
+    validations:
+      required: true
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Explicitly out of scope
+      description: Related work not owned by this report.
+    validations:
+      required: true

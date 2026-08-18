@@ -1,4 +1,3 @@
-
 # FDIR 2.1 — Full-fidelity Document Information Representation
 
 FDIR is an intermediate representation and compiler architecture for extracting **recorded information** from documents without making downstream consumers depend on whether the carrier was DOCX, XLSX, PDF, Markdown, or another format.
@@ -13,9 +12,10 @@ FDIR is an intermediate representation and compiler architecture for extracting 
 | Design status | Final and frozen for the 2.1 line |
 | Logical authority | `machine/logical-model.yaml` + `tools/generate_contracts.py` |
 | Baseline validation | `python3 tools/validate_baseline.py .` |
-| Production converter implementation | Not provided by this baseline |
+| Production converter implementation | In development; no production-qualified converter is claimed yet |
 | Qualification claim | None |
-| Tracking issue | [#2](https://github.com/horiyamayoh/fdir/issues/2) |
+| Umbrella issue | [#1](https://github.com/horiyamayoh/fdir/issues/1) |
+| Completion roadmap | [#4](https://github.com/horiyamayoh/fdir/issues/4) |
 
 A successful schema validation or example extraction is not a production claim. A capability becomes production-qualified only for an exact format/capability/profile tuple backed by qualification evidence.
 
@@ -56,10 +56,19 @@ EquivalenceCertificate                    InventoryDomain / AccountingItem
 | `references/` | Packaging, terminology, and authority notes |
 | `diagrams/` | Mermaid diagram sources |
 
+## Project policies
+
+- [Contributing and issue lifecycle](CONTRIBUTING.md)
+- [Development and build policy](DEVELOPMENT.md)
+- [Security and private vulnerability reporting](SECURITY.md)
+- [Apache License 2.0](LICENSE)
+
+The project owner currently permits small validated commits directly to `main`; external contributions should normally use a focused issue and pull request. Issue and PR templates require ownership, acceptance criteria, evidence, claim impact, and intentionally deferred work.
+
 ## Validate
 
 ```bash
 python3 tools/validate_baseline.py .
 ```
 
-The command checks generated-contract parity, schema structure, examples, negative fixtures, accounting closure, canonical vectors, requirement/test traceability, projection boundaries, and Python syntax using only the standard library.
+The command checks generated-contract parity, schema structure, examples, negative fixtures, accounting closure, canonical vectors, requirement/test traceability, projection boundaries, and Python syntax using only the standard library. Issue #6 will add the unified fast/full/release quality runner described in `DEVELOPMENT.md`.

@@ -1,0 +1,90 @@
+name: Bounded implementation work
+description: Propose a small implementation unit owned by an existing FDIR roadmap milestone.
+title: "[Work] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Link this work to its owning issue. A placeholder, skipped test, partial result, or unsupported path is not a successful completion claim.
+  - type: input
+    id: parent
+    attributes:
+      label: Parent / roadmap issue
+      description: Use an issue reference such as #7. State why a new parent is required if none exists.
+      placeholder: "#7"
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: State one observable outcome.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: In scope
+      description: List the responsibilities this issue owns.
+    validations:
+      required: true
+  - type: textarea
+    id: paths
+    attributes:
+      label: Owned paths
+      description: List repository paths this issue may change, including shared seams that require coordination.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Link prerequisite, blocking, or coordinated issues. Write "none" only after checking roadmap #4.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Use verifiable checklist items, including required positive and negative behavior.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Planned verification evidence
+      description: Exact commands, fixtures, receipts, or reviews expected before closure.
+    validations:
+      required: true
+  - type: dropdown
+    id: authority
+    attributes:
+      label: Authority / claim impact
+      options:
+        - No normative or production-claim impact
+        - Generated-contract or normative-source impact
+        - Capability/claim manifest impact
+        - Qualification or release-blocking impact
+        - Unknown; requires design review
+    validations:
+      required: true
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Explicitly out of scope
+      description: Record work intentionally deferred to another issue.
+    validations:
+      required: true
+  - type: checkboxes
+    id: discipline
+    attributes:
+      label: Claim discipline
+      options:
+        - label: I will keep incomplete, unsupported, unresolved, indeterminate, policy-blocked, resource-limited, cancelled, and failed states visible.
+          required: true
+        - label: I checked roadmap #4 for existing ownership and will link newly discovered gaps before claiming completion.
+          required: true

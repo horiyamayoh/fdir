@@ -1,0 +1,70 @@
+name: Normative, qualification, or ownership gap
+description: Record a newly discovered requirement, unowned responsibility, qualification gap, or release blocker.
+title: "[Gap] "
+labels: []
+body:
+  - type: input
+    id: discovered_in
+    attributes:
+      label: Discovered in
+      description: Link the issue, review, test, or qualification activity that exposed the gap.
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: Closure goal
+      description: State the condition needed to eliminate the gap without weakening FDIR 2.1 semantics.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and affected authority
+      description: Cite requirement IDs, ADRs, schemas, fixtures, capabilities, claims, or observed behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Required scope
+      description: Describe implementation, tests, documentation, migration, security, or qualification responsibilities.
+    validations:
+      required: true
+  - type: textarea
+    id: paths
+    attributes:
+      label: Proposed owned paths
+      description: State paths or seams requiring an owner; write "to be assigned" when unknown.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies and roadmap placement
+      description: Identify affected milestones and blockers. Roadmap #4 must be updated for release-relevant gaps.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria and evidence
+      description: Define how closure will be verified and how orphan responsibility will be prevented.
+    validations:
+      required: true
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Explicitly out of scope
+      description: Separate future-major or additive work from required FDIR 2.1 closure.
+    validations:
+      required: true
+  - type: checkboxes
+    id: integrity
+    attributes:
+      label: Integrity confirmation
+      options:
+        - label: I have not converted an unsupported, unresolved, partial, failed, or missing-evidence result into success.
+          required: true
+        - label: This gap will remain visible until a completed replacement owns all affected responsibility.
+          required: true
