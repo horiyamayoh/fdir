@@ -1,0 +1,285 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fdir:dependency-manifest:1",
+  "title": "FDIR dependency and worker manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "id",
+    "name",
+    "kind",
+    "version",
+    "features",
+    "implementationLanguage",
+    "evidenceLanes",
+    "inputKinds",
+    "outputKinds",
+    "normalizations",
+    "unavailableSourceDistinctions",
+    "unsafeCode",
+    "ffi",
+    "nativeCode",
+    "receivesUntrustedDocumentBytes",
+    "processBoundary",
+    "license",
+    "advisorySnapshot",
+    "determinism",
+    "networkPolicy",
+    "resourceCharacteristics",
+    "qualificationState",
+    "ownerIssue"
+  ],
+  "properties": {
+    "schema": {
+      "const": "fdir/dependency-manifest/1"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "enum": [
+        "rust-crate",
+        "python-package",
+        "native-library",
+        "parser",
+        "renderer",
+        "ocr-engine",
+        "evaluator",
+        "codec",
+        "worker",
+        "model",
+        "resource"
+      ]
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "An exact immutable version, revision, digest, or build identity. Floating ranges and branch names are forbidden."
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "implementationLanguage": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidenceLanes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "native-substrate-census",
+          "semantic-helper",
+          "renderer-observation",
+          "ocr-inference-observation",
+          "storage-codec"
+        ]
+      }
+    },
+    "inputKinds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "outputKinds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "normalizations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "unavailableSourceDistinctions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "unsafeCode": {
+      "type": "boolean"
+    },
+    "ffi": {
+      "type": "boolean"
+    },
+    "nativeCode": {
+      "type": "boolean"
+    },
+    "receivesUntrustedDocumentBytes": {
+      "type": "boolean"
+    },
+    "processBoundary": {
+      "enum": [
+        "trusted-core",
+        "in-process",
+        "isolated-worker",
+        "external-service-forbidden"
+      ]
+    },
+    "inProcessException": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adr",
+        "threatAnalysis",
+        "boundedInputContract",
+        "qualificationEvidence"
+      ],
+      "properties": {
+        "adr": {
+          "type": "string"
+        },
+        "threatAnalysis": {
+          "type": "string"
+        },
+        "boundedInputContract": {
+          "type": "string"
+        },
+        "qualificationEvidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "nativeAuthority": {
+      "type": "boolean",
+      "default": false
+    },
+    "independentCensus": {
+      "type": "boolean",
+      "default": false
+    },
+    "license": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "spdx",
+        "reviewStatus"
+      ],
+      "properties": {
+        "spdx": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reviewStatus": {
+          "enum": [
+            "pending",
+            "accepted",
+            "rejected"
+          ]
+        }
+      }
+    },
+    "advisorySnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "asOf",
+        "source",
+        "status"
+      ],
+      "properties": {
+        "asOf": {
+          "type": "string",
+          "format": "date"
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "clear",
+            "findings-open",
+            "rejected"
+          ]
+        }
+      }
+    },
+    "determinism": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim",
+        "nondeterminismRecorded"
+      ],
+      "properties": {
+        "claim": {
+          "enum": [
+            "deterministic",
+            "bounded-nondeterministic",
+            "unknown"
+          ]
+        },
+        "nondeterminismRecorded": {
+          "type": "boolean"
+        }
+      }
+    },
+    "networkPolicy": {
+      "enum": [
+        "deny",
+        "allowlisted",
+        "required"
+      ]
+    },
+    "resourceCharacteristics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cpu",
+        "memory",
+        "temporaryStorage",
+        "output"
+      ],
+      "properties": {
+        "cpu": {
+          "type": "string"
+        },
+        "memory": {
+          "type": "string"
+        },
+        "temporaryStorage": {
+          "type": "string"
+        },
+        "output": {
+          "type": "string"
+        }
+      }
+    },
+    "qualificationState": {
+      "enum": [
+        "candidate",
+        "admitted-unqualified",
+        "adapter-qualified",
+        "production-qualified",
+        "rejected"
+      ]
+    },
+    "ownerIssue": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}
