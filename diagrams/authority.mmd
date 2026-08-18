@@ -1,0 +1,10 @@
+flowchart TD
+  LM[machine/logical-model.yaml] --> G[tools/generate_contracts.py]
+  G --> S[schemas/*]
+  G --> R[spec/generated/logical-model.md]
+  REQ[machine/requirements.yaml] --> T[tools/generate_traceability.py]
+  TEST[machine/acceptance-tests.yaml] --> T
+  T --> M[matrices/requirements-tests.*]
+  S --> P[PDF/DOCX/PNG review projections]
+  R --> P
+  P -. non-canonical .-> X[dist/]
