@@ -15,7 +15,7 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v6.0.2
-      - name: Export source as reviewable text chunks
+      - name: Create source archive and export metadata
         shell: bash
         run: |
           set -euo pipefail
@@ -25,8 +25,20 @@ jobs:
           base64 -w 0 /tmp/fdir-source.tar.gz | split -b 3000 - .issue6-export/chunk-
           sha256sum /tmp/fdir-source.tar.gz > .issue6-export/archive.sha256
           printf '%s\n' "${GITHUB_SHA}" > .issue6-export/source-sha
+          printf '%s\n' "${GITHUB_RUN_ID}" > .issue6-export/run-id
+      - name: Upload source archive
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: issue-6-source-${{ github.run_id }}
+          path: /tmp/fdir-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+      - name: Publish export metadata
+        shell: bash
+        run: |
+          set -euo pipefail
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add -A .issue6-export
-          git commit -m "Refresh Issue 6 workspace chunks [skip actions]"
+          git commit -m "Refresh Issue 6 workspace export [skip actions]"
           git push
