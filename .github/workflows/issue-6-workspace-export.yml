@@ -4,12 +4,14 @@ on:
   push:
     branches:
       - agent/issue-6-quality-gates
+  pull_request:
 
 permissions:
   contents: read
 
 jobs:
   export:
+    if: github.event_name == 'push' || github.head_ref == 'agent/issue-6-quality-gates'
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
