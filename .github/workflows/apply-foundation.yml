@@ -1,15 +1,21 @@
 name: Apply final foundation bundle
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/finalize-development-foundation
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
     paths:
       - .foundation-bundle.part00
       - .foundation-bundle.part01
       - .foundation-bundle.part02
       - .foundation-bundle.part03
       - .github/workflows/apply-foundation.yml
+  workflow_dispatch:
 
 permissions:
   contents: write
