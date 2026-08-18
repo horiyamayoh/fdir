@@ -22,7 +22,7 @@ jobs:
           rm -rf .issue6-export
           mkdir .issue6-export
           git archive --format=tar.gz --output=/tmp/fdir-source.tar.gz HEAD -- . ':(exclude).issue6-export/**'
-          base64 -w 0 /tmp/fdir-source.tar.gz | fold -w 8000 | split -l 1 - .issue6-export/chunk-
+          base64 -w 0 /tmp/fdir-source.tar.gz | split -b 3000 - .issue6-export/chunk-
           sha256sum /tmp/fdir-source.tar.gz > .issue6-export/archive.sha256
           printf '%s\n' "${GITHUB_SHA}" > .issue6-export/source-sha
           git config user.name github-actions[bot]
