@@ -4,7 +4,7 @@ This policy governs the production claim manifest for the `2.1.x` release line. 
 
 ## Authority
 
-`release/claim-manifest.yaml`, `release/traceability.yaml`, and `release/deferred-capabilities.yaml` are the version-controlled release-scope authority. Generated matrices are review projections and are valid only when byte-identical to regeneration.
+`release/claim-manifest.yaml`, `release/traceability.yaml`, `release/deferred-capabilities.yaml`, `release/blocker-policy.yaml`, and this policy are the version-controlled release-scope authority. `release/scope-approvals.yaml` binds each approved scope revision to the exact Git blob identities of those authority files and to the approving issue and pull request. Generated matrices are review projections and are valid only when byte-identical to regeneration.
 
 The claim manifest begins in `development-unqualified` state. No tuple or release-wide function is production-ready until the final release gate issues qualification evidence for the exact product, source revision, adapter and dependency versions, platform, profile, interpretation context, corpus, resource/security policy, and report identity.
 
@@ -18,9 +18,11 @@ The claim manifest begins in `development-unqualified` state. No tuple or releas
 
 ## Approval record
 
-The initial development scope is established by issue #5 under umbrella #1 and roadmap #4. Every later semantic scope change must cite a project-owner-approved issue or signed release-scope amendment. The validating tool requires an incremented scope revision and consistent revisions across all release-scope registries; human review verifies the approval evidence.
+The initial development scope is established by issue #5 under umbrella #1 and roadmap #4. Every later semantic scope change must cite a project-owner-approved issue or signed release-scope amendment. The validating tool requires an incremented scope revision, consistent revisions across all release-scope registries, and an approval record whose authority-file blob identities match the checkout. Human review verifies that the approving diff is intentional.
 
 ## Release blockers
+
+`release/blocker-policy.yaml` is the machine-readable severity and gap-intake authority. Critical and high findings are release-blocking. Medium findings are blocking when they affect required behavior, security/privacy, accounting closure, determinism, or evidence integrity. Low and informational findings remain auditable and cannot be used to downgrade a more serious condition.
 
 The following are release-blocking for any affected tuple:
 
@@ -33,7 +35,7 @@ The following are release-blocking for any affected tuple:
 - unresolved license conflict, unreproducible package, invalid SBOM/provenance/checksum/signature, or unsupported installation path;
 - production wording that exceeds the exact qualified tuple.
 
-A blocker may narrow the published claim manifest, but no waiver may relabel missing evidence or failure as success or contradict the FDIR 2.1 normative baseline.
+A newly discovered normative requirement, unowned responsibility, release blocker, or qualification gap receives a stable identifier and owning issue, is added to roadmap #4, and updates traceability before the affected gate can pass. A blocker may narrow the published claim manifest, but no waiver may relabel missing evidence or failure as success or contradict the FDIR 2.1 normative baseline.
 
 ## Deferred capabilities
 
