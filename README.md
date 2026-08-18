@@ -78,7 +78,7 @@ The project owner currently permits small validated commits directly to `main`; 
 python3 tools/validate_baseline.py .
 ```
 
-The command checks generated-contract parity, schema structure, examples, negative fixtures, accounting closure, canonical vectors, requirement/test traceability, release-claim ownership, scope approvals, generated release matrices, projection boundaries, and Python syntax using only the standard library. It also runs fail-closed traceability self-tests for orphan requirements/tests, missing owners, missing due evidence, unqualified production exposure, stale scope approval, and stale generated mappings.
+The command checks generated-contract parity, schema structure, examples, negative fixtures, accounting closure, canonical vectors, requirement/test traceability, release-claim ownership, scope approvals, generated release matrices, projection boundaries, and Python syntax using only the standard library. It rejects stale generated mappings and runs fail-closed traceability self-tests for orphan requirements/tests, missing owners, missing due evidence, unqualified production exposure, and stale scope approval.
 
 For a machine-readable completion summary:
 
