@@ -1,4 +1,4 @@
-name: Issue 6 workspace export
+name: Issue 6 workspace import
 
 on:
   push:
@@ -9,36 +9,44 @@ permissions:
   contents: write
 
 jobs:
-  export:
+  import:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
         uses: actions/checkout@v6.0.2
-      - name: Create source archive and export metadata
+      - name: Apply validated workspace archive
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf .issue6-export
-          mkdir .issue6-export
-          git archive --format=tar.gz --output=/tmp/fdir-source.tar.gz HEAD -- . ':(exclude).issue6-export/**'
-          base64 -w 0 /tmp/fdir-source.tar.gz | split -b 3000 - .issue6-export/chunk-
-          sha256sum /tmp/fdir-source.tar.gz > .issue6-export/archive.sha256
-          printf '%s\n' "${GITHUB_SHA}" > .issue6-export/source-sha
-          printf '%s\n' "${GITHUB_RUN_ID}" > .issue6-export/run-id
-      - name: Upload source archive
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: issue-6-source-${{ github.run_id }}
-          path: /tmp/fdir-source.tar.gz
-          if-no-files-found: error
-          retention-days: 1
-      - name: Publish export metadata
-        shell: bash
-        run: |
-          set -euo pipefail
+          if [[ ! -f .issue6-import/READY ]]; then
+            echo "No complete Issue 6 import is staged."
+            exit 0
+          fi
+
+          cat .issue6-import/chunk-* | base64 --decode > /tmp/issue6-changes.tar.gz
+          expected="$(cat .issue6-import/archive.sha256)"
+          actual="$(sha256sum /tmp/issue6-changes.tar.gz | cut -d' ' -f1)"
+          test "${actual}" = "${expected}"
+
+          message="$(cat .issue6-import/COMMIT_MESSAGE)"
+          remove_workflow=false
+          if [[ -f .issue6-import/REMOVE_WORKFLOW ]]; then
+            remove_workflow=true
+          fi
+
+          tar -xzf /tmp/issue6-changes.tar.gz -C .
+          rm -rf .issue6-import .issue6-export
+          if [[ "${remove_workflow}" = true ]]; then
+            rm -f .github/workflows/issue-6-workspace-export.yml
+          fi
+
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add -A .issue6-export
-          git commit -m "Refresh Issue 6 workspace export [skip actions]"
+          git add -A
+          git diff --cached --quiet && {
+            echo "Import archive produced no changes."
+            exit 1
+          }
+          git commit -m "${message}"
           git push
