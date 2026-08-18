@@ -1,0 +1,27 @@
+name: Issue 6 workspace export
+
+on:
+  push:
+    branches:
+      - agent/issue-6-quality-gates
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6.0.2
+        with:
+          persist-credentials: false
+      - name: Create source archive
+        run: git archive --format=tar.gz --output=fdir-source.tar.gz HEAD
+      - name: Upload source archive
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: issue-6-source-${{ github.sha }}
+          path: fdir-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
