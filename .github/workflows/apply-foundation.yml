@@ -1,0 +1,63 @@
+name: Apply final foundation bundle
+
+on:
+  push:
+    branches:
+      - agent/finalize-development-foundation
+    paths:
+      - .foundation-bundle.part00
+      - .foundation-bundle.part01
+      - .foundation-bundle.part02
+      - .foundation-bundle.part03
+      - .github/workflows/apply-foundation.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-final-foundation
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out the publication branch
+        uses: actions/checkout@v6.0.2
+        with:
+          ref: agent/finalize-development-foundation
+          fetch-depth: 0
+
+      - name: Verify, unpack, and validate the final foundation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .foundation-bundle.part00 \
+              .foundation-bundle.part01 \
+              .foundation-bundle.part02 \
+              .foundation-bundle.part03 \
+            | base64 --decode > /tmp/fdir-foundation.tar.gz
+          echo '153f333c99e87dc81c45897125df61d7a3a65c2124013f6bdd7a9b6e2a311a17  /tmp/fdir-foundation.tar.gz' \
+            | sha256sum --check --strict
+          tar -xzf /tmp/fdir-foundation.tar.gz
+          rm -f \
+            .foundation-bundle.part00 \
+            .foundation-bundle.part01 \
+            .foundation-bundle.part02 \
+            .foundation-bundle.part03 \
+            .github/workflows/apply-foundation.yml
+          python3 tools/validate_implementation_policy.py --check --self-test --json .
+          python3 -m unittest tests/test_implementation_policy.py -v
+          python3 tools/generate_traceability.py --check .
+
+      - name: Commit the validated foundation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add --all
+          git diff --cached --check
+          git commit -m 'Finalize issue-driven development foundation (#32)'
+          git push origin HEAD:agent/finalize-development-foundation
