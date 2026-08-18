@@ -28,6 +28,16 @@ Every non-trivial change starts from an issue. The issue must identify:
 
 New normative requirements, unowned responsibilities, qualification gaps, and release blockers must be represented by issues and linked into roadmap #4 before final release work proceeds.
 
+### Dependency and external-worker proposals
+
+Use `.github/ISSUE_TEMPLATE/dependency.yml` for any parser, renderer, OCR engine, evaluator, codec, model, resource, native library, Python package, or Rust crate that may enter the product boundary. The proposal must link its implementation owner and Issue #33, name an exact version/build/features, declare evidence lanes, list every normalization and unavailable source distinction, record unsafe/FFI/native and untrusted-byte facts, select a process boundary, and define license/advisory, determinism, network, and resource evidence.
+
+High-level parser output, rendered pixels, OCR tokens, or inference candidates may not be offered as the sole native evidence or independent census. Admission to `machine/dependency-catalog.yaml` is not a production capability claim. Policy-affecting contributions must run:
+
+```bash
+python3 tools/validate_implementation_policy.py --check --self-test --json .
+```
+
 ### Actionable issue lifecycle
 
 1. **Propose or select the owning issue.** Use the appropriate issue form, link its parent and related work, and define goal, bounded scope, owned paths, dependencies, acceptance criteria, planned evidence, claim impact, and explicit exclusions.
@@ -79,7 +89,7 @@ For a bounded edit loop, `--mode fast` is permitted, but it does not replace the
 
 Record the exact command, Python version, mode, cache policy, result, and receipt path in the issue or pull request. A check that did not run, discovered no tests, used a stale cache, or returned skipped/neutral/cancelled is not a pass. Full receipts are written under `reports/quality/` and archived by CI.
 
-For generated contracts, validation includes byte-for-byte regeneration parity and schema-contract checks. For implementation changes, formatting, linting, all discovered unit/integration tests, relevant positive and negative cases, requirement/test traceability, documentation links, and claim discipline are mandatory.
+For generated contracts, validation includes byte-for-byte regeneration parity and schema-contract checks. For implementation changes, formatting, linting, all discovered unit/integration tests, relevant positive and negative cases, requirement/test traceability, documentation links, implementation/dependency policy conformance, and claim discipline are mandatory.
 
 Use the intentional-failure suite when changing a quality gate or its policy:
 
@@ -96,6 +106,7 @@ A pull request must include:
 - the owning issue;
 - what changed and why;
 - authority and production-claim impact;
+- implementation boundary, dependency manifest, evidence-lane, normalization, and process-isolation impact;
 - changed/owned paths;
 - exact validation commands and results;
 - incomplete, unsupported, intentionally deferred, or follow-up work;

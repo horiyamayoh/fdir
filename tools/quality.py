@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Iterable, Sequence
 
-QUALITY_VERSION = "1.0.0"
+QUALITY_VERSION = "1.1.0"
 RECEIPT_SCHEMA = "fdir/repository-quality-receipt/1"
 FAILURE_RECEIPT_SCHEMA = "fdir/quality-failure-demonstration/1"
 CACHE_SCHEMA = "fdir/repository-quality-cache/1"
@@ -691,6 +691,21 @@ def gate_release_traceability(root: Path) -> GateResult:
     )
 
 
+def gate_implementation_policy(root: Path) -> GateResult:
+    return command_gate(
+        "implementation-policy",
+        root,
+        [
+            sys.executable,
+            "tools/validate_implementation_policy.py",
+            "--check",
+            "--self-test",
+            "--json",
+            ".",
+        ],
+    )
+
+
 def gate_fixture_registry(root: Path) -> GateResult:
     gate_id = "positive-negative-fixtures"
     failures: list[str] = []
@@ -987,6 +1002,7 @@ def gate_repository_policy(root: Path) -> GateResult:
     required_tokens = {
         "quality/README.md": (
             "python3 tools/quality.py --mode full --cache-policy off .",
+            "python3 tools/validate_implementation_policy.py --check --self-test --json .",
             "`quality / full`",
             "read-write",
             "read-only",
@@ -995,17 +1011,32 @@ def gate_repository_policy(root: Path) -> GateResult:
         ),
         "README.md": (
             "python3 tools/quality.py --mode full --cache-policy off .",
+            "python3 tools/validate_implementation_policy.py --check --self-test --json .",
+            "release/development-handoff.md",
             "quality/README.md",
         ),
         "DEVELOPMENT.md": (
             "python3 tools/quality.py --mode full --cache-policy off .",
+            "python3 tools/validate_implementation_policy.py --check --self-test --json .",
+            "machine/dependency-catalog.yaml",
             "`quality / full`",
         ),
         "CONTRIBUTING.md": (
             "python3 tools/quality.py --mode full --cache-policy off .",
+            "python3 tools/validate_implementation_policy.py --check --self-test --json .",
+            ".github/ISSUE_TEMPLATE/dependency.yml",
             "`quality / full`",
         ),
-        ".github/pull_request_template.md": ("`quality / full`",),
+        ".github/pull_request_template.md": (
+            "`quality / full`",
+            "validate_implementation_policy.py",
+        ),
+        "release/development-handoff.md": (
+            "Issue #7",
+            "Definition of Done",
+            "python3 tools/quality.py --mode full --cache-policy off .",
+            "python3 tools/validate_implementation_policy.py --check --self-test --json .",
+        ),
     }
     failures: list[str] = []
     hashes: dict[str, str] = {}
@@ -1031,6 +1062,7 @@ def gate_plan(mode: str) -> list[str]:
         "text-format",
         "python-lint",
         "documentation-links",
+        "implementation-policy",
         "generated-contract-parity",
         "schema-contracts",
         "positive-negative-fixtures",
@@ -1193,6 +1225,7 @@ def run_gates(root: Path, mode: str) -> list[GateResult]:
         "text-format": gate_text_format,
         "python-lint": gate_python_lint,
         "documentation-links": gate_docs_links,
+        "implementation-policy": gate_implementation_policy,
         "generated-contract-parity": gate_generated_contracts,
         "schema-contracts": gate_schema_contracts,
         "positive-negative-fixtures": gate_fixture_registry,
@@ -1455,6 +1488,27 @@ def run_failure_demonstrations(root: Path, receipt_path: Path) -> tuple[int, dic
         ),
         gate_docs_links,
         "missing-self-test.md",
+    )
+
+    def unsafe_unisolated_dependency(candidate: Path) -> None:
+        validator = import_tool(
+            candidate / "tools/validate_implementation_policy.py",
+            "fdir_quality_implementation_policy",
+        )
+        path = candidate / "machine/dependency-catalog.yaml"
+        catalog = load_json(path)
+        dependency = validator.valid_test_manifest()
+        dependency["unsafeCode"] = True
+        dependency["processBoundary"] = "in-process"
+        catalog["state"] = "admitted-dependencies"
+        catalog["dependencies"] = [dependency]
+        write_json(path, catalog)
+
+    demonstrate(
+        "unsafe-unisolated-dependency",
+        unsafe_unisolated_dependency,
+        gate_implementation_policy,
+        "must be isolated",
     )
 
     def failing_test(candidate: Path) -> None:

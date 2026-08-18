@@ -18,7 +18,7 @@ The command writes a deterministic JSON receipt and returns a nonzero status whe
 
 | Mode | Purpose | Included authority | Release meaning |
 |---|---|---|---|
-| `fast` | Bounded developer feedback | Toolchain, text format, Python lint, documentation links, generated-contract parity, schema contracts, positive/negative fixtures, requirement traceability, baseline validation, and claim discipline | Never certifies a release |
+| `fast` | Bounded developer feedback | Toolchain, text format, Python lint, documentation links, implementation/dependency policy, generated-contract parity, schema contracts, positive/negative fixtures, requirement traceability, baseline validation, and claim discipline | Never certifies a release |
 | `full` | Required integration evidence | Every `fast` gate plus generated traceability, release-scope traceability, all discovered Python tests, CI policy, and repository policy | Produces durable integration evidence, not a production claim |
 | `release` | Future release-candidate evidence | Every `full` gate plus fail-closed release qualification | Passes only after every declared release tuple is explicitly qualified and production-ready |
 
@@ -57,7 +57,7 @@ A caller may select another receipt path with `--receipt`. An absolute path outs
 
 Every pull request and protected integration into `main` must pass the exact GitHub Actions check `quality / full` from [`.github/workflows/baseline.yml`](../.github/workflows/baseline.yml). Repository branch protection or rulesets should require that exact check name and should not permit skipped, neutral, or cancelled runs to count as success.
 
-The `quality / full` job performs, in order:
+The `quality / full` job performs, in order. Its full run includes the focused policy command `python3 tools/validate_implementation_policy.py --check --self-test --json .` as an authoritative gate:
 
 1. a clean `full` run with cache policy `off`;
 2. the intentional failure demonstration suite;
@@ -75,6 +75,6 @@ Run every major negative demonstration with:
 python3 tools/quality.py --self-test-gates .
 ```
 
-The suite makes isolated repository copies and proves rejection of generated-contract drift, invalid schema SQL, invalid positive examples, unregistered negative fixtures, orphan requirements, formatting and lint defects, broken documentation links, failing and empty test suites, false production claims, stale read-only caches, unpinned CI actions, missing required-check policy, and an unqualified release. The source tree is not mutated.
+The suite makes isolated repository copies and proves rejection of generated-contract drift, invalid schema SQL, invalid positive examples, unregistered negative fixtures, orphan requirements, formatting and lint defects, broken documentation links, unsafe unisolated dependency admission, failing and empty test suites, false production claims, stale read-only caches, unpinned CI actions, missing required-check policy, and an unqualified release. The source tree is not mutated.
 
 See [DEVELOPMENT.md](../DEVELOPMENT.md) for authority and build rules and [CONTRIBUTING.md](../CONTRIBUTING.md) for pull-request evidence requirements.

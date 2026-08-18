@@ -13,6 +13,7 @@ Roadmap milestone: <!-- required for product work -->
 - [ ] Changes canonical machine/normative source
 - [ ] Changes generated normative contracts
 - [ ] Changes capability/claim/qualification evidence
+- [ ] Changes implementation boundary, dependency manifest/catalog, evidence lanes, normalization, or process isolation
 
 Explain the selected impact, including model/protocol/migration compatibility:
 
@@ -31,6 +32,7 @@ Commands and results:
 - [ ] Local `python3 tools/quality.py --mode full --cache-policy off .` completed, or an unavailable check is explicitly recorded
 - [ ] Required GitHub Actions check `quality / full` passed for this head revision
 - [ ] Generated-contract parity checked when applicable
+- [ ] `python3 tools/validate_implementation_policy.py --check --self-test --json .` passed when policy, dependencies, workers, or handoff are affected
 - [ ] Positive behavior checked
 - [ ] Negative/non-success behavior checked
 - [ ] Documentation/examples checked when applicable
@@ -39,6 +41,8 @@ Commands and results:
 ## Status and claim discipline
 
 - [ ] Partial, unsupported, unresolved, indeterminate, unreadable, policy-blocked, resource-limited, cancelled, and failed states remain visible
+- [ ] Native substrate/census, semantic helper, renderer, OCR/inference, and storage/codec lanes remain distinct
+- [ ] High-level helper output is not used as the sole native evidence or independent census
 - [ ] No placeholder, skipped test, empty discovery, or demo result is presented as production qualification
 - [ ] Production claims, if affected, name the exact format/capability/profile tuple and qualification evidence
 
