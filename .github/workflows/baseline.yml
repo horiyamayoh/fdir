@@ -1,45 +1,38 @@
-name: Issue 6 validated workspace import
+name: Issue 6 source export
 
 on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  import:
+  export:
     if: github.head_ref == 'agent/issue-6-quality-gates'
+    name: export validated workspace
     runs-on: ubuntu-latest
     steps:
       - name: Check out Issue 6 branch
         uses: actions/checkout@v6.0.2
         with:
-          ref: agent/issue-6-quality-gates
-      - name: Apply validated core quality archive
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Create source archive
         shell: bash
         run: |
           set -euo pipefail
-          cat .issue6-import/chunk-* | base64 --decode > /tmp/issue6-changes.tar.gz
-          expected="$(cat .issue6-import/archive.sha256)"
-          actual="$(sha256sum /tmp/issue6-changes.tar.gz | cut -d' ' -f1)"
-          echo "expected=${expected}"
-          echo "actual=${actual}"
-          test "${actual}" = "${expected}"
-
-          set +e
-          gzip -dc /tmp/issue6-changes.tar.gz > /tmp/issue6-changes.tar
-          gzip_status=$?
-          set -e
-          if [[ "${gzip_status}" -ne 0 ]]; then
-            echo "::warning::gzip footer is damaged; validating the recovered tar before use"
-          fi
-          tar -tf /tmp/issue6-changes.tar
-
-          message="$(cat .issue6-import/COMMIT_MESSAGE)"
-          tar -xf /tmp/issue6-changes.tar -C .
-          rm -rf .issue6-import .issue6-export
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add -A
-          git commit -m "${message}"
-          git push origin HEAD:agent/issue-6-quality-gates
+          tar \
+            --exclude=.git \
+            --exclude=.issue6-export \
+            --exclude=.issue6-import \
+            --exclude=.validation \
+            --exclude=reports \
+            -czf /tmp/fdir-source.tar.gz .
+          sha256sum /tmp/fdir-source.tar.gz
+      - name: Upload source archive
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: issue-6-source
+          path: /tmp/fdir-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
