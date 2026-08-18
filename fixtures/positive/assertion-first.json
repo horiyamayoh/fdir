@@ -1,0 +1,132 @@
+{
+  "acceptedProjections": [
+    {
+      "assertionIds": [
+        "assertion-kind",
+        "assertion-text"
+      ],
+      "projectionId": "projection-1",
+      "unitId": "unit-1",
+      "value": {
+        "text": "Hello",
+        "unitKind": "paragraph"
+      }
+    }
+  ],
+  "accountingItems": [
+    {
+      "accountingItemId": "accounting-1",
+      "diagnosticIds": [],
+      "disposition": "represented",
+      "inventoryDomainId": "inventory-blocks",
+      "sourceKey": "block:1",
+      "unitIds": [
+        "unit-1"
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "artifactId": "artifact-source",
+      "byteLength": 12,
+      "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "mediaType": "text/markdown",
+      "role": "source"
+    }
+  ],
+  "assertions": [
+    {
+      "assertionId": "assertion-kind",
+      "confidence": 1,
+      "occurrenceIds": [
+        "occurrence-1"
+      ],
+      "predicate": "unitKind",
+      "status": "accepted",
+      "unitId": "unit-1",
+      "value": "paragraph"
+    },
+    {
+      "assertionId": "assertion-text",
+      "confidence": 1,
+      "occurrenceIds": [
+        "occurrence-1"
+      ],
+      "predicate": "text",
+      "status": "accepted",
+      "unitId": "unit-1",
+      "value": "Hello"
+    }
+  ],
+  "carriers": [
+    {
+      "artifactId": "artifact-source",
+      "carrierId": "carrier-body",
+      "carrierType": "markdown-source",
+      "path": "/"
+    }
+  ],
+  "censusReceipts": [
+    {
+      "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "inventoryDomainId": "inventory-blocks",
+      "observedCount": 1,
+      "receiptId": "receipt-1"
+    }
+  ],
+  "claims": {
+    "productionReady": false,
+    "qualified": false
+  },
+  "diagnostics": [],
+  "equivalenceCertificates": [],
+  "fdirVersion": "2.1.0",
+  "geometries": [],
+  "guaranteeStatuses": [
+    {
+      "diagnosticIds": [],
+      "guaranteeStatusId": "guarantee-core",
+      "profileId": "recorded-information-core",
+      "state": "complete"
+    }
+  ],
+  "interpretationContexts": [],
+  "inventoryDomains": [
+    {
+      "carrierId": "carrier-body",
+      "domainType": "markdown-block",
+      "expectedCount": 1,
+      "inventoryDomainId": "inventory-blocks"
+    }
+  ],
+  "lineageCertificates": [],
+  "observations": [],
+  "occurrences": [
+    {
+      "carrierId": "carrier-body",
+      "geometryIds": [],
+      "occurrenceId": "occurrence-1",
+      "selectorIds": [
+        "selector-line-1"
+      ]
+    }
+  ],
+  "relations": [],
+  "selectors": [
+    {
+      "selectorId": "selector-line-1",
+      "selectorType": "text-position",
+      "value": {
+        "end": 5,
+        "start": 0
+      }
+    }
+  ],
+  "snapshotId": "snap-minimal",
+  "surfaces": [],
+  "units": [
+    {
+      "unitId": "unit-1"
+    }
+  ]
+}

@@ -1,0 +1,823 @@
+{
+  "$defs": {
+    "AcceptedProjection": {
+      "additionalProperties": false,
+      "description": "A convenience view derived only from accepted assertions; never a substitute for assertions.",
+      "properties": {
+        "assertionIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "projectionId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "unitId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "value": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "projectionId",
+        "unitId",
+        "assertionIds"
+      ],
+      "type": "object"
+    },
+    "AccountingItem": {
+      "additionalProperties": false,
+      "description": "Exactly one disposition for one independently inventoried source item.",
+      "properties": {
+        "accountingItemId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "diagnosticIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "disposition": {
+          "enum": [
+            "represented",
+            "residual",
+            "unsupported",
+            "unreadable",
+            "policy-excluded",
+            "duplicate"
+          ]
+        },
+        "inventoryDomainId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "sourceKey": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "unitIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "accountingItemId",
+        "inventoryDomainId",
+        "sourceKey",
+        "disposition"
+      ],
+      "type": "object"
+    },
+    "Artifact": {
+      "additionalProperties": false,
+      "description": "A source or derived byte sequence with a content digest.",
+      "properties": {
+        "artifactId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "byteLength": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "digest": {
+          "minLength": 1,
+          "pattern": "^[a-z0-9-]+:[0-9a-f]+$",
+          "type": "string"
+        },
+        "mediaType": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "role": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifactId",
+        "mediaType",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "Carrier": {
+      "additionalProperties": false,
+      "description": "A format-specific physical or logical carrier within an artifact.",
+      "properties": {
+        "artifactId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "carrierId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "carrierType": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "carrierId",
+        "artifactId",
+        "carrierType"
+      ],
+      "type": "object"
+    },
+    "Diagnostic": {
+      "additionalProperties": false,
+      "description": "A visible limitation, unsupported condition, conflict, or failure.",
+      "properties": {
+        "code": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "diagnosticId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "message": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "relatedIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning",
+            "error",
+            "fatal"
+          ]
+        }
+      },
+      "required": [
+        "diagnosticId",
+        "code",
+        "severity",
+        "message"
+      ],
+      "type": "object"
+    },
+    "EquivalenceCertificate": {
+      "additionalProperties": false,
+      "description": "A profile-scoped, evidence-backed equivalence decision.",
+      "properties": {
+        "certificateId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "coverageStatusIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "evidenceDigest": {
+          "minLength": 1,
+          "pattern": "^[a-z0-9-]+:[0-9a-f]+$",
+          "type": "string"
+        },
+        "leftSnapshotId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "outcome": {
+          "enum": [
+            "equivalent",
+            "not-equivalent",
+            "indeterminate"
+          ]
+        },
+        "profileId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "rightSnapshotId": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "certificateId",
+        "leftSnapshotId",
+        "rightSnapshotId",
+        "profileId",
+        "outcome",
+        "coverageStatusIds"
+      ],
+      "type": "object"
+    },
+    "Geometry": {
+      "additionalProperties": false,
+      "description": "Geometry recorded in a named coordinate space without implying semantic truth.",
+      "properties": {
+        "bounds": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        },
+        "coordinateSpace": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "geometryId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "surfaceId": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "geometryId",
+        "surfaceId",
+        "coordinateSpace",
+        "bounds"
+      ],
+      "type": "object"
+    },
+    "GuaranteeStatus": {
+      "additionalProperties": false,
+      "description": "A status vector for one guarantee profile and bounded scope.",
+      "properties": {
+        "diagnosticIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "guaranteeStatusId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "profileId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "complete",
+            "partial",
+            "unsupported",
+            "unresolved",
+            "cancelled",
+            "failed"
+          ]
+        }
+      },
+      "required": [
+        "guaranteeStatusId",
+        "profileId",
+        "state"
+      ],
+      "type": "object"
+    },
+    "IndependentCensusReceipt": {
+      "additionalProperties": false,
+      "description": "An independently produced census result used to close accounting domains.",
+      "properties": {
+        "digest": {
+          "minLength": 1,
+          "pattern": "^[a-z0-9-]+:[0-9a-f]+$",
+          "type": "string"
+        },
+        "inventoryDomainId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "observedCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "receiptId": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "receiptId",
+        "inventoryDomainId",
+        "observedCount",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "InformationRelation": {
+      "additionalProperties": false,
+      "description": "A typed relation between information units, expressed as an assertion-like statement.",
+      "properties": {
+        "occurrenceIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "relationId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "relationKind": {
+          "enum": [
+            "contains",
+            "precedes",
+            "references",
+            "annotates",
+            "groups",
+            "derived-from",
+            "continues"
+          ]
+        },
+        "sourceUnitId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "accepted",
+            "candidate",
+            "rejected",
+            "superseded",
+            "unresolved"
+          ]
+        },
+        "targetUnitId": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "relationId",
+        "sourceUnitId",
+        "targetUnitId",
+        "relationKind",
+        "status"
+      ],
+      "type": "object"
+    },
+    "InformationUnit": {
+      "additionalProperties": false,
+      "description": "An identity and construction anchor; substantive content is asserted separately.",
+      "properties": {
+        "unitId": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "unitId"
+      ],
+      "type": "object"
+    },
+    "InterpretationContext": {
+      "additionalProperties": false,
+      "description": "A declared context for conditional visibility or interpretation.",
+      "properties": {
+        "contextId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "parameters": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "contextId",
+        "parameters"
+      ],
+      "type": "object"
+    },
+    "InventoryDomain": {
+      "additionalProperties": false,
+      "description": "A bounded census domain for exhaustive source accounting.",
+      "properties": {
+        "carrierId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "domainType": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "expectedCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "inventoryDomainId": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "inventoryDomainId",
+        "carrierId",
+        "domainType"
+      ],
+      "type": "object"
+    },
+    "LineageCertificate": {
+      "additionalProperties": false,
+      "description": "A cross-revision continuity claim that is distinct from identity and equivalence.",
+      "properties": {
+        "evidenceDigest": {
+          "minLength": 1,
+          "pattern": "^[a-z0-9-]+:[0-9a-f]+$",
+          "type": "string"
+        },
+        "lineageCertificateId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "predecessorUnitIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "status": {
+          "enum": [
+            "accepted",
+            "candidate",
+            "rejected",
+            "superseded",
+            "unresolved"
+          ]
+        },
+        "successorUnitIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "lineageCertificateId",
+        "predecessorUnitIds",
+        "successorUnitIds",
+        "status"
+      ],
+      "type": "object"
+    },
+    "Observation": {
+      "additionalProperties": false,
+      "description": "A measured or inferred observation with method and confidence retained.",
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "method": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "observationId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "occurrenceId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "value": {}
+      },
+      "required": [
+        "observationId",
+        "occurrenceId",
+        "method",
+        "value"
+      ],
+      "type": "object"
+    },
+    "Occurrence": {
+      "additionalProperties": false,
+      "description": "A located occurrence that links recorded claims to source evidence.",
+      "properties": {
+        "carrierId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "geometryIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "occurrenceId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "selectorIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "occurrenceId",
+        "carrierId",
+        "selectorIds"
+      ],
+      "type": "object"
+    },
+    "RecordAssertion": {
+      "additionalProperties": false,
+      "description": "The authoritative statement of unit class, facets, value, visibility, lineage, or limitation.",
+      "properties": {
+        "assertionId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "contextId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "occurrenceIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "predicate": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "accepted",
+            "candidate",
+            "rejected",
+            "superseded",
+            "unresolved"
+          ]
+        },
+        "unitId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "value": {}
+      },
+      "required": [
+        "assertionId",
+        "unitId",
+        "predicate",
+        "value",
+        "status",
+        "occurrenceIds"
+      ],
+      "type": "object"
+    },
+    "Selector": {
+      "additionalProperties": false,
+      "description": "A format-specific locator into a carrier or artifact.",
+      "properties": {
+        "selectorId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "selectorType": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "value": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "selectorId",
+        "selectorType",
+        "value"
+      ],
+      "type": "object"
+    },
+    "Snapshot": {
+      "additionalProperties": false,
+      "description": "A canonical FDIR snapshot containing recorded information and its evidence substrate.",
+      "properties": {
+        "acceptedProjections": {
+          "items": {
+            "$ref": "#/$defs/AcceptedProjection"
+          },
+          "type": "array"
+        },
+        "accountingItems": {
+          "items": {
+            "$ref": "#/$defs/AccountingItem"
+          },
+          "type": "array"
+        },
+        "artifacts": {
+          "items": {
+            "$ref": "#/$defs/Artifact"
+          },
+          "type": "array"
+        },
+        "assertions": {
+          "items": {
+            "$ref": "#/$defs/RecordAssertion"
+          },
+          "type": "array"
+        },
+        "carriers": {
+          "items": {
+            "$ref": "#/$defs/Carrier"
+          },
+          "type": "array"
+        },
+        "censusReceipts": {
+          "items": {
+            "$ref": "#/$defs/IndependentCensusReceipt"
+          },
+          "type": "array"
+        },
+        "claims": {
+          "type": "object"
+        },
+        "diagnostics": {
+          "items": {
+            "$ref": "#/$defs/Diagnostic"
+          },
+          "type": "array"
+        },
+        "equivalenceCertificates": {
+          "items": {
+            "$ref": "#/$defs/EquivalenceCertificate"
+          },
+          "type": "array"
+        },
+        "fdirVersion": {
+          "const": "2.1.0"
+        },
+        "geometries": {
+          "items": {
+            "$ref": "#/$defs/Geometry"
+          },
+          "type": "array"
+        },
+        "guaranteeStatuses": {
+          "items": {
+            "$ref": "#/$defs/GuaranteeStatus"
+          },
+          "type": "array"
+        },
+        "interpretationContexts": {
+          "items": {
+            "$ref": "#/$defs/InterpretationContext"
+          },
+          "type": "array"
+        },
+        "inventoryDomains": {
+          "items": {
+            "$ref": "#/$defs/InventoryDomain"
+          },
+          "type": "array"
+        },
+        "lineageCertificates": {
+          "items": {
+            "$ref": "#/$defs/LineageCertificate"
+          },
+          "type": "array"
+        },
+        "observations": {
+          "items": {
+            "$ref": "#/$defs/Observation"
+          },
+          "type": "array"
+        },
+        "occurrences": {
+          "items": {
+            "$ref": "#/$defs/Occurrence"
+          },
+          "type": "array"
+        },
+        "relations": {
+          "items": {
+            "$ref": "#/$defs/InformationRelation"
+          },
+          "type": "array"
+        },
+        "selectors": {
+          "items": {
+            "$ref": "#/$defs/Selector"
+          },
+          "type": "array"
+        },
+        "snapshotId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "surfaces": {
+          "items": {
+            "$ref": "#/$defs/Surface"
+          },
+          "type": "array"
+        },
+        "units": {
+          "items": {
+            "$ref": "#/$defs/InformationUnit"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "fdirVersion",
+        "snapshotId",
+        "artifacts",
+        "carriers",
+        "selectors",
+        "occurrences",
+        "units",
+        "assertions",
+        "relations",
+        "inventoryDomains",
+        "accountingItems",
+        "guaranteeStatuses",
+        "diagnostics"
+      ],
+      "type": "object"
+    },
+    "Surface": {
+      "additionalProperties": false,
+      "description": "A page, sheet, slide, viewport, or other addressable presentation surface.",
+      "properties": {
+        "carrierId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "label": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "surfaceId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "surfaceType": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "surfaceId",
+        "carrierId",
+        "surfaceType"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://fdir.dev/schema/2.1/fdir.schema.json",
+  "$ref": "#/$defs/Snapshot",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FDIR 2.1 Snapshot"
+}

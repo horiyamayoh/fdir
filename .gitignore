@@ -1,0 +1,24 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.DS_Store
+
+# Generated review projections and rebuildable indexes are not canonical.
+dist/
+reports/
+indexes/
+*.pdf
+*.docx
+*.png
+*.svg
+
+# Binary qualification packages are distributed under separate manifests.
+qualification/**/*.bin
+qualification/**/*.zip
+qualification/**/*.tar
+qualification/**/*.tar.gz
+
+# Local validation scratch.
+.tmp/
+.validation/

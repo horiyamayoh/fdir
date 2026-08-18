@@ -1,0 +1,24 @@
+name: FDIR baseline
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - agent/issue-2-fdir-2.1-baseline
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate FDIR 2.1 normative baseline
+        run: python3 tools/validate_baseline.py .
