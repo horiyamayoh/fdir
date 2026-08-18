@@ -1,0 +1,178 @@
+; Generated from machine/logical-model.yaml. Do not edit.
+fdir-snapshot = snapshot
+
+accountingdisposition = "represented" / "residual" / "unsupported" / "unreadable" / "policy-excluded" / "duplicate"
+assertionstatus = "accepted" / "candidate" / "rejected" / "superseded" / "unresolved"
+completenessstate = "complete" / "partial" / "unsupported" / "unresolved" / "cancelled" / "failed"
+diagnosticseverity = "info" / "warning" / "error" / "fatal"
+equivalenceoutcome = "equivalent" / "not-equivalent" / "indeterminate"
+relationkind = "contains" / "precedes" / "references" / "annotates" / "groups" / "derived-from" / "continues"
+unitkind = "document" / "section" / "paragraph" / "span" / "list" / "list-item" / "table" / "row" / "cell" / "figure" / "formula" / "field" / "note" / "comment" / "custom"
+visibility = "visible" / "hidden" / "conditional" / "unknown"
+
+artifact = {
+  artifactId: tstr,
+  ? byteLength: int,
+  digest: tstr,
+  mediaType: tstr,
+  ? role: tstr,
+}
+
+carrier = {
+  artifactId: tstr,
+  carrierId: tstr,
+  carrierType: tstr,
+  ? path: tstr,
+}
+
+surface = {
+  carrierId: tstr,
+  ? label: tstr,
+  surfaceId: tstr,
+  surfaceType: tstr,
+}
+
+geometry = {
+  bounds: [ 4*4 (float / int) ],
+  coordinateSpace: tstr,
+  geometryId: tstr,
+  surfaceId: tstr,
+}
+
+selector = {
+  selectorId: tstr,
+  selectorType: tstr,
+  value: { * tstr => any },
+}
+
+occurrence = {
+  carrierId: tstr,
+  ? geometryIds: [ * tstr ],
+  occurrenceId: tstr,
+  selectorIds: [ * tstr ],
+}
+
+observation = {
+  ? confidence: float / int,
+  method: tstr,
+  observationId: tstr,
+  occurrenceId: tstr,
+  value: any,
+}
+
+inventorydomain = {
+  carrierId: tstr,
+  domainType: tstr,
+  ? expectedCount: int,
+  inventoryDomainId: tstr,
+}
+
+accountingitem = {
+  accountingItemId: tstr,
+  ? diagnosticIds: [ * tstr ],
+  disposition: accountingdisposition,
+  inventoryDomainId: tstr,
+  sourceKey: tstr,
+  ? unitIds: [ * tstr ],
+}
+
+independentcensusreceipt = {
+  digest: tstr,
+  inventoryDomainId: tstr,
+  observedCount: int,
+  receiptId: tstr,
+}
+
+informationunit = {
+  unitId: tstr,
+}
+
+recordassertion = {
+  assertionId: tstr,
+  ? confidence: float / int,
+  ? contextId: tstr,
+  occurrenceIds: [ * tstr ],
+  predicate: tstr,
+  status: assertionstatus,
+  unitId: tstr,
+  value: any,
+}
+
+informationrelation = {
+  ? occurrenceIds: [ * tstr ],
+  relationId: tstr,
+  relationKind: relationkind,
+  sourceUnitId: tstr,
+  status: assertionstatus,
+  targetUnitId: tstr,
+}
+
+acceptedprojection = {
+  assertionIds: [ * tstr ],
+  projectionId: tstr,
+  unitId: tstr,
+  ? value: { * tstr => any },
+}
+
+interpretationcontext = {
+  contextId: tstr,
+  parameters: { * tstr => any },
+}
+
+guaranteestatus = {
+  ? diagnosticIds: [ * tstr ],
+  guaranteeStatusId: tstr,
+  profileId: tstr,
+  state: completenessstate,
+}
+
+equivalencecertificate = {
+  certificateId: tstr,
+  coverageStatusIds: [ * tstr ],
+  ? evidenceDigest: tstr,
+  leftSnapshotId: tstr,
+  outcome: equivalenceoutcome,
+  profileId: tstr,
+  rightSnapshotId: tstr,
+}
+
+lineagecertificate = {
+  ? evidenceDigest: tstr,
+  lineageCertificateId: tstr,
+  predecessorUnitIds: [ * tstr ],
+  status: assertionstatus,
+  successorUnitIds: [ * tstr ],
+}
+
+diagnostic = {
+  code: tstr,
+  diagnosticId: tstr,
+  message: tstr,
+  ? relatedIds: [ * tstr ],
+  severity: diagnosticseverity,
+}
+
+snapshot = {
+  ? acceptedProjections: [ * acceptedprojection ],
+  accountingItems: [ * accountingitem ],
+  artifacts: [ * artifact ],
+  assertions: [ * recordassertion ],
+  carriers: [ * carrier ],
+  ? censusReceipts: [ * independentcensusreceipt ],
+  ? claims: { * tstr => any },
+  diagnostics: [ * diagnostic ],
+  ? equivalenceCertificates: [ * equivalencecertificate ],
+  fdirVersion: "2.1.0",
+  ? geometries: [ * geometry ],
+  guaranteeStatuses: [ * guaranteestatus ],
+  ? interpretationContexts: [ * interpretationcontext ],
+  inventoryDomains: [ * inventorydomain ],
+  ? lineageCertificates: [ * lineagecertificate ],
+  ? observations: [ * observation ],
+  occurrences: [ * occurrence ],
+  relations: [ * informationrelation ],
+  selectors: [ * selector ],
+  snapshotId: tstr,
+  ? surfaces: [ * surface ],
+  units: [ * informationunit ],
+}
