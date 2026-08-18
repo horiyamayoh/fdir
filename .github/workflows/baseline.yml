@@ -19,9 +19,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat .issue6-import/part-* > /tmp/issue6-changes.tar.gz
+          cat .issue6-import/chunk-* | base64 --decode > /tmp/issue6-changes.tar.gz
           expected="$(cat .issue6-import/archive.sha256)"
           actual="$(sha256sum /tmp/issue6-changes.tar.gz | cut -d' ' -f1)"
+          echo "expected=${expected}"
+          echo "actual=${actual}"
           test "${actual}" = "${expected}"
           message="$(cat .issue6-import/COMMIT_MESSAGE)"
           tar -xzf /tmp/issue6-changes.tar.gz -C .
