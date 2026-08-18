@@ -1,0 +1,72 @@
+name: Apply definitive development foundation
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+    paths:
+      - .foundation-final.patch.part00
+      - .foundation-final.patch.part01
+      - .foundation-final.patch.part02
+      - .github/workflows/apply-final-foundation.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-definitive-development-foundation
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out the foundation branch
+        uses: actions/checkout@v6.0.2
+        with:
+          ref: agent/finalize-development-foundation
+          fetch-depth: 0
+
+      - name: Verify and apply the definitive foundation patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat \
+            .foundation-final.patch.part00 \
+            .foundation-final.patch.part01 \
+            .foundation-final.patch.part02 \
+            | base64 --decode > /tmp/fdir-final.patch.xz
+          echo '3ab7cf4576e004aca4933f54b7618cc668f1b61caaf91176dcb17ee49996e9d3  /tmp/fdir-final.patch.xz' \
+            | sha256sum --check --strict
+          xz --decompress --stdout /tmp/fdir-final.patch.xz > /tmp/fdir-final.patch
+          echo 'b608f5e029e238c108a175b385c6d1dfedd5fe1d3e04f324d2696fcf72ac7829  /tmp/fdir-final.patch' \
+            | sha256sum --check --strict
+          git apply --check --binary /tmp/fdir-final.patch
+          git apply --index --binary /tmp/fdir-final.patch
+          rm -f \
+            .foundation-final.patch.part00 \
+            .foundation-final.patch.part01 \
+            .foundation-final.patch.part02 \
+            .github/workflows/apply-final-foundation.yml
+          python3 tools/validate_implementation_policy.py --check --self-test --json .
+          python3 tools/validate_release_traceability.py --check --self-test --json .
+          python3 tools/quality.py --mode full --cache-policy off .
+          python3 tools/quality.py --self-test-gates .
+
+      - name: Commit the validated foundation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add --all
+          git diff --cached --check
+          git commit -m 'Finalize issue-driven development foundation (#32)'
+          git push origin HEAD:agent/finalize-development-foundation
