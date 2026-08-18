@@ -1,0 +1,146 @@
+{
+  "tests": [
+    {
+      "command": "python3 tools/generate_contracts.py --check .",
+      "id": "AT-AUTH-PARITY",
+      "kind": "generator-parity",
+      "requirements": [
+        "FDIR-AUTH-001",
+        "FDIR-AUTH-002"
+      ]
+    },
+    {
+      "command": "python3 tools/validate_baseline.py .",
+      "id": "AT-PROJECTION-BOUNDARY",
+      "kind": "metadata",
+      "requirements": [
+        "FDIR-AUTH-003",
+        "FDIR-PKG-001"
+      ]
+    },
+    {
+      "fixture": "fixtures/positive/assertion-first.json",
+      "id": "AT-ASSERTION-FIRST",
+      "kind": "positive-fixture",
+      "requirements": [
+        "FDIR-MODEL-001",
+        "FDIR-MODEL-002",
+        "FDIR-MODEL-003"
+      ]
+    },
+    {
+      "fixture": "fixtures/positive/accounted-document.json",
+      "id": "AT-EVIDENCE-LINKS",
+      "kind": "positive-fixture",
+      "requirements": [
+        "FDIR-EVID-001",
+        "FDIR-EVID-002",
+        "FDIR-EVID-003"
+      ]
+    },
+    {
+      "fixture": "fixtures/positive/accounted-document.json",
+      "id": "AT-ACCOUNTING-CLOSURE",
+      "kind": "positive-fixture",
+      "requirements": [
+        "FDIR-ACCT-001",
+        "FDIR-ACCT-002",
+        "FDIR-ACCT-003"
+      ]
+    },
+    {
+      "expectedCode": "ACCOUNTING_DUPLICATE_SOURCE_KEY",
+      "fixture": "fixtures/negative/duplicate-accounting-key.json",
+      "id": "AT-ACCOUNTING-DUPLICATE",
+      "kind": "negative-fixture",
+      "requirements": [
+        "FDIR-ACCT-001"
+      ]
+    },
+    {
+      "fixture": "fixtures/positive/unsupported-visible.json",
+      "id": "AT-VISIBLE-UNSUPPORTED",
+      "kind": "positive-fixture",
+      "requirements": [
+        "FDIR-ACCT-003",
+        "FDIR-COMP-002"
+      ]
+    },
+    {
+      "fixture": "fixtures/positive/accounted-document.json",
+      "id": "AT-COMPLETENESS-VECTOR",
+      "kind": "positive-fixture",
+      "requirements": [
+        "FDIR-COMP-001"
+      ]
+    },
+    {
+      "fixture": "fixtures/positive/equivalence-indeterminate.json",
+      "id": "AT-EQUIVALENCE-INDETERMINATE",
+      "kind": "positive-fixture",
+      "requirements": [
+        "FDIR-EQ-001",
+        "FDIR-EQ-002"
+      ]
+    },
+    {
+      "expectedCode": "EQUIVALENCE_INSUFFICIENT_COVERAGE",
+      "fixture": "fixtures/negative/equivalent-with-partial-coverage.json",
+      "id": "AT-EQUIVALENCE-REJECT",
+      "kind": "negative-fixture",
+      "requirements": [
+        "FDIR-EQ-002"
+      ]
+    },
+    {
+      "fixture": "fixtures/canonical/vector.json",
+      "id": "AT-CANONICAL-VECTOR",
+      "kind": "canonical-vector",
+      "requirements": [
+        "FDIR-ID-001"
+      ]
+    },
+    {
+      "command": "python3 tools/validate_baseline.py .",
+      "id": "AT-IDENTITY-SEPARATION",
+      "kind": "metadata",
+      "requirements": [
+        "FDIR-ID-002"
+      ]
+    },
+    {
+      "command": "python3 tools/validate_baseline.py .",
+      "id": "AT-VALIDATION-ENTRY",
+      "kind": "command",
+      "requirements": [
+        "FDIR-VAL-001"
+      ]
+    },
+    {
+      "command": "python3 tools/validate_baseline.py .",
+      "id": "AT-POSITIVE-NEGATIVE",
+      "kind": "fixture-suite",
+      "requirements": [
+        "FDIR-VAL-002"
+      ]
+    },
+    {
+      "command": "python3 tools/generate_traceability.py --check .",
+      "id": "AT-TRACEABILITY",
+      "kind": "traceability",
+      "requirements": [
+        "FDIR-VAL-003"
+      ]
+    },
+    {
+      "expectedCode": "FALSE_PRODUCTION_CLAIM",
+      "fixture": "fixtures/negative/false-production-claim.json",
+      "id": "AT-NO-PRODUCTION-CLAIM",
+      "kind": "negative-fixture",
+      "requirements": [
+        "FDIR-CLAIM-001"
+      ]
+    }
+  ],
+  "version": "2.1.0"
+}
