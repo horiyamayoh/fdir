@@ -24,7 +24,7 @@ jobs:
             exit 0
           fi
 
-          cat .issue6-import/chunk-* | base64 --decode > /tmp/issue6-changes.tar.gz
+          cat .issue6-import/part-* > /tmp/issue6-changes.tar.gz
           expected="$(cat .issue6-import/archive.sha256)"
           actual="$(sha256sum /tmp/issue6-changes.tar.gz | cut -d' ' -f1)"
           test "${actual}" = "${expected}"
