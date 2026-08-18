@@ -67,7 +67,22 @@ jobs:
                       raise SystemExit(f"unsafe archive member: {member.name}")
               handle.extractall("/tmp/fdir-baseline")
           PY
-          cp -a /tmp/fdir-baseline/. .
+
+          mapfile -t archive_roots < <(find /tmp/fdir-baseline -mindepth 1 -maxdepth 1 -print | sort)
+          if [[ "${#archive_roots[@]}" -eq 1 && -d "${archive_roots[0]}" ]]; then
+            import_root="${archive_roots[0]}"
+          else
+            import_root=/tmp/fdir-baseline
+          fi
+          echo "FDIR baseline import root: ${import_root}"
+          find "${import_root}" -mindepth 1 -maxdepth 2 -print | sort | sed -n '1,120p'
+          cp -a "${import_root}/." .
+
+          test -f baseline.yaml
+          test -f machine/logical-model.yaml
+          test -f tools/generate_contracts.py
+          test -f tools/generate_traceability.py
+          test -f tools/validate_baseline.py
 
           python3 tools/generate_contracts.py .
           python3 tools/generate_traceability.py .
