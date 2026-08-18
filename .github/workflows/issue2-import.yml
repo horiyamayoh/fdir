@@ -31,6 +31,9 @@ jobs:
       TARGET_BRANCH: agent/issue-2-normative-baseline
       SOURCE_BRANCH: agent/issue-2-fdir-2.1-baseline
       SOURCE_PAYLOAD_TREE: b7d611f0961fca5afc2a9725a794b58b7c3ed4e5
+      REPAIR_SPLIT_A_BLOB: b351c9a78514f524a0e5ee268207774070335a4a
+      REPAIR_SPLIT_B_BLOB: 9c706c9c8e2b7544101ac84e5dd6c8fdae7fed1a
+      REPAIR_SPLIT_C_BLOB: 558c78864a1645f51911e9df3a1ac13b8857cfe7
       BASELINE_ARCHIVE_SHA256: 66868d4f85d9bbd7304519d165d9c769c0cb836aa35bbaa7ec631f7dbcca3c8f
     steps:
       - name: Check out dedicated branch
@@ -52,10 +55,17 @@ jobs:
           git fetch --no-tags origin \
             "refs/heads/${SOURCE_BRANCH}:refs/remotes/origin/${SOURCE_BRANCH}"
           git cat-file -e "${SOURCE_PAYLOAD_TREE}^{tree}"
-          rm -rf /tmp/fdir-source-payload
-          mkdir -p /tmp/fdir-source-payload
+          rm -rf /tmp/fdir-source-payload /tmp/fdir-repair
+          mkdir -p /tmp/fdir-source-payload /tmp/fdir-repair
           git archive "${SOURCE_PAYLOAD_TREE}" \
             | tar -x -C /tmp/fdir-source-payload
+
+          git cat-file -e "${REPAIR_SPLIT_A_BLOB}^{blob}"
+          git cat-file -e "${REPAIR_SPLIT_B_BLOB}^{blob}"
+          git cat-file -e "${REPAIR_SPLIT_C_BLOB}^{blob}"
+          git cat-file blob "${REPAIR_SPLIT_A_BLOB}" > /tmp/fdir-repair/part-001-a
+          git cat-file blob "${REPAIR_SPLIT_B_BLOB}" > /tmp/fdir-repair/part-001-b
+          git cat-file blob "${REPAIR_SPLIT_C_BLOB}" > /tmp/fdir-repair/part-001-c
 
           python3 - <<'PY'
           import base64
@@ -72,15 +82,34 @@ jobs:
               names = ', '.join(part.name for part in parts)
               raise SystemExit(f'unexpected pinned payload layout: {names}')
 
+          raw_texts = []
           chunks = []
           for part in parts:
               text = part.read_text(encoding='ascii')
               compact = ''.join(text.split())
-              print(f'{part.name}: {len(text)} bytes, {len(compact)} base64 characters')
+              whitespace = [index for index, character in enumerate(text) if character.isspace()]
+              print(
+                  f'{part.name}: {len(text)} bytes, {len(compact)} base64 characters, '
+                  f'whitespace offsets={whitespace}'
+              )
+              raw_texts.append(text)
               chunks.append(compact)
 
+          split_parts = sorted(Path('/tmp/fdir-repair').glob('part-001-*'))
+          split_chunks = []
+          for part in split_parts:
+              compact = ''.join(part.read_text(encoding='ascii').split())
+              print(f'{part.name}: {len(compact)} verified repair characters')
+              split_chunks.append(compact)
+          verified_prefix = ''.join(split_chunks)
+          if len(verified_prefix) != 9000:
+              raise SystemExit(f'expected 9000 verified repair characters, found {len(verified_prefix)}')
+
           expected = os.environ['BASELINE_ARCHIVE_SHA256']
-          encoded = ''.join(chunks)
+          old_part = chunks[1]
+          encoded_prefix = chunks[0]
+          encoded_suffix = chunks[2] + chunks[3]
+          encoded = encoded_prefix + old_part + encoded_suffix
           print(f'Combined base64 characters: {len(encoded)} (mod 4 = {len(encoded) % 4})')
 
           def decode(candidate: str):
@@ -96,24 +125,69 @@ jobs:
               archive = direct[0]
               print('Pinned payload decoded without repair.')
           else:
-              insertion_offset = len(chunks[0]) + len(chunks[1])
-              if len(encoded) % 4 != 3 or len(chunks[1]) != 11999:
+              if len(old_part) != 11999 or len(encoded) % 4 != 3:
                   raise SystemExit('pinned payload is not in the recognized one-character truncation state')
 
-              matches = []
+              candidate_repairs = []
+              raw_part = raw_texts[1]
+              nonspace_before = 0
+              for character in raw_part:
+                  if character.isspace():
+                      if nonspace_before < len(verified_prefix):
+                          candidate_repairs.append(
+                              (nonspace_before, verified_prefix[nonspace_before], 'staging whitespace offset')
+                          )
+                  else:
+                      nonspace_before += 1
+
+              mismatch = next(
+                  (index for index, (old, verified) in enumerate(zip(old_part, verified_prefix)) if old != verified),
+                  None,
+              )
+              if mismatch is not None:
+                  if old_part[mismatch:len(verified_prefix) - 1] == verified_prefix[mismatch + 1:]:
+                      candidate_repairs.append(
+                          (mismatch, verified_prefix[mismatch], 'verified split alignment')
+                      )
+                  search_positions = range(0)
+              elif old_part[:len(verified_prefix)] == verified_prefix:
+                  search_positions = range(len(verified_prefix), len(old_part) + 1)
+                  print(
+                      'The verified 9000-character prefix is unchanged; '
+                      f'searching {len(search_positions)} remaining insertion positions.'
+                  )
+              else:
+                  search_positions = range(0, len(old_part) + 1)
+                  print('Verified prefix alignment was inconclusive; searching all insertion positions.')
+
               alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-              for character in alphabet:
-                  candidate = encoded[:insertion_offset] + character + encoded[insertion_offset:]
-                  result = decode(candidate)
+              matches = []
+              seen = set()
+
+              def test_repair(position: int, character: str, source: str):
+                  key = (position, character)
+                  if key in seen:
+                      return
+                  seen.add(key)
+                  repaired_part = old_part[:position] + character + old_part[position:]
+                  result = decode(encoded_prefix + repaired_part + encoded_suffix)
                   if result is not None and result[1] == expected:
-                      matches.append((character, result[0]))
+                      matches.append((position, character, source, result[0]))
+
+              for position, character, source in candidate_repairs:
+                  test_repair(position, character, source)
+
+              if not matches:
+                  for position in search_positions:
+                      for character in alphabet:
+                          test_repair(position, character, 'digest search')
 
               if len(matches) != 1:
                   raise SystemExit(f'expected one digest-matching repair, found {len(matches)}')
-              recovered_character, archive = matches[0]
+              position, recovered_character, source, archive = matches[0]
               print(
                   'Recovered the single truncated staging character '
-                  f'at base64 offset {insertion_offset}: {recovered_character!r}'
+                  f'at part-001 offset {position}: {recovered_character!r} ({source})'
               )
 
           archive_path = Path('/tmp/fdir-2.1.0-baseline.tar.gz')
