@@ -6,7 +6,13 @@
     "machine/profiles.yaml",
     "machine/capabilities.yaml",
     "machine/adrs/**",
-    "spec/** except spec/generated/**"
+    "spec/** except spec/generated/**",
+    "release/claim-manifest.yaml",
+    "release/traceability.yaml",
+    "release/deferred-capabilities.yaml",
+    "release/blocker-policy.yaml",
+    "release/scope-approvals.yaml",
+    "release/change-control.md"
   ],
   "generatedNormative": [
     "schemas/fdir.schema.json",
@@ -16,9 +22,13 @@
     "schemas/generated-manifest.json",
     "spec/generated/logical-model.md",
     "matrices/requirements-tests.md",
-    "matrices/requirements-tests.csv"
+    "matrices/requirements-tests.csv",
+    "matrices/release-claims.md",
+    "matrices/release-traceability.md",
+    "matrices/release-traceability.csv"
   ],
   "issue": 2,
+  "releaseScopeIssue": 5,
   "name": "FDIR Information Independence Final Baseline",
   "nonCanonicalGenerated": [
     "dist/**/*.pdf",
