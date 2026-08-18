@@ -12,6 +12,8 @@ FDIR is an intermediate representation and compiler architecture for extracting 
 | Design status | Final and frozen for the 2.1 line |
 | Logical authority | `machine/logical-model.yaml` + `tools/generate_contracts.py` |
 | Repository quality | `python3 tools/quality.py --mode full --cache-policy off .` |
+| Implementation boundary | Rust-first product; CPython source/verification oracle; frozen by ADR 0004 and Issue #32 |
+| Dependency admission | Exact manifest + evidence lanes + isolation policy; no product runtime dependency currently admitted |
 | Release claim scope | Scope revision `1`; four tuples; `development-unqualified` |
 | Release traceability | `python3 tools/validate_release_traceability.py --check --self-test .` |
 | Production converter implementation | Not provided by this baseline |
@@ -21,6 +23,8 @@ FDIR is an intermediate representation and compiler architecture for extracting 
 | Completion roadmap | [#4](https://github.com/horiyamayoh/fdir/issues/4) |
 | Release scope issue | [#5](https://github.com/horiyamayoh/fdir/issues/5) |
 | Quality framework issue | [#6](https://github.com/horiyamayoh/fdir/issues/6) |
+| Foundation decision issue | [#32](https://github.com/horiyamayoh/fdir/issues/32) |
+| First product implementation issue | [#7](https://github.com/horiyamayoh/fdir/issues/7) |
 
 A successful schema validation or example extraction is not a production claim. A capability becomes production-qualified only for an exact format/capability/profile tuple backed by qualification evidence.
 
@@ -43,8 +47,9 @@ EquivalenceCertificate                    InventoryDomain / AccountingItem
 1. `machine/logical-model.yaml` and pinned `tools/generate_contracts.py` are the core logical authority.
 2. Generated contracts are normative only when byte-identical to regeneration.
 3. Requirements, acceptance tests, profiles, capability registries, ADRs, and the versioned `release/` scope registries are additional normative authorities.
-4. Markdown specifications explain intent and operating rules.
-5. PDF, DOCX, PNG, SVG, reports, indexes, and binary qualification bundles are generated projections or evidence packages, never canonical authority.
+4. `machine/implementation-policy.yaml` governs implementation language, evidence lanes, isolation, dependency admission, and the product-development handoff without changing the language-neutral FDIR 2.1 semantics.
+5. Markdown specifications explain intent and operating rules.
+6. PDF, DOCX, PNG, SVG, reports, indexes, and binary qualification bundles are generated projections or evidence packages, never canonical authority.
 
 ## Repository map
 
@@ -52,7 +57,7 @@ EquivalenceCertificate                    InventoryDomain / AccountingItem
 |---|---|
 | `spec/` | Normative explanatory specification and generated reference |
 | `machine/` | Logical model, profiles, requirements, tests, ADRs, migration, and backlog boundary |
-| `release/` | Claim manifest, end-to-end traceability, deferred scope, blocker policy, and scope approvals |
+| `release/` | Claim manifest, end-to-end traceability, deferred scope, blocker policy, scope approvals, and the product-development handoff |
 | `schemas/` | Deterministically generated core contracts |
 | `tools/` | Contract, traceability, canonicalization, and repository-quality validators |
 | `tests/` | Standard-library unit and integration-style repository gate tests |
@@ -69,6 +74,8 @@ EquivalenceCertificate                    InventoryDomain / AccountingItem
 - [Contributing and issue lifecycle](CONTRIBUTING.md)
 - [Development and build policy](DEVELOPMENT.md)
 - [Repository quality and required-check policy](quality/README.md)
+- [Product-development handoff](release/development-handoff.md)
+- [Dependency candidate assessment baseline](references/dependency-candidate-assessments.md)
 - [Security and private vulnerability reporting](SECURITY.md)
 - [Apache License 2.0](LICENSE)
 - [Issue intake forms](.github/ISSUE_TEMPLATE/)
@@ -84,7 +91,7 @@ The required local and CI integration command is:
 python3 tools/quality.py --mode full --cache-policy off .
 ```
 
-It uses only CPython's standard library and checks the pinned toolchain, text format, Python lint, documentation links, generated-contract byte parity, JSON Schema/JSON-LD/CDDL/SQLite contract structure, positive and negative fixtures, normative requirement/test traceability, baseline and release-scope traceability, unit tests, CI policy, repository policy, and unsupported production claims. The default machine-readable receipt is `reports/quality/full.json`.
+It uses only CPython's standard library and checks the pinned toolchain, text format, Python lint, documentation links, the frozen implementation/dependency policy, generated-contract byte parity, JSON Schema/JSON-LD/CDDL/SQLite contract structure, positive and negative fixtures, normative requirement/test traceability, baseline and release-scope traceability, unit tests, CI policy, repository policy, and unsupported production claims. The default machine-readable receipt is `reports/quality/full.json`.
 
 For a shorter edit loop that cannot certify integration or release:
 
@@ -104,5 +111,6 @@ The lower-level validators remain available for focused diagnosis:
 
 ```bash
 python3 tools/validate_baseline.py .
+python3 tools/validate_implementation_policy.py --check --self-test --json .
 python3 tools/validate_release_traceability.py --check --self-test --json .
 ```

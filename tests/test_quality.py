@@ -189,6 +189,29 @@ class QualityGateTests(unittest.TestCase):
         self.assertEqual(full, release[:-1])
         self.assertEqual("release-qualification", release[-1])
 
+    def test_implementation_policy_gate_passes(self) -> None:
+        result = quality.gate_implementation_policy(REPOSITORY_ROOT)
+        self.assertEqual("passed", result.status, result.diagnostics)
+
+    def test_implementation_policy_gate_rejects_unsafe_in_process_dependency(self) -> None:
+        temporary, root = self.repository_copy()
+        with temporary:
+            validator = quality.import_tool(
+                root / "tools/validate_implementation_policy.py",
+                "fdir_test_implementation_policy",
+            )
+            path = root / "machine/dependency-catalog.yaml"
+            catalog = quality.load_json(path)
+            dependency = validator.valid_test_manifest()
+            dependency["unsafeCode"] = True
+            dependency["processBoundary"] = "in-process"
+            catalog["state"] = "admitted-dependencies"
+            catalog["dependencies"] = [dependency]
+            quality.write_json(path, catalog)
+            result = quality.gate_implementation_policy(root)
+            self.assertEqual("failed", result.status)
+            self.assertIn("must be isolated", quality.combined_result_text(result))
+
     def test_repository_policy_gate_passes(self) -> None:
         result = quality.gate_repository_policy(REPOSITORY_ROOT)
         self.assertEqual("passed", result.status, result.diagnostics)

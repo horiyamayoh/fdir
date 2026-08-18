@@ -1,0 +1,111 @@
+name: Dependency or external worker admission
+description: Assess one exact parser, renderer, OCR, evaluator, codec, model, resource, or library under the FDIR evidence-lane policy.
+title: "[Dependency] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This form proposes a bounded dependency decision. Admission does not create a format capability or production claim. Link the implementation owner and Issue #33.
+  - type: input
+    id: owner
+    attributes:
+      label: Owning implementation issue
+      description: Link the issue that needs this dependency and its roadmap/milestone owner.
+      placeholder: "#7; roadmap #4"
+    validations:
+      required: true
+  - type: input
+    id: identity
+    attributes:
+      label: Candidate identity
+      description: Name, project/source, package or engine kind, and implementation language.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Exact version
+      description: Exact immutable version, revision, digest, build, and feature set. Ranges, branches, latest, and floating tags are forbidden.
+    validations:
+      required: true
+  - type: textarea
+    id: lanes
+    attributes:
+      label: Evidence lanes
+      description: Select and justify one or more of native-substrate-census, semantic-helper, renderer-observation, ocr-inference-observation, or storage-codec.
+    validations:
+      required: true
+  - type: textarea
+    id: io
+    attributes:
+      label: Inputs, outputs, and authority boundary
+      description: State input/output kinds, whether untrusted document bytes are received, and what output may or may not establish.
+    validations:
+      required: true
+  - type: textarea
+    id: normalization
+    attributes:
+      label: Normalization and unavailable source distinctions
+      description: Enumerate every decode, repair, merge, reorder, omission, canonicalization, rendering, inference, or source distinction the candidate cannot expose.
+    validations:
+      required: true
+  - type: dropdown
+    id: process
+    attributes:
+      label: Process boundary
+      description: Unsafe/FFI/native or non-Rust document workers receiving untrusted bytes are isolated by default.
+      options:
+        - trusted-core
+        - in-process
+        - isolated-worker
+        - external-service-forbidden
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Unsafe code, FFI, native code, and exception evidence
+      description: Record each fact. An in-process exception requires an accepted ADR, threat analysis, bounded input contract, and exact-build qualification evidence.
+    validations:
+      required: true
+  - type: textarea
+    id: supply_chain
+    attributes:
+      label: License, advisory snapshot, determinism, and support
+      description: Record SPDX/license review, dated advisory source/status, determinism claim, offline/network behavior, platform/support policy, and update cadence.
+    validations:
+      required: true
+  - type: textarea
+    id: resources
+    attributes:
+      label: Resource and isolation limits
+      description: Define CPU, memory, temporary storage, output/object count, decompression/recursion, timeout, cancellation, crash, filesystem, credential, and network policy.
+    validations:
+      required: true
+  - type: textarea
+    id: conformance
+    attributes:
+      label: Conformance and substitution evidence
+      description: List positive, negative, malformed, normalization-loss, upgrade/substitution, lane-separation, inventory-shrinkage, and deterministic-replay tests.
+    validations:
+      required: true
+  - type: textarea
+    id: manifest
+    attributes:
+      label: Proposed manifest record
+      description: Provide the complete JSON record conforming to machine/dependency-manifest.schema.json, or link the pull request that adds it.
+      render: json
+    validations:
+      required: true
+  - type: checkboxes
+    id: discipline
+    attributes:
+      label: Admission discipline
+      options:
+        - label: High-level, rendered, OCR, or inferred output will not be used as the sole native evidence or independent census.
+          required: true
+        - label: Dependency substitution or upgrade will fail if native inventory shrinks or source distinctions disappear without explicit disposition.
+          required: true
+        - label: No production capability claim is created by this assessment or admission.
+          required: true

@@ -97,7 +97,7 @@ Rejected. Clean text, paragraphs, cells, ASTs, or repaired object models can nor
 The frozen decision is checked by:
 
 ```bash
-python3 tools/validate_implementation_policy.py --self-test --json .
+python3 tools/validate_implementation_policy.py --check --self-test --json .
 python3 tools/quality.py --mode full --cache-policy off .
 ```
 
