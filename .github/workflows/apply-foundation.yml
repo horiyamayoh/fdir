@@ -46,7 +46,20 @@ jobs:
             | base64 --decode > /tmp/fdir-foundation.tar.gz
           actual_sha256="$(sha256sum /tmp/fdir-foundation.tar.gz | awk '{print $1}')"
           echo "FOUNDATION_BUNDLE_SHA256=${actual_sha256}"
-          test "${actual_sha256}" = '153f333c99e87dc81c45897125df61d7a3a65c2124013f6bdd7a9b6e2a311a17'
+          test "${actual_sha256}" = '8af4c38b7eb465a64841cb95971f2157d8f0a0b8d7c9d91ecdfa45984d1f6c72'
+          python3 - <<'PY'
+          from pathlib import PurePosixPath
+          import tarfile
+
+          archive = "/tmp/fdir-foundation.tar.gz"
+          with tarfile.open(archive, "r:gz") as bundle:
+              for member in bundle.getmembers():
+                  path = PurePosixPath(member.name)
+                  if path.is_absolute() or ".." in path.parts:
+                      raise SystemExit(f"unsafe archive path: {member.name}")
+                  if not (member.isfile() or member.isdir()):
+                      raise SystemExit(f"unsupported archive member: {member.name}")
+          PY
           tar -xzf /tmp/fdir-foundation.tar.gz
           rm -f \
             .foundation-bundle.part00 \
@@ -57,6 +70,7 @@ jobs:
           python3 tools/validate_implementation_policy.py --check --self-test --json .
           python3 -m unittest tests/test_implementation_policy.py -v
           python3 tools/generate_traceability.py --check .
+          python3 tools/quality.py --mode full --cache-policy off .
 
       - name: Commit the validated foundation
         shell: bash
