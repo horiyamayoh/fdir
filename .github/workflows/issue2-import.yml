@@ -31,10 +31,10 @@ jobs:
       TARGET_BRANCH: agent/issue-2-normative-baseline
       SOURCE_BRANCH: agent/issue-2-fdir-2.1-baseline
       SOURCE_PAYLOAD_TREE: b7d611f0961fca5afc2a9725a794b58b7c3ed4e5
-      REPAIR_SPLIT_A_BLOB: b351c9a78514f524a0e5ee268207774070335a4a
-      REPAIR_SPLIT_B_BLOB: 9c706c9c8e2b7544101ac84e5dd6c8fdae7fed1a
-      REPAIR_SPLIT_C_BLOB: 558c78864a1645f51911e9df3a1ac13b8857cfe7
       BASELINE_ARCHIVE_SHA256: 66868d4f85d9bbd7304519d165d9c769c0cb836aa35bbaa7ec631f7dbcca3c8f
+      REPAIR_PART: part-001
+      REPAIR_OFFSET: "7301"
+      REPAIR_CHARACTER: n
     steps:
       - name: Check out dedicated branch
         uses: actions/checkout@v4
@@ -42,169 +42,72 @@ jobs:
           ref: agent/issue-2-normative-baseline
           fetch-depth: 0
 
-      - name: Verify complete normative source archive
+      - name: Reconstruct and verify the pinned source archive
         shell: bash
         run: |
           set -euo pipefail
 
-          if [[ -f baseline.yaml ]]; then
-            echo "FDIR 2.1 baseline is already imported; nothing to do."
-            exit 0
-          fi
-
+          test ! -f baseline.yaml
           git fetch --no-tags origin \
             "refs/heads/${SOURCE_BRANCH}:refs/remotes/origin/${SOURCE_BRANCH}"
           git cat-file -e "${SOURCE_PAYLOAD_TREE}^{tree}"
-          rm -rf /tmp/fdir-source-payload /tmp/fdir-repair
-          mkdir -p /tmp/fdir-source-payload /tmp/fdir-repair
+
+          rm -rf /tmp/fdir-source-payload
+          mkdir -p /tmp/fdir-source-payload
           git archive "${SOURCE_PAYLOAD_TREE}" \
             | tar -x -C /tmp/fdir-source-payload
 
-          git cat-file -e "${REPAIR_SPLIT_A_BLOB}^{blob}"
-          git cat-file -e "${REPAIR_SPLIT_B_BLOB}^{blob}"
-          git cat-file -e "${REPAIR_SPLIT_C_BLOB}^{blob}"
-          git cat-file blob "${REPAIR_SPLIT_A_BLOB}" > /tmp/fdir-repair/part-001-a
-          git cat-file blob "${REPAIR_SPLIT_B_BLOB}" > /tmp/fdir-repair/part-001-b
-          git cat-file blob "${REPAIR_SPLIT_C_BLOB}" > /tmp/fdir-repair/part-001-c
-
           python3 - <<'PY'
           import base64
-          import binascii
           import hashlib
           import os
           from pathlib import Path
 
           payload_dir = Path('/tmp/fdir-source-payload')
           parts = sorted(payload_dir.glob('part-*'))
-          print(f'Pinned payload tree: {os.environ["SOURCE_PAYLOAD_TREE"]}')
-          print(f'Baseline payload parts: {len(parts)}')
-          if [part.name for part in parts] != ['part-000', 'part-001', 'part-002', 'part-003']:
-              names = ', '.join(part.name for part in parts)
-              raise SystemExit(f'unexpected pinned payload layout: {names}')
+          expected_names = ['part-000', 'part-001', 'part-002', 'part-003']
+          if [part.name for part in parts] != expected_names:
+              raise SystemExit(f'unexpected pinned payload layout: {[part.name for part in parts]}')
 
-          raw_texts = []
-          chunks = []
-          for part in parts:
-              text = part.read_text(encoding='ascii')
-              compact = ''.join(text.split())
-              whitespace = [index for index, character in enumerate(text) if character.isspace()]
-              print(
-                  f'{part.name}: {len(text)} bytes, {len(compact)} base64 characters, '
-                  f'whitespace offsets={whitespace}'
-              )
-              raw_texts.append(text)
-              chunks.append(compact)
+          chunks = {
+              part.name: ''.join(part.read_text(encoding='ascii').split())
+              for part in parts
+          }
+          repair_part = os.environ['REPAIR_PART']
+          repair_offset = int(os.environ['REPAIR_OFFSET'])
+          repair_character = os.environ['REPAIR_CHARACTER']
+          damaged = chunks[repair_part]
+          if len(damaged) != 11999:
+              raise SystemExit(f'unexpected {repair_part} length: {len(damaged)}')
 
-          split_parts = sorted(Path('/tmp/fdir-repair').glob('part-001-*'))
-          split_chunks = []
-          for part in split_parts:
-              compact = ''.join(part.read_text(encoding='ascii').split())
-              print(f'{part.name}: {len(compact)} verified repair characters')
-              split_chunks.append(compact)
-          verified_prefix = ''.join(split_chunks)
-          if len(verified_prefix) != 9000:
-              raise SystemExit(f'expected 9000 verified repair characters, found {len(verified_prefix)}')
-
-          expected = os.environ['BASELINE_ARCHIVE_SHA256']
-          old_part = chunks[1]
-          encoded_prefix = chunks[0]
-          encoded_suffix = chunks[2] + chunks[3]
-          encoded = encoded_prefix + old_part + encoded_suffix
-          print(f'Combined base64 characters: {len(encoded)} (mod 4 = {len(encoded) % 4})')
-
-          def decode(candidate: str):
-              try:
-                  data = base64.b64decode(candidate, validate=True)
-              except (binascii.Error, ValueError):
-                  return None
-              return data, hashlib.sha256(data).hexdigest()
-
-          archive = None
-          direct = decode(encoded)
-          if direct is not None and direct[1] == expected:
-              archive = direct[0]
-              print('Pinned payload decoded without repair.')
-          else:
-              if len(old_part) != 11999 or len(encoded) % 4 != 3:
-                  raise SystemExit('pinned payload is not in the recognized one-character truncation state')
-
-              candidate_repairs = []
-              raw_part = raw_texts[1]
-              nonspace_before = 0
-              for character in raw_part:
-                  if character.isspace():
-                      if nonspace_before < len(verified_prefix):
-                          candidate_repairs.append(
-                              (nonspace_before, verified_prefix[nonspace_before], 'staging whitespace offset')
-                          )
-                  else:
-                      nonspace_before += 1
-
-              mismatch = next(
-                  (index for index, (old, verified) in enumerate(zip(old_part, verified_prefix)) if old != verified),
-                  None,
-              )
-              if mismatch is not None:
-                  if old_part[mismatch:len(verified_prefix) - 1] == verified_prefix[mismatch + 1:]:
-                      candidate_repairs.append(
-                          (mismatch, verified_prefix[mismatch], 'verified split alignment')
-                      )
-                  search_positions = range(0)
-              elif old_part[:len(verified_prefix)] == verified_prefix:
-                  search_positions = range(len(verified_prefix), len(old_part) + 1)
-                  print(
-                      'The verified 9000-character prefix is unchanged; '
-                      f'searching {len(search_positions)} remaining insertion positions.'
-                  )
-              else:
-                  search_positions = range(0, len(old_part) + 1)
-                  print('Verified prefix alignment was inconclusive; searching all insertion positions.')
-
-              alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-              matches = []
-              seen = set()
-
-              def test_repair(position: int, character: str, source: str):
-                  key = (position, character)
-                  if key in seen:
-                      return
-                  seen.add(key)
-                  repaired_part = old_part[:position] + character + old_part[position:]
-                  result = decode(encoded_prefix + repaired_part + encoded_suffix)
-                  if result is not None and result[1] == expected:
-                      matches.append((position, character, source, result[0]))
-
-              for position, character, source in candidate_repairs:
-                  test_repair(position, character, source)
-
-              if not matches:
-                  for position in search_positions:
-                      for character in alphabet:
-                          test_repair(position, character, 'digest search')
-
-              if len(matches) != 1:
-                  raise SystemExit(f'expected one digest-matching repair, found {len(matches)}')
-              position, recovered_character, source, archive = matches[0]
-              print(
-                  'Recovered the single truncated staging character '
-                  f'at part-001 offset {position}: {recovered_character!r} ({source})'
-              )
-
-          archive_path = Path('/tmp/fdir-2.1.0-baseline.tar.gz')
-          archive_path.write_bytes(archive)
+          repaired = damaged[:repair_offset] + repair_character + damaged[repair_offset:]
+          encoded = chunks['part-000'] + repaired + chunks['part-002'] + chunks['part-003']
+          archive = base64.b64decode(encoded, validate=True)
           digest = hashlib.sha256(archive).hexdigest()
+          expected_digest = os.environ['BASELINE_ARCHIVE_SHA256']
+
+          print(f'Pinned payload tree: {os.environ["SOURCE_PAYLOAD_TREE"]}')
+          print(
+              f'Restored {repair_part} character {repair_character!r} '
+              f'at offset {repair_offset}'
+          )
           print(f'FDIR baseline archive bytes: {len(archive)}')
           print(f'FDIR baseline archive sha256: {digest}')
-          if digest != expected:
-              raise SystemExit(f'archive digest mismatch: expected {expected}, got {digest}')
+          if digest != expected_digest:
+              raise SystemExit(
+                  f'archive digest mismatch: expected {expected_digest}, got {digest}'
+              )
+
+          Path('/tmp/fdir-2.1.0-baseline.tar.gz').write_bytes(archive)
           PY
 
-      - name: Extract and validate source package
+      - name: Extract and validate the normative source package
         shell: bash
         run: |
           set -euo pipefail
           rm -rf /tmp/fdir-baseline
           mkdir -p /tmp/fdir-baseline
+
           python3 - <<'PY'
           import tarfile
           from pathlib import Path, PurePosixPath
@@ -226,17 +129,16 @@ jobs:
                   ):
                       raise SystemExit(f'unsafe archive member: {member.name}')
               handle.extractall(destination)
+          print(f'Extracted {len(members)} validated regular files.')
           PY
 
           cd /tmp/fdir-baseline
-          echo "Validated source package entries:"
-          find . -mindepth 1 -maxdepth 2 -print | sort
           test -f baseline.yaml
           test -f machine/logical-model.yaml
           test -f tools/generate_contracts.py
           test -f tools/generate_traceability.py
           test -f tools/validate_baseline.py
-          test -f references/artifact-packaging.md
+          test -f references/packaging.md
           test -f .github/workflows/validate-baseline.yml
 
           python3 tools/generate_contracts.py --check .
@@ -245,7 +147,7 @@ jobs:
           python3 -m py_compile tools/*.py
           find tools -type d -name __pycache__ -prune -exec rm -rf {} +
 
-      - name: Publish validated source in focused commits
+      - name: Publish the validated baseline in focused commits
         shell: bash
         run: |
           set -euo pipefail
@@ -275,7 +177,9 @@ jobs:
           git commit -m "Add baseline fixtures and traceability validation (#2)"
           git push origin "HEAD:${TARGET_BRANCH}"
 
-          git add .gitattributes .gitignore .github/workflows/validate-baseline.yml references diagrams
+          git add .gitattributes .gitignore \
+            .github/workflows/validate-baseline.yml \
+            references diagrams
           git add -A -- .bootstrap .issue2 .github/workflows/issue2-import.yml
           git commit -m "Document review artifacts and add baseline CI (#2)"
 
