@@ -78,11 +78,25 @@ jobs:
           find "${import_root}" -mindepth 1 -maxdepth 2 -print | sort | sed -n '1,120p'
           cp -a "${import_root}/." .
 
-          test -f baseline.yaml
-          test -f machine/logical-model.yaml
-          test -f tools/generate_contracts.py
-          test -f tools/generate_traceability.py
-          test -f tools/validate_baseline.py
+          echo "Imported tool files:"
+          if [[ -d tools ]]; then
+            find tools -mindepth 1 -maxdepth 2 -type f -print | sort
+          else
+            echo "(tools directory missing)"
+          fi
+
+          require_file() {
+            local path="$1"
+            if [[ ! -f "${path}" ]]; then
+              echo "::error file=${path}::required baseline source file is missing"
+              return 1
+            fi
+          }
+          require_file baseline.yaml
+          require_file machine/logical-model.yaml
+          require_file tools/generate_contracts.py
+          require_file tools/generate_traceability.py
+          require_file tools/validate_baseline.py
 
           python3 tools/generate_contracts.py .
           python3 tools/generate_traceability.py .
