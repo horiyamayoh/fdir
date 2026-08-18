@@ -22,3 +22,5 @@ jobs:
           python-version: "3.12"
       - name: Validate FDIR 2.1 normative baseline
         run: python3 tools/validate_baseline.py .
+      - name: Validate release scope and traceability summary
+        run: python3 tools/validate_release_traceability.py --check --self-test --json .
