@@ -1,0 +1,74 @@
+name: Import FDIR 2.1 normative baseline
+
+on:
+  push:
+    branches:
+      - agent/issue-2-normative-baseline
+    paths:
+      - .issue2/trigger
+
+permissions:
+  contents: write
+
+jobs:
+  import-baseline:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out dedicated branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/issue-2-normative-baseline
+          fetch-depth: 0
+
+      - name: Verify, import, validate, and publish the baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cat .issue2/payload/part-* | base64 --decode > /tmp/fdir-baseline.tar.gz
+          echo "b78c28385cbce1a0afc43156796e7fbb9a8c10749647e9dff26ef420d1af0e91  /tmp/fdir-baseline.tar.gz" | sha256sum --check --strict
+
+          mkdir -p /tmp/fdir-baseline
+          python3 - <<'PY'
+          import tarfile
+          from pathlib import PurePosixPath
+
+          archive = "/tmp/fdir-baseline.tar.gz"
+          with tarfile.open(archive, "r:gz") as handle:
+              for member in handle.getmembers():
+                  path = PurePosixPath(member.name)
+                  if path.is_absolute() or ".." in path.parts or member.issym() or member.islnk():
+                      raise SystemExit(f"unsafe archive member: {member.name}")
+          PY
+          tar -xzf /tmp/fdir-baseline.tar.gz -C /tmp/fdir-baseline
+          cp -a /tmp/fdir-baseline/. .
+
+          python3 tools/generate_contracts.py .
+          python3 tools/generate_traceability.py .
+          python3 tools/generate_contracts.py --check .
+          python3 tools/generate_traceability.py --check .
+          python3 tools/validate_baseline.py .
+          python3 -m py_compile tools/*.py
+          find tools -type d -name __pycache__ -prune -exec rm -rf {} +
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config core.autocrlf false
+
+          git add baseline.yaml machine spec
+          git commit -m "Import FDIR 2.1 normative authority (#2)"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+          git add tools schemas
+          git commit -m "Generate FDIR 2.1 contracts from machine authority (#2)"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+          git add examples fixtures matrices queries
+          git commit -m "Add baseline fixtures and traceability validation (#2)"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+          git add README.md .gitignore .gitattributes references diagrams
+          git rm -r --ignore-unmatch .bootstrap .issue2 .github/workflows/issue2-import.yml
+          git commit -m "Document baseline authority and remove bootstrap staging (#2)"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
