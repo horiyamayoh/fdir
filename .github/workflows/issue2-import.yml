@@ -59,6 +59,7 @@ jobs:
 
           python3 - <<'PY'
           import base64
+          import binascii
           import hashlib
           import os
           from pathlib import Path
@@ -67,9 +68,9 @@ jobs:
           parts = sorted(payload_dir.glob('part-*'))
           print(f'Pinned payload tree: {os.environ["SOURCE_PAYLOAD_TREE"]}')
           print(f'Baseline payload parts: {len(parts)}')
-          if len(parts) != 4:
+          if [part.name for part in parts] != ['part-000', 'part-001', 'part-002', 'part-003']:
               names = ', '.join(part.name for part in parts)
-              raise SystemExit(f'expected 4 payload parts, found {len(parts)}: {names}')
+              raise SystemExit(f'unexpected pinned payload layout: {names}')
 
           chunks = []
           for part in parts:
@@ -78,17 +79,46 @@ jobs:
               print(f'{part.name}: {len(text)} bytes, {len(compact)} base64 characters')
               chunks.append(compact)
 
+          expected = os.environ['BASELINE_ARCHIVE_SHA256']
           encoded = ''.join(chunks)
           print(f'Combined base64 characters: {len(encoded)} (mod 4 = {len(encoded) % 4})')
-          try:
-              archive = base64.b64decode(encoded, validate=True)
-          except Exception as exc:
-              raise SystemExit(f'invalid baseline payload: {exc}') from exc
+
+          def decode(candidate: str):
+              try:
+                  data = base64.b64decode(candidate, validate=True)
+              except (binascii.Error, ValueError):
+                  return None
+              return data, hashlib.sha256(data).hexdigest()
+
+          archive = None
+          direct = decode(encoded)
+          if direct is not None and direct[1] == expected:
+              archive = direct[0]
+              print('Pinned payload decoded without repair.')
+          else:
+              insertion_offset = len(chunks[0]) + len(chunks[1])
+              if len(encoded) % 4 != 3 or len(chunks[1]) != 11999:
+                  raise SystemExit('pinned payload is not in the recognized one-character truncation state')
+
+              matches = []
+              alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+              for character in alphabet:
+                  candidate = encoded[:insertion_offset] + character + encoded[insertion_offset:]
+                  result = decode(candidate)
+                  if result is not None and result[1] == expected:
+                      matches.append((character, result[0]))
+
+              if len(matches) != 1:
+                  raise SystemExit(f'expected one digest-matching repair, found {len(matches)}')
+              recovered_character, archive = matches[0]
+              print(
+                  'Recovered the single truncated staging character '
+                  f'at base64 offset {insertion_offset}: {recovered_character!r}'
+              )
 
           archive_path = Path('/tmp/fdir-2.1.0-baseline.tar.gz')
           archive_path.write_bytes(archive)
           digest = hashlib.sha256(archive).hexdigest()
-          expected = os.environ['BASELINE_ARCHIVE_SHA256']
           print(f'FDIR baseline archive bytes: {len(archive)}')
           print(f'FDIR baseline archive sha256: {digest}')
           if digest != expected:
