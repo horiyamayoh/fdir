@@ -12,6 +12,7 @@ import platform
 import re
 import shlex
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -26,10 +27,12 @@ QUALITY_VERSION = "1.0.0"
 RECEIPT_SCHEMA = "fdir/repository-quality-receipt/1"
 FAILURE_RECEIPT_SCHEMA = "fdir/quality-failure-demonstration/1"
 CACHE_SCHEMA = "fdir/repository-quality-cache/1"
+TOOLCHAIN_SCHEMA = "fdir/quality-toolchain/1"
 
 EXCLUDED_PARTS = {
     ".git",
     ".issue6-export",
+    ".issue6-import",
     ".tmp",
     ".validation",
     "__pycache__",
@@ -235,20 +238,28 @@ def deterministic_environment() -> dict[str, str]:
 
 
 def command_gate(gate_id: str, root: Path, command: Sequence[str]) -> GateResult:
-    completed = subprocess.run(
-        list(command),
-        cwd=root,
-        env=deterministic_environment(),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        check=False,
-    )
+    rendered = display_command(command, root)
+    try:
+        completed = subprocess.run(
+            list(command),
+            cwd=root,
+            env=deterministic_environment(),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+    except OSError as error:
+        return GateResult.failed(
+            gate_id,
+            [f"command could not be executed: {error}"],
+            command=rendered,
+            details={"exitCode": None},
+        )
     stdout = normalize_output(completed.stdout, root)
     stderr = normalize_output(completed.stderr, root)
-    rendered = display_command(command, root)
     if completed.returncode == 0:
         return GateResult.passed(
             gate_id,
@@ -267,6 +278,13 @@ def command_gate(gate_id: str, root: Path, command: Sequence[str]) -> GateResult
     )
 
 
+def parse_version_pair(value: Any, label: str) -> tuple[int, int]:
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9]+\.[0-9]+", value):
+        raise ValueError(f"{label} must be a major.minor string")
+    major, minor = value.split(".")
+    return int(major), int(minor)
+
+
 def gate_toolchain(root: Path) -> GateResult:
     gate_id = "toolchain"
     path = root / "quality/toolchain.json"
@@ -277,30 +295,86 @@ def gate_toolchain(root: Path) -> GateResult:
         policy = load_json(path)
     except (OSError, json.JSONDecodeError) as error:
         return GateResult.failed(gate_id, [f"invalid quality/toolchain.json: {error}"])
-    if policy.get("schema") != "fdir/quality-toolchain/1":
+    if not isinstance(policy, dict):
+        return GateResult.failed(gate_id, ["quality/toolchain.json must contain an object"])
+    if policy.get("schema") != TOOLCHAIN_SCHEMA:
         failures.append("unexpected toolchain schema")
-    python_policy = policy.get("python", {})
+
+    python_policy = policy.get("python")
+    minimum: tuple[int, int] | None = None
+    maximum: tuple[int, int] | None = None
+    if not isinstance(python_policy, dict):
+        failures.append("toolchain Python policy must be an object")
+        python_policy = {}
     if python_policy.get("implementation") != "CPython":
         failures.append("toolchain must require CPython")
-    minimum = tuple(int(item) for item in str(python_policy.get("minimum", "0.0")).split("."))
-    maximum = tuple(
-        int(item) for item in str(python_policy.get("maximumExclusive", "0.0")).split(".")
-    )
+    try:
+        minimum = parse_version_pair(python_policy.get("minimum"), "python.minimum")
+        maximum = parse_version_pair(
+            python_policy.get("maximumExclusive"),
+            "python.maximumExclusive",
+        )
+        if minimum >= maximum:
+            failures.append("Python version interval must be non-empty")
+    except ValueError as error:
+        failures.append(str(error))
+
+    ci_python = policy.get("ciPython")
+    try:
+        ci_version = parse_version_pair(ci_python, "ciPython")
+    except ValueError as error:
+        failures.append(str(error))
+        ci_version = None
+    version_file = root / ".python-version"
+    if not version_file.is_file():
+        failures.append("missing .python-version")
+    else:
+        try:
+            pinned_python = version_file.read_text(encoding="utf-8").strip()
+        except OSError as error:
+            failures.append(f"cannot read .python-version: {error}")
+        else:
+            if pinned_python != ci_python:
+                failures.append(".python-version does not match ciPython")
+    if minimum is not None and maximum is not None and ci_version is not None:
+        if ci_version < minimum or ci_version >= maximum:
+            failures.append("ciPython is outside the supported Python interval")
+
+    actions = policy.get("actions")
+    if not isinstance(actions, dict):
+        failures.append("toolchain actions policy must be an object")
+        actions = {}
+    for action_name in ("checkout", "setupPython", "uploadArtifact"):
+        version = actions.get(action_name)
+        if not isinstance(version, str) or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+            failures.append(f"action {action_name} must use an exact semantic version")
+
+    runner_image = policy.get("runnerImage")
+    if not isinstance(runner_image, str) or not re.fullmatch(r"ubuntu-[0-9]{2}\.[0-9]{2}", runner_image):
+        failures.append("runnerImage must pin an Ubuntu major.minor image")
+    expected_command = "python3 tools/quality.py --mode full --cache-policy off ."
+    if policy.get("qualityCommand") != expected_command:
+        failures.append(f"qualityCommand must be: {expected_command}")
+    if policy.get("thirdPartyDependencies") != []:
+        failures.append("repository quality command must have no third-party dependencies")
+
     actual = sys.version_info[:2]
     if sys.implementation.name != "cpython":
         failures.append(f"unsupported Python implementation: {sys.implementation.name}")
-    if actual < minimum or actual >= maximum:
+    if minimum is not None and maximum is not None and not (minimum <= actual < maximum):
         failures.append(
             "unsupported Python version: "
             f"{actual[0]}.{actual[1]} is outside {minimum[0]}.{minimum[1]} <= version < "
             f"{maximum[0]}.{maximum[1]}"
         )
-    if policy.get("thirdPartyDependencies") != []:
-        failures.append("repository quality command must have no third-party dependencies")
+
     details = {
+        "actions": actions,
+        "ciPython": ci_python,
         "implementation": platform.python_implementation(),
-        "pythonVersion": platform.python_version(),
         "policySha256": sha256_bytes(path.read_bytes()),
+        "pythonVersion": platform.python_version(),
+        "runnerImage": runner_image,
     }
     if failures:
         return GateResult.failed(gate_id, failures, details=details)
@@ -484,6 +558,116 @@ def gate_generated_traceability(root: Path) -> GateResult:
     )
 
 
+def gate_schema_contracts(root: Path) -> GateResult:
+    gate_id = "schema-contracts"
+    failures: list[str] = []
+    required = {
+        "jsonSchema": root / "schemas/fdir.schema.json",
+        "jsonLdContext": root / "schemas/context.jsonld",
+        "cddl": root / "schemas/fdir.cddl",
+        "sqlite": root / "schemas/fdir.sql",
+        "manifest": root / "schemas/generated-manifest.json",
+    }
+    for label, path in required.items():
+        if not path.is_file():
+            failures.append(f"missing {label} contract: {path.relative_to(root).as_posix()}")
+    if failures:
+        return GateResult.failed(gate_id, failures, details={"checkedContracts": 0})
+
+    try:
+        schema = load_json(required["jsonSchema"])
+    except (OSError, json.JSONDecodeError) as error:
+        failures.append(f"invalid schemas/fdir.schema.json: {error}")
+        schema = {}
+    if not isinstance(schema, dict):
+        failures.append("schemas/fdir.schema.json must contain an object")
+        schema = {}
+    if schema.get("$schema") != "https://json-schema.org/draft/2020-12/schema":
+        failures.append("schemas/fdir.schema.json has an unexpected dialect")
+    if not isinstance(schema.get("$ref"), str):
+        failures.append("schemas/fdir.schema.json has no root $ref")
+    if not isinstance(schema.get("$defs"), dict) or not schema.get("$defs"):
+        failures.append("schemas/fdir.schema.json has no non-empty $defs")
+
+    try:
+        context = load_json(required["jsonLdContext"])
+    except (OSError, json.JSONDecodeError) as error:
+        failures.append(f"invalid schemas/context.jsonld: {error}")
+        context = {}
+    context_value = context.get("@context") if isinstance(context, dict) else None
+    if not isinstance(context_value, dict):
+        failures.append("schemas/context.jsonld has no object @context")
+    elif context_value.get("@version") != 1.1:
+        failures.append("schemas/context.jsonld must declare JSON-LD 1.1")
+
+    cddl_text = required["cddl"].read_text(encoding="utf-8")
+    if not cddl_text.startswith("; Generated from machine/logical-model.yaml. Do not edit.\n"):
+        failures.append("schemas/fdir.cddl is missing its generated authority header")
+    if "fdir-snapshot = snapshot" not in cddl_text:
+        failures.append("schemas/fdir.cddl has no fdir-snapshot root rule")
+    if cddl_text.count("{") != cddl_text.count("}"):
+        failures.append("schemas/fdir.cddl has unbalanced map braces")
+
+    sql_text = required["sqlite"].read_text(encoding="utf-8")
+    database = sqlite3.connect(":memory:")
+    try:
+        database.executescript(sql_text)
+        database.execute("PRAGMA foreign_key_check").fetchall()
+        objects = {
+            row[0]
+            for row in database.execute(
+                "SELECT name FROM sqlite_master WHERE type IN ('table', 'index')"
+            )
+        }
+    except sqlite3.Error as error:
+        failures.append(f"invalid schemas/fdir.sql: {error}")
+        objects = set()
+    finally:
+        database.close()
+    for expected in ("snapshot_meta", "assertions", "accounting_items", "diagnostics"):
+        if expected not in objects:
+            failures.append(f"schemas/fdir.sql is missing object: {expected}")
+
+    try:
+        manifest = load_json(required["manifest"])
+    except (OSError, json.JSONDecodeError) as error:
+        failures.append(f"invalid schemas/generated-manifest.json: {error}")
+        manifest = {}
+    files = manifest.get("files") if isinstance(manifest, dict) else None
+    if not isinstance(files, dict) or not files:
+        failures.append("schemas/generated-manifest.json has no generated file map")
+        files = {}
+    for relative, expected_digest in sorted(files.items()):
+        if not isinstance(relative, str) or not isinstance(expected_digest, str):
+            failures.append("schemas/generated-manifest.json contains an invalid entry")
+            continue
+        candidate = (root / relative).resolve()
+        try:
+            candidate.relative_to(root)
+        except ValueError:
+            failures.append(f"generated manifest path escapes repository: {relative}")
+            continue
+        if not candidate.is_file():
+            failures.append(f"generated manifest references missing file: {relative}")
+            continue
+        actual_digest = sha256_bytes(candidate.read_bytes())
+        if actual_digest != expected_digest:
+            failures.append(f"generated manifest digest mismatch: {relative}")
+    for authority_key in ("generator", "logicalModel"):
+        relative = manifest.get(authority_key) if isinstance(manifest, dict) else None
+        if not isinstance(relative, str) or not (root / relative).is_file():
+            failures.append(f"generated manifest has invalid {authority_key} authority")
+
+    details = {
+        "checkedContracts": len(required),
+        "manifestFiles": len(files),
+        "sqliteObjects": len(objects),
+    }
+    if failures:
+        return GateResult.failed(gate_id, failures, details=details)
+    return GateResult.passed(gate_id, details=details)
+
+
 def gate_baseline(root: Path) -> GateResult:
     return command_gate(
         "normative-baseline",
@@ -664,8 +848,8 @@ def gate_requirement_traceability(root: Path) -> GateResult:
     return GateResult.passed(gate_id, details=details)
 
 
-def gate_claim_dis/ipline(root: Path) -> GateResult:
-    gate_id = "claim-dis/ipline"
+def gate_claim_discipline(root: Path) -> GateResult:
+    gate_id = "claim-discipline"
     failures: list[str] = []
     try:
         baseline = load_json(root / "baseline.yaml")
@@ -724,9 +908,9 @@ def gate_unit_tests(root: Path) -> GateResult:
         import sys
         import unittest
 
-        suite = unittest.defaultTestLoader.dis/over("tests", pattern="test_*.py")
+        suite = unittest.defaultTestLoader.discover("tests", pattern="test_*.py")
         count = suite.countTestCases()
-        print(f"dis/overed {count} unit tests")
+        print(f"discovered {count} unit tests")
         if count == 0:
             raise SystemExit(2)
         result = unittest.TextTestRunner(verbosity=2).run(suite)
@@ -734,40 +918,108 @@ def gate_unit_tests(root: Path) -> GateResult:
         """
     ).strip()
     result = command_gate("unit-tests", root, [sys.executable, "-c", script])
-    if result.status == "failed" and "dis/overed 0 unit tests" in result.stdout:
-        result.diagnostics.append("unit test dis/overy returned zero tests")
+    if result.status == "failed" and "discovered 0 unit tests" in result.stdout:
+        result.diagnostics.append("unit test discovery returned zero tests")
         result.diagnostics = sorted(set(result.diagnostics))
     return result
 
 
 def gate_workflow_policy(root: Path) -> GateResult:
     gate_id = "ci-policy"
-    path = root / ".github/workflows/baseline.yml"
+    workflow_path = root / ".github/workflows/baseline.yml"
+    toolchain_path = root / "quality/toolchain.json"
     failures: list[str] = []
-    if not path.is_file():
+    if not workflow_path.is_file():
         return GateResult.failed(gate_id, ["missing .github/workflows/baseline.yml"])
-    text = path.read_text(encoding="utf-8")
+    try:
+        policy = load_json(toolchain_path)
+    except (OSError, json.JSONDecodeError) as error:
+        return GateResult.failed(gate_id, [f"cannot load CI toolchain policy: {error}"])
+    if not isinstance(policy, dict):
+        return GateResult.failed(gate_id, ["CI toolchain policy must be an object"])
+    actions = policy.get("actions") if isinstance(policy.get("actions"), dict) else {}
+    checkout = actions.get("checkout", "<missing>")
+    setup_python = actions.get("setupPython", "<missing>")
+    upload_artifact = actions.get("uploadArtifact", "<missing>")
+    ci_python = policy.get("ciPython", "<missing>")
+    runner_image = policy.get("runnerImage", "<missing>")
+
+    text = workflow_path.read_text(encoding="utf-8")
     required_tokens = {
         "workflow name": "name: FDIR quality",
+        "pull-request trigger": "pull_request:",
+        "main-branch push trigger": "      - main",
+        "read-only repository permission": "contents: read",
         "required job name": "name: quality / full",
-        "pinned checkout action": "actions/checkout@v6.0.2",
-        "pinned setup-python action": "actions/setup-python@v6.0.0",
-        "pinned upload-artifact action": "actions/upload-artifact@v7.0.1",
-        "Python series": 'python-version: "3.12"',
+        "pinned runner image": f"runs-on: {runner_image}",
+        "pinned checkout action": f"actions/checkout@v{checkout}",
+        "pinned setup-python action": f"actions/setup-python@v{setup_python}",
+        "pinned upload-artifact action": f"actions/upload-artifact@v{upload_artifact}",
+        "Python series": f'python-version: "{ci_python}"',
         "credential isolation": "persist-credentials: false",
-        "full quality command": "python3 tools/quality.py --mode full --cache-policy off",
-        "failure demonstration": "python3 tools/quality.py --self-test-gates",
+        "full quality command": "python3 tools/quality.py --mode full --cache-policy off .",
+        "failure demonstration": "python3 tools/quality.py --self-test-gates .",
         "read-write cache validation": "--cache-policy read-write",
         "read-only cache validation": "--cache-policy read-only",
+        "quality receipt upload": "reports/quality/*.json",
+        "cache receipt upload": ".validation/quality-cache.json",
         "durable evidence retention": "retention-days: 90",
         "failure evidence upload": "if: always()",
     }
     for description, token in required_tokens.items():
         if token not in text:
             failures.append(f"CI policy is missing {description}: {token}")
-    if re.search(r"uses:\s+[^\s]+@(main|master|v\d+)\s*$", text, re.MULTILINE):
+    if "contents: write" in text:
+        failures.append("quality CI must not request contents write permission")
+    if re.search(r"uses:\s+[^\s]+@(main|master|v[0-9]+)\s*$", text, re.MULTILINE):
         failures.append("CI action references must use exact semantic versions")
-    details = {"workflowSha256": sha256_bytes(path.read_bytes())}
+    details = {
+        "requiredCheck": "quality / full",
+        "workflowSha256": sha256_bytes(workflow_path.read_bytes()),
+    }
+    if failures:
+        return GateResult.failed(gate_id, failures, details=details)
+    return GateResult.passed(gate_id, details=details)
+
+
+def gate_repository_policy(root: Path) -> GateResult:
+    gate_id = "repository-policy"
+    required_tokens = {
+        "quality/README.md": (
+            "python3 tools/quality.py --mode full --cache-policy off .",
+            "`quality / full`",
+            "read-write",
+            "read-only",
+            "reports/quality",
+            "release",
+        ),
+        "README.md": (
+            "python3 tools/quality.py --mode full --cache-policy off .",
+            "quality/README.md",
+        ),
+        "DEVELOPMENT.md": (
+            "python3 tools/quality.py --mode full --cache-policy off .",
+            "`quality / full`",
+        ),
+        "CONTRIBUTING.md": (
+            "python3 tools/quality.py --mode full --cache-policy off .",
+            "`quality / full`",
+        ),
+        ".github/pull_request_template.md": ("`quality / full`",),
+    }
+    failures: list[str] = []
+    hashes: dict[str, str] = {}
+    for relative, tokens in required_tokens.items():
+        path = root / relative
+        if not path.is_file():
+            failures.append(f"missing repository policy document: {relative}")
+            continue
+        text = path.read_text(encoding="utf-8")
+        hashes[relative] = sha256_bytes(path.read_bytes())
+        for token in tokens:
+            if token not in text:
+                failures.append(f"repository policy is missing token in {relative}: {token}")
+    details = {"documents": len(hashes), "documentSha256": hashes}
     if failures:
         return GateResult.failed(gate_id, failures, details=details)
     return GateResult.passed(gate_id, details=details)
@@ -780,10 +1032,11 @@ def gate_plan(mode: str) -> list[str]:
         "python-lint",
         "documentation-links",
         "generated-contract-parity",
+        "schema-contracts",
         "positive-negative-fixtures",
         "requirement-test-traceability",
         "normative-baseline",
-        "claim-dis/ipline",
+        "claim-discipline",
     ]
     if mode in {"full", "release"}:
         common.extend(
@@ -792,6 +1045,7 @@ def gate_plan(mode: str) -> list[str]:
                 "release-traceability",
                 "unit-tests",
                 "ci-policy",
+                "repository-policy",
             ]
         )
     if mode == "release":
@@ -906,6 +1160,33 @@ def write_cache(
     )
 
 
+def run_gate_safely(
+    gate_id: str,
+    function: Callable[[Path], GateResult],
+    root: Path,
+) -> GateResult:
+    try:
+        result = function(root)
+    except Exception as error:
+        message = str(error).replace(str(root), ".")
+        return GateResult.failed(
+            gate_id,
+            [f"gate raised {type(error).__name__}: {message}"],
+            details={"exceptionType": type(error).__name__},
+        )
+    if result.gate_id != gate_id:
+        return GateResult.failed(
+            gate_id,
+            [f"gate returned mismatched identifier: {result.gate_id}"],
+        )
+    if result.status not in {"passed", "failed"}:
+        return GateResult.failed(
+            gate_id,
+            [f"gate returned invalid status: {result.status}"],
+        )
+    return result
+
+
 def run_gates(root: Path, mode: str) -> list[GateResult]:
     functions: dict[str, Callable[[Path], GateResult]] = {
         "toolchain": gate_toolchain,
@@ -913,30 +1194,35 @@ def run_gates(root: Path, mode: str) -> list[GateResult]:
         "python-lint": gate_python_lint,
         "documentation-links": gate_docs_links,
         "generated-contract-parity": gate_generated_contracts,
+        "schema-contracts": gate_schema_contracts,
         "positive-negative-fixtures": gate_fixture_registry,
         "requirement-test-traceability": gate_requirement_traceability,
         "normative-baseline": gate_baseline,
-        "claim-dis/ipline": gate_claim_dis/ipline,
+        "claim-discipline": gate_claim_discipline,
         "generated-traceability-parity": gate_generated_traceability,
         "release-traceability": gate_release_traceability,
         "unit-tests": gate_unit_tests,
         "ci-policy": gate_workflow_policy,
+        "repository-policy": gate_repository_policy,
         "release-qualification": gate_release_qualification,
     }
-    return [functions[gate_id](root) for gate_id in gate_plan(mode)]
+    return [run_gate_safely(gate_id, functions[gate_id], root) for gate_id in gate_plan(mode)]
 
 
 def git_metadata(root: Path) -> dict[str, Any]:
     def git(*arguments: str) -> str | None:
-        completed = subprocess.run(
-            ["git", *arguments],
-            cwd=root,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            encoding="utf-8",
-            check=False,
-        )
+        try:
+            completed = subprocess.run(
+                ["git", *arguments],
+                cwd=root,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                encoding="utf-8",
+                check=False,
+            )
+        except OSError:
+            return None
         return completed.stdout.strip() if completed.returncode == 0 else None
 
     revision = git("rev-parse", "HEAD")
@@ -956,6 +1242,11 @@ def build_receipt(
     results: Sequence[GateResult],
 ) -> dict[str, Any]:
     status = "passed" if all(result.status == "passed" for result in results) else "failed"
+    evidence_class = {
+        "fast": "developer-feedback",
+        "full": "integration-evidence",
+        "release": "release-candidate-evidence",
+    }[mode]
     return {
         "schema": RECEIPT_SCHEMA,
         "qualityVersion": QUALITY_VERSION,
@@ -971,7 +1262,9 @@ def build_receipt(
         "mode": mode,
         "cachePolicy": policy,
         "status": status,
+        "evidenceClass": evidence_class,
         "durableEvidence": mode in {"full", "release"},
+        "gateResultsSha256": authoritative_results_digest(results),
         "releaseCertification": mode == "release" and status == "passed",
         "authoritativeGatesSkipped": False,
         "source": {
@@ -1005,7 +1298,19 @@ def execute_quality(
     results = [cache_result, *authoritative, equivalence]
     receipt = build_receipt(root, mode, policy, digest, file_count, results)
     if policy == "read-write" and receipt["status"] == "passed":
-        write_cache(root, mode, digest, results_digest)
+        try:
+            write_cache(root, mode, digest, results_digest)
+        except OSError as error:
+            results[0] = GateResult.failed(
+                "cache-policy",
+                [f"cache could not be written: {error}"],
+                details={
+                    "authoritativeGatesSkipped": False,
+                    "cachePath": ".validation/quality-cache.json",
+                    "policy": policy,
+                },
+            )
+            receipt = build_receipt(root, mode, policy, digest, file_count, results)
     write_json(receipt_path, receipt)
     return (0 if receipt["status"] == "passed" else 1), receipt
 
@@ -1018,6 +1323,7 @@ def copy_repository(root: Path, destination: Path) -> None:
         ignore=shutil.ignore_patterns(
             ".git",
             ".issue6-export",
+    ".issue6-import",
             ".tmp",
             ".validation",
             "__pycache__",
@@ -1065,6 +1371,17 @@ def run_failure_demonstrations(root: Path, receipt_path: Path) -> tuple[int, dic
         ),
         gate_generated_contracts,
         "schemas/fdir.cddl",
+    )
+
+    demonstrate(
+        "invalid-schema-contract",
+        lambda candidate: (candidate / "schemas/fdir.sql").write_text(
+            (candidate / "schemas/fdir.sql").read_text(encoding="utf-8")
+            + "THIS IS NOT SQL;\n",
+            encoding="utf-8",
+        ),
+        gate_schema_contracts,
+        "schemas/fdir.sql",
     )
 
     def invalid_positive(candidate: Path) -> None:
@@ -1157,7 +1474,7 @@ def run_failure_demonstrations(root: Path, receipt_path: Path) -> tuple[int, dic
         shutil.rmtree(candidate / "tests", ignore_errors=True)
         (candidate / "tests").mkdir()
 
-    demonstrate("empty-unit-test-suite", empty_tests, gate_unit_tests, "dis/overed 0 unit tests")
+    demonstrate("empty-unit-test-suite", empty_tests, gate_unit_tests, "discovered 0 unit tests")
 
     def false_claim(candidate: Path) -> None:
         path = candidate / "release/claim-manifest.yaml"
@@ -1165,7 +1482,7 @@ def run_failure_demonstrations(root: Path, receipt_path: Path) -> tuple[int, dic
         value["productionReady"] = True
         write_json(path, value)
 
-    demonstrate("false-production-claim", false_claim, gate_claim_dis/ipline, "unsupported production-ready")
+    demonstrate("false-production-claim", false_claim, gate_claim_discipline, "unsupported production-ready")
 
     def stale_cache(candidate: Path) -> None:
         path = cache_path(candidate)
@@ -1191,14 +1508,30 @@ def run_failure_demonstrations(root: Path, receipt_path: Path) -> tuple[int, dic
 
     def workflow_drift(candidate: Path) -> None:
         path = candidate / ".github/workflows/baseline.yml"
+        policy = load_json(candidate / "quality/toolchain.json")
+        checkout = policy["actions"]["checkout"]
         path.write_text(
             path.read_text(encoding="utf-8").replace(
-                "actions/checkout@v6.0.2", "actions/checkout@main"
+                f"actions/checkout@v{checkout}", "actions/checkout@main"
             ),
             encoding="utf-8",
         )
 
     demonstrate("unpinned-ci-action", workflow_drift, gate_workflow_policy, "pinned checkout action")
+
+    def missing_required_check_policy(candidate: Path) -> None:
+        path = candidate / "quality/README.md"
+        path.write_text(
+            path.read_text(encoding="utf-8").replace("`quality / full`", "`quality / bypassed`"),
+            encoding="utf-8",
+        )
+
+    demonstrate(
+        "missing-required-check-policy",
+        missing_required_check_policy,
+        gate_repository_policy,
+        "quality/README.md",
+    )
     demonstrate(
         "unqualified-release",
         lambda _candidate: None,
@@ -1277,7 +1610,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         status, receipt = run_failure_demonstrations(root, receipt_path)
     else:
         status, receipt = execute_quality(root, args.mode, args.cache_policy, receipt_path)
-    print_summary(receipt_path.relative_to(root), receipt)
+    try:
+        display_path = receipt_path.relative_to(root)
+    except ValueError:
+        display_path = receipt_path
+    print_summary(display_path, receipt)
     return status
 
 

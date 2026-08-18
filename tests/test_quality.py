@@ -126,5 +126,73 @@ class QualityGateTests(unittest.TestCase):
         self.assertEqual("Ran 8 tests in <duration>s", normalized)
 
 
+    def test_schema_gate_rejects_invalid_sql(self) -> None:
+        temporary, root = self.repository_copy()
+        with temporary:
+            path = root / "schemas/fdir.sql"
+            path.write_text(
+                path.read_text(encoding="utf-8") + "THIS IS NOT SQL;\n",
+                encoding="utf-8",
+            )
+            result = quality.gate_schema_contracts(root)
+            self.assertEqual("failed", result.status)
+            self.assertTrue(
+                any("schemas/fdir.sql" in diagnostic for diagnostic in result.diagnostics)
+            )
+
+    def test_toolchain_gate_rejects_floating_action_version(self) -> None:
+        temporary, root = self.repository_copy()
+        with temporary:
+            path = root / "quality/toolchain.json"
+            value = quality.load_json(path)
+            value["actions"]["checkout"] = "main"
+            quality.write_json(path, value)
+            result = quality.gate_toolchain(root)
+            self.assertEqual("failed", result.status)
+            self.assertIn(
+                "action checkout must use an exact semantic version",
+                result.diagnostics,
+            )
+
+    def test_run_gate_safely_records_unexpected_exception(self) -> None:
+        def explode(_root: Path) -> quality.GateResult:
+            raise RuntimeError("intentional boom")
+
+        result = quality.run_gate_safely("exploding-gate", explode, REPOSITORY_ROOT)
+        self.assertEqual("failed", result.status)
+        self.assertIn(
+            "gate raised RuntimeError: intentional boom",
+            result.diagnostics,
+        )
+
+    def test_full_receipt_is_durable_but_not_release_certification(self) -> None:
+        result = quality.GateResult.passed("example")
+        receipt = quality.build_receipt(
+            REPOSITORY_ROOT,
+            "full",
+            "off",
+            "0" * 64,
+            1,
+            [result],
+        )
+        self.assertTrue(receipt["durableEvidence"])
+        self.assertEqual("integration-evidence", receipt["evidenceClass"])
+        self.assertFalse(receipt["releaseCertification"])
+        self.assertEqual(
+            quality.authoritative_results_digest([result]),
+            receipt["gateResultsSha256"],
+        )
+
+    def test_release_plan_extends_full_plan(self) -> None:
+        full = quality.gate_plan("full")
+        release = quality.gate_plan("release")
+        self.assertEqual(full, release[:-1])
+        self.assertEqual("release-qualification", release[-1])
+
+    def test_repository_policy_gate_passes(self) -> None:
+        result = quality.gate_repository_policy(REPOSITORY_ROOT)
+        self.assertEqual("passed", result.status, result.diagnostics)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -5,14 +5,13 @@
     "uploadArtifact": "7.0.1"
   },
   "ciPython": "3.12",
-  "maximumExclusive": "3.14",
-  "minimum": "3.12",
   "python": {
     "implementation": "CPython",
     "maximumExclusive": "3.14",
     "minimum": "3.12"
   },
   "qualityCommand": "python3 tools/quality.py --mode full --cache-policy off .",
+  "runnerImage": "ubuntu-24.04",
   "schema": "fdir/quality-toolchain/1",
   "thirdPartyDependencies": []
 }

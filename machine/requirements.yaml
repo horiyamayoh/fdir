@@ -93,7 +93,7 @@
     {
       "id": "FDIR-VAL-001",
       "level": "must",
-      "text": "The repository exposes one deterministic standard-library-only quality command with fast, full, and fail-closed release modes."
+      "text": "The repository exposes one deterministic standard-library-only quality command with fast, full, and fail-closed release modes, explicit cache policies, and machine-readable receipts."
     },
     {
       "id": "FDIR-VAL-002",

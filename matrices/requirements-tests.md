@@ -22,7 +22,7 @@
 | `FDIR-EQ-002` | must | `AT-EQUIVALENCE-INDETERMINATE`, `AT-EQUIVALENCE-REJECT` | Insufficient coverage yields indeterminate and cannot yield equivalent. |
 | `FDIR-ID-001` | must | `AT-CANONICAL-VECTOR` | Canonical serialization is deterministic and content digests are computed over canonical bytes. |
 | `FDIR-ID-002` | must | `AT-IDENTITY-SEPARATION` | Unit identity, cross-format equivalence, and cross-revision continuity remain distinct. |
-| `FDIR-VAL-001` | must | `AT-VALIDATION-ENTRY` | The repository exposes one deterministic standard-library-only quality command with fast, full, and fail-closed release modes. |
+| `FDIR-VAL-001` | must | `AT-VALIDATION-ENTRY` | The repository exposes one deterministic standard-library-only quality command with fast, full, and fail-closed release modes, explicit cache policies, and machine-readable receipts. |
 | `FDIR-VAL-002` | must | `AT-POSITIVE-NEGATIVE` | Positive examples validate and registered negative fixtures fail for their expected reason. |
 | `FDIR-VAL-003` | must | `AT-TRACEABILITY` | Every normative requirement is linked to at least one executable acceptance test. |
 | `FDIR-CLAIM-001` | must | `AT-NO-PRODUCTION-CLAIM` | The normative baseline does not claim that production converters are implemented or qualified. |
