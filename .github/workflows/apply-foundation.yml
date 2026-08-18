@@ -53,14 +53,17 @@ jobs:
 
           archive = "/tmp/fdir-foundation.tar.gz"
           with tarfile.open(archive, "r:gz") as bundle:
-              for member in bundle.getmembers():
+              members = bundle.getmembers()
+              print(f"FOUNDATION_BUNDLE_MEMBERS={len(members)}")
+              for member in members:
                   path = PurePosixPath(member.name)
                   if path.is_absolute() or ".." in path.parts:
                       raise SystemExit(f"unsafe archive path: {member.name}")
                   if not (member.isfile() or member.isdir()):
                       raise SystemExit(f"unsupported archive member: {member.name}")
+                  print(member.name)
+              bundle.extractall(path=".", members=members, filter="data")
           PY
-          tar -xzf /tmp/fdir-foundation.tar.gz
           rm -f \
             .foundation-bundle.part00 \
             .foundation-bundle.part01 \
