@@ -5,6 +5,7 @@ on:
     branches:
       - agent/issue-2-normative-baseline
     paths:
+      - .github/workflows/issue2-import.yml
       - .issue2/trigger
 
 permissions:
@@ -26,8 +27,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          cat .issue2/payload/part-* | base64 --decode > /tmp/fdir-baseline.tar.gz
-          echo "b78c28385cbce1a0afc43156796e7fbb9a8c10749647e9dff26ef420d1af0e91  /tmp/fdir-baseline.tar.gz" | sha256sum --check --strict
+          cat .bootstrap/fdir-source-hex/part-* \
+            | tr -d '[:space:]' \
+            | xxd -r -p > /tmp/fdir-baseline.tar.gz
+          echo "b78c28385cbce1a0afc43156796e7fbb9a8c10749647e9dff26ef420d1af0e91  /tmp/fdir-baseline.tar.gz" \
+            | sha256sum --check --strict
 
           mkdir -p /tmp/fdir-baseline
           python3 - <<'PY'
@@ -40,8 +44,8 @@ jobs:
                   path = PurePosixPath(member.name)
                   if path.is_absolute() or ".." in path.parts or member.issym() or member.islnk():
                       raise SystemExit(f"unsafe archive member: {member.name}")
+              handle.extractall("/tmp/fdir-baseline")
           PY
-          tar -xzf /tmp/fdir-baseline.tar.gz -C /tmp/fdir-baseline
           cp -a /tmp/fdir-baseline/. .
 
           python3 tools/generate_contracts.py .
