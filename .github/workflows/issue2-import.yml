@@ -50,15 +50,23 @@ jobs:
 
           git fetch --no-tags origin \
             "refs/heads/${SOURCE_BRANCH}:refs/remotes/origin/${SOURCE_BRANCH}"
+          rm -rf /tmp/fdir-source-branch
+          mkdir -p /tmp/fdir-source-branch
+          git archive "origin/${SOURCE_BRANCH}" .issue2/payload \
+            | tar -x -C /tmp/fdir-source-branch
+
           mapfile -t payload_paths < <(
-            git ls-tree -r --name-only "origin/${SOURCE_BRANCH}" -- .issue2/payload | sort
+            find /tmp/fdir-source-branch/.issue2/payload \
+              -mindepth 1 -maxdepth 1 -type f -name 'part-*' -print | sort
           )
           test "${#payload_paths[@]}" -eq 4
           for path in "${payload_paths[@]}"; do
-            git show "origin/${SOURCE_BRANCH}:${path}"
-          done \
-            | tr -d '[:space:]' \
-            | base64 --decode > /tmp/fdir-2.1.0-baseline.tar.gz
+            if grep -q '[^A-Za-z0-9+/=[:space:]]' "${path}"; then
+              echo "::error file=${path}::payload contains a non-base64 character"
+              exit 1
+            fi
+          done
+          cat "${payload_paths[@]}" | base64 --decode > /tmp/fdir-2.1.0-baseline.tar.gz
 
           actual_digest="$(sha256sum /tmp/fdir-2.1.0-baseline.tar.gz | cut -d ' ' -f1)"
           echo "FDIR baseline archive sha256: ${actual_digest}"
