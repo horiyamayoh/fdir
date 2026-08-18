@@ -109,7 +109,7 @@
       ]
     },
     {
-      "command": "python3 tools/validate_baseline.py .",
+      "command": "python3 tools/quality.py --mode full --cache-policy off .",
       "id": "AT-VALIDATION-ENTRY",
       "kind": "command",
       "requirements": [
@@ -117,7 +117,7 @@
       ]
     },
     {
-      "command": "python3 tools/validate_baseline.py .",
+      "command": "python3 tools/quality.py --mode full --cache-policy off .",
       "id": "AT-POSITIVE-NEGATIVE",
       "kind": "fixture-suite",
       "requirements": [

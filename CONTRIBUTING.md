@@ -64,19 +64,30 @@ The project owner currently permits small validated commits directly to `main`. 
 - Reference the owning issue in commit or PR text.
 - Do not mix unrelated work or silently rewrite another issue's owned paths.
 - Preserve deterministic generated output and commit all required generated artifacts together with the authority change.
+- Do not merge unless the exact required check `quality / full` passes for the pull-request head revision.
 - Never force-push shared history without explicit project-owner approval and a recorded reason.
 
 ## 5. Validation evidence
 
-Until issue #6 installs the complete repository quality runner, the mandatory baseline check is:
+The mandatory integration check is:
 
 ```bash
-python3 tools/validate_baseline.py .
+python3 tools/quality.py --mode full --cache-policy off .
 ```
 
-Run every additional check relevant to the changed responsibility. Record exact commands, versions, result summaries, and any intentionally unavailable checks in the issue or pull request. A check that did not run is not a pass.
+For a bounded edit loop, `--mode fast` is permitted, but it does not replace the full command before review or integration and cannot certify a release. The GitHub Actions result named `quality / full` is the required pull-request and main-integration check.
 
-For generated contracts, validation must include byte-for-byte regeneration parity. For implementation changes, formatting, linting, unit tests, integration tests, negative cases, and applicable qualification fixtures become mandatory as the corresponding infrastructure lands.
+Record the exact command, Python version, mode, cache policy, result, and receipt path in the issue or pull request. A check that did not run, discovered no tests, used a stale cache, or returned skipped/neutral/cancelled is not a pass. Full receipts are written under `reports/quality/` and archived by CI.
+
+For generated contracts, validation includes byte-for-byte regeneration parity and schema-contract checks. For implementation changes, formatting, linting, all discovered unit/integration tests, relevant positive and negative cases, requirement/test traceability, documentation links, and claim discipline are mandatory.
+
+Use the intentional-failure suite when changing a quality gate or its policy:
+
+```bash
+python3 tools/quality.py --self-test-gates .
+```
+
+`release` mode is a separate fail-closed qualification boundary. It is expected to fail while any release tuple remains unqualified; a passing full check must never be presented as production qualification. See [`quality/README.md`](quality/README.md) for the mode, cache, receipt, and required-check contract.
 
 ## 6. Pull requests
 

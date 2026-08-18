@@ -11,7 +11,7 @@ FDIR is an intermediate representation and compiler architecture for extracting 
 | Normative baseline | `FDIR 2.1.0` |
 | Design status | Final and frozen for the 2.1 line |
 | Logical authority | `machine/logical-model.yaml` + `tools/generate_contracts.py` |
-| Baseline validation | `python3 tools/validate_baseline.py .` |
+| Repository quality | `python3 tools/quality.py --mode full --cache-policy off .` |
 | Release claim scope | Scope revision `1`; four tuples; `development-unqualified` |
 | Release traceability | `python3 tools/validate_release_traceability.py --check --self-test .` |
 | Production converter implementation | Not provided by this baseline |
@@ -20,6 +20,7 @@ FDIR is an intermediate representation and compiler architecture for extracting 
 | Product umbrella issue | [#1](https://github.com/horiyamayoh/fdir/issues/1) |
 | Completion roadmap | [#4](https://github.com/horiyamayoh/fdir/issues/4) |
 | Release scope issue | [#5](https://github.com/horiyamayoh/fdir/issues/5) |
+| Quality framework issue | [#6](https://github.com/horiyamayoh/fdir/issues/6) |
 
 A successful schema validation or example extraction is not a production claim. A capability becomes production-qualified only for an exact format/capability/profile tuple backed by qualification evidence.
 
@@ -53,7 +54,9 @@ EquivalenceCertificate                    InventoryDomain / AccountingItem
 | `machine/` | Logical model, profiles, requirements, tests, ADRs, migration, and backlog boundary |
 | `release/` | Claim manifest, end-to-end traceability, deferred scope, blocker policy, and scope approvals |
 | `schemas/` | Deterministically generated core contracts |
-| `tools/` | Contract, traceability, canonicalization, and baseline validators |
+| `tools/` | Contract, traceability, canonicalization, and repository-quality validators |
+| `tests/` | Standard-library unit and integration-style repository gate tests |
+| `quality/` | Pinned toolchain and required-check, cache, and receipt policy |
 | `examples/` | Assertion-first logical examples |
 | `fixtures/` | Positive, negative, and canonical vectors |
 | `matrices/` | Generated requirement/test, claim, traceability, and design-status projections |
@@ -65,6 +68,7 @@ EquivalenceCertificate                    InventoryDomain / AccountingItem
 
 - [Contributing and issue lifecycle](CONTRIBUTING.md)
 - [Development and build policy](DEVELOPMENT.md)
+- [Repository quality and required-check policy](quality/README.md)
 - [Security and private vulnerability reporting](SECURITY.md)
 - [Apache License 2.0](LICENSE)
 - [Issue intake forms](.github/ISSUE_TEMPLATE/)
@@ -74,16 +78,31 @@ The project owner currently permits small validated commits directly to `main`; 
 
 ## Validate
 
+The required local and CI integration command is:
+
+```bash
+python3 tools/quality.py --mode full --cache-policy off .
+```
+
+It uses only CPython's standard library and checks the pinned toolchain, text format, Python lint, documentation links, generated-contract byte parity, JSON Schema/JSON-LD/CDDL/SQLite contract structure, positive and negative fixtures, normative requirement/test traceability, baseline and release-scope traceability, unit tests, CI policy, repository policy, and unsupported production claims. The default machine-readable receipt is `reports/quality/full.json`.
+
+For a shorter edit loop that cannot certify integration or release:
+
+```bash
+python3 tools/quality.py --mode fast --cache-policy off .
+```
+
+To demonstrate that every major gate rejects an intentional defect:
+
+```bash
+python3 tools/quality.py --self-test-gates .
+```
+
+Explicit `read-write` and `read-only` cache policies are available for equivalence checks; neither policy skips authoritative gates. `release` mode adds fail-closed qualification and intentionally fails while the claim manifest remains `development-unqualified`. See [the repository quality policy](quality/README.md) for the mode matrix, receipt schemas, cache rules, exact required check name, and release boundary.
+
+The lower-level validators remain available for focused diagnosis:
+
 ```bash
 python3 tools/validate_baseline.py .
-```
-
-The command checks generated-contract parity, schema structure, examples, negative fixtures, accounting closure, canonical vectors, requirement/test traceability, release-claim ownership, scope approvals, generated release matrices, projection boundaries, and Python syntax using only the standard library. It rejects stale generated mappings and runs fail-closed traceability self-tests for orphan requirements/tests, missing owners, missing due evidence, unqualified production exposure, and stale scope approval.
-
-For a machine-readable completion summary:
-
-```bash
 python3 tools/validate_release_traceability.py --check --self-test --json .
 ```
-
-Issue #6 will add the unified fast/full/release quality runner described in `DEVELOPMENT.md`.
