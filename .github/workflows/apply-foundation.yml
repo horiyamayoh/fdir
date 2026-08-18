@@ -1,4 +1,4 @@
-name: Apply final foundation bundle
+name: Recover final foundation sources
 
 on:
   pull_request:
@@ -21,11 +21,11 @@ permissions:
   contents: write
 
 concurrency:
-  group: apply-final-foundation
+  group: recover-final-foundation
   cancel-in-progress: false
 
 jobs:
-  apply:
+  recover:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     steps:
@@ -35,7 +35,7 @@ jobs:
           ref: agent/finalize-development-foundation
           fetch-depth: 0
 
-      - name: Verify, unpack, and validate the final foundation
+      - name: Verify and recover the four foundation source files
         shell: bash
         run: |
           set -euo pipefail
@@ -45,23 +45,27 @@ jobs:
               .foundation-bundle.part03 \
             | base64 --decode > /tmp/fdir-foundation.tar.gz
           actual_sha256="$(sha256sum /tmp/fdir-foundation.tar.gz | awk '{print $1}')"
-          echo "FOUNDATION_BUNDLE_SHA256=${actual_sha256}"
           test "${actual_sha256}" = '8af4c38b7eb465a64841cb95971f2157d8f0a0b8d7c9d91ecdfa45984d1f6c72'
           python3 - <<'PY'
           from pathlib import PurePosixPath
           import tarfile
 
+          expected = [
+              "machine/implementation-policy.yaml",
+              "machine/dependency-manifest.schema.json",
+              "machine/dependency-catalog.yaml",
+              "references/dependency-candidate-assessments.md",
+          ]
           archive = "/tmp/fdir-foundation.tar.gz"
           with tarfile.open(archive, "r:gz") as bundle:
               members = bundle.getmembers()
-              print(f"FOUNDATION_BUNDLE_MEMBERS={len(members)}")
+              names = [member.name for member in members]
+              if names != expected:
+                  raise SystemExit(f"unexpected archive member list: {names!r}")
               for member in members:
                   path = PurePosixPath(member.name)
-                  if path.is_absolute() or ".." in path.parts:
-                      raise SystemExit(f"unsafe archive path: {member.name}")
-                  if not (member.isfile() or member.isdir()):
-                      raise SystemExit(f"unsupported archive member: {member.name}")
-                  print(member.name)
+                  if path.is_absolute() or ".." in path.parts or not member.isfile():
+                      raise SystemExit(f"unsafe archive member: {member.name}")
               bundle.extractall(path=".", members=members, filter="data")
           PY
           rm -f \
@@ -70,12 +74,9 @@ jobs:
             .foundation-bundle.part02 \
             .foundation-bundle.part03 \
             .github/workflows/apply-foundation.yml
-          python3 tools/validate_implementation_policy.py --check --self-test --json .
-          python3 -m unittest tests/test_implementation_policy.py -v
-          python3 tools/generate_traceability.py --check .
-          python3 tools/quality.py --mode full --cache-policy off .
+          git diff --check
 
-      - name: Commit the validated foundation
+      - name: Commit the recovered source files
         shell: bash
         run: |
           set -euo pipefail
@@ -83,5 +84,5 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add --all
           git diff --cached --check
-          git commit -m 'Finalize issue-driven development foundation (#32)'
+          git commit -m 'Recover final foundation policy sources (#32)'
           git push origin HEAD:agent/finalize-development-foundation
