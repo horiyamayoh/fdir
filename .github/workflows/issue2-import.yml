@@ -30,6 +30,7 @@ jobs:
     env:
       TARGET_BRANCH: agent/issue-2-normative-baseline
       SOURCE_BRANCH: agent/issue-2-fdir-2.1-baseline
+      SOURCE_PAYLOAD_TREE: b7d611f0961fca5afc2a9725a794b58b7c3ed4e5
       BASELINE_ARCHIVE_SHA256: 66868d4f85d9bbd7304519d165d9c769c0cb836aa35bbaa7ec631f7dbcca3c8f
     steps:
       - name: Check out dedicated branch
@@ -50,10 +51,11 @@ jobs:
 
           git fetch --no-tags origin \
             "refs/heads/${SOURCE_BRANCH}:refs/remotes/origin/${SOURCE_BRANCH}"
-          rm -rf /tmp/fdir-source-branch
-          mkdir -p /tmp/fdir-source-branch
-          git archive "origin/${SOURCE_BRANCH}" .issue2/payload \
-            | tar -x -C /tmp/fdir-source-branch
+          git cat-file -e "${SOURCE_PAYLOAD_TREE}^{tree}"
+          rm -rf /tmp/fdir-source-payload
+          mkdir -p /tmp/fdir-source-payload
+          git archive "${SOURCE_PAYLOAD_TREE}" \
+            | tar -x -C /tmp/fdir-source-payload
 
           python3 - <<'PY'
           import base64
@@ -61,11 +63,13 @@ jobs:
           import os
           from pathlib import Path
 
-          payload_dir = Path('/tmp/fdir-source-branch/.issue2/payload')
+          payload_dir = Path('/tmp/fdir-source-payload')
           parts = sorted(payload_dir.glob('part-*'))
+          print(f'Pinned payload tree: {os.environ["SOURCE_PAYLOAD_TREE"]}')
           print(f'Baseline payload parts: {len(parts)}')
           if len(parts) != 4:
-              raise SystemExit(f'expected 4 payload parts, found {len(parts)}')
+              names = ', '.join(part.name for part in parts)
+              raise SystemExit(f'expected 4 payload parts, found {len(parts)}: {names}')
 
           chunks = []
           for part in parts:
