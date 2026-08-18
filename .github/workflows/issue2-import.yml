@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TARGET_BRANCH: agent/issue-2-normative-baseline
-      BASELINE_ARCHIVE_SHA256: b78c28385cbce1a0afc43156796e7fbb9a8c10749647e9dff26ef420d1af0e91
+      BASELINE_ARCHIVE_SHA256: f56efd9aa7f8ee80a9fbf89d54e770049a62de8b1984a7bbe516f267103cc8b3
     steps:
       - name: Check out dedicated branch
         uses: actions/checkout@v4
