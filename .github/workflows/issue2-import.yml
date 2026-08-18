@@ -29,7 +29,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TARGET_BRANCH: agent/issue-2-normative-baseline
-      BASELINE_ARCHIVE_SHA256: f56efd9aa7f8ee80a9fbf89d54e770049a62de8b1984a7bbe516f267103cc8b3
+      SOURCE_BRANCH: agent/issue-2-fdir-2.1-baseline
+      BASELINE_ARCHIVE_SHA256: 66868d4f85d9bbd7304519d165d9c769c0cb836aa35bbaa7ec631f7dbcca3c8f
     steps:
       - name: Check out dedicated branch
         uses: actions/checkout@v4
@@ -37,7 +38,7 @@ jobs:
           ref: agent/issue-2-normative-baseline
           fetch-depth: 0
 
-      - name: Verify, import, validate, and publish the baseline
+      - name: Verify complete normative source archive
         shell: bash
         run: |
           set -euo pipefail
@@ -47,74 +48,91 @@ jobs:
             exit 0
           fi
 
-          cat .issue2/payload/part-* \
+          git fetch --no-tags origin \
+            "refs/heads/${SOURCE_BRANCH}:refs/remotes/origin/${SOURCE_BRANCH}"
+          mapfile -t payload_paths < <(
+            git ls-tree -r --name-only "origin/${SOURCE_BRANCH}" -- .issue2/payload | sort
+          )
+          test "${#payload_paths[@]}" -eq 4
+          for path in "${payload_paths[@]}"; do
+            git show "origin/${SOURCE_BRANCH}:${path}"
+          done \
             | tr -d '[:space:]' \
-            | base64 --decode > /tmp/fdir-baseline.tar.gz
-          actual_digest="$(sha256sum /tmp/fdir-baseline.tar.gz | cut -d ' ' -f1)"
+            | base64 --decode > /tmp/fdir-2.1.0-baseline.tar.gz
+
+          actual_digest="$(sha256sum /tmp/fdir-2.1.0-baseline.tar.gz | cut -d ' ' -f1)"
           echo "FDIR baseline archive sha256: ${actual_digest}"
           test "${actual_digest}" = "${BASELINE_ARCHIVE_SHA256}"
 
+      - name: Extract and validate source package
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/fdir-baseline
           mkdir -p /tmp/fdir-baseline
           python3 - <<'PY'
           import tarfile
-          from pathlib import PurePosixPath
+          from pathlib import Path, PurePosixPath
 
-          archive = "/tmp/fdir-baseline.tar.gz"
-          with tarfile.open(archive, "r:gz") as handle:
-              for member in handle.getmembers():
+          archive = Path('/tmp/fdir-2.1.0-baseline.tar.gz')
+          destination = Path('/tmp/fdir-baseline')
+          with tarfile.open(archive, 'r:gz') as handle:
+              members = handle.getmembers()
+              if len(members) != 57:
+                  raise SystemExit(f'unexpected archive file count: {len(members)}')
+              for member in members:
                   path = PurePosixPath(member.name)
-                  if path.is_absolute() or ".." in path.parts or member.issym() or member.islnk():
-                      raise SystemExit(f"unsafe archive member: {member.name}")
-              handle.extractall("/tmp/fdir-baseline")
+                  if (
+                      path.is_absolute()
+                      or '..' in path.parts
+                      or member.issym()
+                      or member.islnk()
+                      or not member.isfile()
+                  ):
+                      raise SystemExit(f'unsafe archive member: {member.name}')
+              handle.extractall(destination)
           PY
 
-          mapfile -t archive_roots < <(find /tmp/fdir-baseline -mindepth 1 -maxdepth 1 -print | sort)
-          if [[ "${#archive_roots[@]}" -eq 1 && -d "${archive_roots[0]}" ]]; then
-            import_root="${archive_roots[0]}"
-          else
-            import_root=/tmp/fdir-baseline
-          fi
-          echo "FDIR baseline import root: ${import_root}"
-          find "${import_root}" -mindepth 1 -maxdepth 2 -print | sort | sed -n '1,120p'
-          cp -a "${import_root}/." .
+          cd /tmp/fdir-baseline
+          echo "Validated source package entries:"
+          find . -mindepth 1 -maxdepth 2 -print | sort
+          test -f baseline.yaml
+          test -f machine/logical-model.yaml
+          test -f tools/generate_contracts.py
+          test -f tools/generate_traceability.py
+          test -f tools/validate_baseline.py
+          test -f references/artifact-packaging.md
+          test -f .github/workflows/validate-baseline.yml
 
-          echo "Imported tool files:"
-          if [[ -d tools ]]; then
-            find tools -mindepth 1 -maxdepth 2 -type f -print | sort
-          else
-            echo "(tools directory missing)"
-          fi
-
-          require_file() {
-            local path="$1"
-            if [[ ! -f "${path}" ]]; then
-              echo "::error file=${path}::required baseline source file is missing"
-              return 1
-            fi
-          }
-          require_file baseline.yaml
-          require_file machine/logical-model.yaml
-          require_file tools/generate_contracts.py
-          require_file tools/generate_traceability.py
-          require_file tools/validate_baseline.py
-
-          python3 tools/generate_contracts.py .
-          python3 tools/generate_traceability.py .
           python3 tools/generate_contracts.py --check .
           python3 tools/generate_traceability.py --check .
           python3 tools/validate_baseline.py .
           python3 -m py_compile tools/*.py
           find tools -type d -name __pycache__ -prune -exec rm -rf {} +
 
+      - name: Publish validated source in focused commits
+        shell: bash
+        run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config core.autocrlf false
 
-          git add baseline.yaml machine spec
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -a /tmp/fdir-baseline/. .
+
+          git add README.md baseline.yaml machine \
+            spec/README.md \
+            spec/01-authority.md \
+            spec/02-assertion-first-model.md \
+            spec/03-evidence-and-accounting.md \
+            spec/04-completeness-and-equivalence.md \
+            spec/05-canonicalization-and-identity.md \
+            spec/06-claims-and-qualification.md
           git commit -m "Import FDIR 2.1 normative authority (#2)"
           git push origin "HEAD:${TARGET_BRANCH}"
 
-          git add tools schemas
+          git add tools schemas spec/generated
           git commit -m "Generate FDIR 2.1 contracts from machine authority (#2)"
           git push origin "HEAD:${TARGET_BRANCH}"
 
@@ -122,7 +140,16 @@ jobs:
           git commit -m "Add baseline fixtures and traceability validation (#2)"
           git push origin "HEAD:${TARGET_BRANCH}"
 
-          git add README.md .gitignore .gitattributes references diagrams
-          git rm -r --ignore-unmatch .bootstrap .issue2 .github/workflows/issue2-import.yml
-          git commit -m "Document baseline authority and remove bootstrap staging (#2)"
+          git add .gitattributes .gitignore .github/workflows/validate-baseline.yml references diagrams
+          git add -A -- .bootstrap .issue2 .github/workflows/issue2-import.yml
+          git commit -m "Document review artifacts and add baseline CI (#2)"
+
+          python3 tools/generate_contracts.py --check .
+          python3 tools/generate_traceability.py --check .
+          python3 tools/validate_baseline.py .
+          python3 -m py_compile tools/*.py
+          find tools -type d -name __pycache__ -prune -exec rm -rf {} +
+          test -z "$(git status --porcelain --untracked-files=no)"
+
           git push origin "HEAD:${TARGET_BRANCH}"
+          echo "Published validated FDIR baseline at $(git rev-parse HEAD)"
