@@ -6,6 +6,11 @@ on:
       - agent/issue-2-fdir-2.1-baseline
     paths:
       - .issue2/trigger
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .issue2/trigger
 
 permissions:
   contents: write
@@ -13,6 +18,9 @@ permissions:
 concurrency:
   group: issue-2-baseline-import
   cancel-in-progress: false
+
+env:
+  TARGET_BRANCH: agent/issue-2-fdir-2.1-baseline
 
 jobs:
   assemble:
@@ -88,19 +96,19 @@ jobs:
             spec/05-canonicalization-and-identity.md \
             spec/06-claims-and-qualification.md
           git commit -m "Import FDIR 2.1 normative authority (#2)"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git push origin "HEAD:${TARGET_BRANCH}"
 
           git add tools schemas spec/generated
           git commit -m "Generate FDIR 2.1 contracts from machine authority (#2)"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git push origin "HEAD:${TARGET_BRANCH}"
 
           git add examples fixtures matrices queries
           git commit -m "Add baseline fixtures and traceability validation (#2)"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git push origin "HEAD:${TARGET_BRANCH}"
 
           git add .gitattributes .gitignore .github/workflows/validate-baseline.yml references diagrams
           git commit -m "Document review artifacts and add baseline CI (#2)"
           python3 tools/validate_baseline.py .
           find tools -type d -name __pycache__ -prune -exec rm -rf {} +
           test -z "$(git status --porcelain --untracked-files=no)"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git push origin "HEAD:${TARGET_BRANCH}"
