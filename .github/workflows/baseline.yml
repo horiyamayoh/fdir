@@ -25,8 +25,18 @@ jobs:
           echo "expected=${expected}"
           echo "actual=${actual}"
           test "${actual}" = "${expected}"
+
+          set +e
+          gzip -dc /tmp/issue6-changes.tar.gz > /tmp/issue6-changes.tar
+          gzip_status=$?
+          set -e
+          if [[ "${gzip_status}" -ne 0 ]]; then
+            echo "::warning::gzip footer is damaged; validating the recovered tar before use"
+          fi
+          tar -tf /tmp/issue6-changes.tar
+
           message="$(cat .issue6-import/COMMIT_MESSAGE)"
-          tar -xzf /tmp/issue6-changes.tar.gz -C .
+          tar -xf /tmp/issue6-changes.tar -C .
           rm -rf .issue6-import .issue6-export
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
