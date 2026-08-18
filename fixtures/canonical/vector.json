@@ -1,0 +1,17 @@
+{
+  "canonical": "{\"a\":{\"n\":null,\"number\":1.25},\"z\":[3,{\"a\":true,\"é\":\"value\"}]}",
+  "digest": "sha256:2d464b2fdfdead3b231fa814e2e744856b9281de7ca82199c27d46b3b78d2fa1",
+  "value": {
+    "a": {
+      "n": null,
+      "number": 1.25
+    },
+    "z": [
+      3,
+      {
+        "a": true,
+        "é": "value"
+      }
+    ]
+  }
+}
