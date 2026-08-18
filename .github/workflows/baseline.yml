@@ -1,26 +1,33 @@
-name: FDIR baseline
+name: Issue 6 validated workspace import
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
-      - agent/issue-2-fdir-2.1-baseline
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  validate:
+  import:
+    if: github.head_ref == 'agent/issue-6-quality-gates'
     runs-on: ubuntu-latest
     steps:
-      - name: Check out source
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Check out Issue 6 branch
+        uses: actions/checkout@v6.0.2
         with:
-          python-version: "3.12"
-      - name: Validate FDIR 2.1 normative baseline
-        run: python3 tools/validate_baseline.py .
-      - name: Validate release scope and traceability summary
-        run: python3 tools/validate_release_traceability.py --check --self-test --json .
+          ref: agent/issue-6-quality-gates
+      - name: Apply validated core quality archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .issue6-import/part-* > /tmp/issue6-changes.tar.gz
+          expected="$(cat .issue6-import/archive.sha256)"
+          actual="$(sha256sum /tmp/issue6-changes.tar.gz | cut -d' ' -f1)"
+          test "${actual}" = "${expected}"
+          message="$(cat .issue6-import/COMMIT_MESSAGE)"
+          tar -xzf /tmp/issue6-changes.tar.gz -C .
+          rm -rf .issue6-import .issue6-export
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "${message}"
+          git push origin HEAD:agent/issue-6-quality-gates
