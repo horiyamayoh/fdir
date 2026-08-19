@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/issue-12-adapter-process-boundary
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
