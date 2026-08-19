@@ -22,10 +22,11 @@
     },
     {
       "dependencies": [
+        "fdir-canonical",
         "fdir-core"
       ],
       "name": "fdir-storage",
-      "responsibility": "authoritative storage boundary"
+      "responsibility": "canonical snapshots and content-addressed evidence storage boundary"
     },
     {
       "dependencies": [

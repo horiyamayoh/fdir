@@ -1,10 +1,10 @@
 # Rust reference-product foundation
 
-This document describes the Issue #7 foundation. It establishes buildable product boundaries and developer tooling; it does not claim that any document format, canonical identity implementation, storage engine, adapter, projection, equivalence operation, or release tuple is production-ready.
+This document describes the Issue #7 Rust foundation and the unqualified product boundaries implemented through Issues #8, #9, and #10. It does not claim that any document format, adapter, projection, equivalence operation, or release tuple is production-ready. Canonical identity and authoritative storage are implemented development boundaries, not qualification evidence.
 
 ## Pinned toolchain
 
-`rust-toolchain.toml` is authoritative for Rust 1.97.1, the minimal profile, `rustfmt`, Clippy, and the `x86_64-unknown-linux-gnu` CI target. `Cargo.toml` records Rust 1.97.1 as the minimum supported version and uses Rust edition 2024. `Cargo.lock` is committed even though the foundation intentionally has no external Rust packages.
+`rust-toolchain.toml` is authoritative for Rust 1.97.1, the minimal profile, `rustfmt`, Clippy, and the `x86_64-unknown-linux-gnu` CI target. `Cargo.toml` records Rust 1.97.1 as the minimum supported version and uses Rust edition 2024. `Cargo.lock` is committed, and the workspace still has no external Rust packages.
 
 The repository-level quality command remains:
 
@@ -25,7 +25,7 @@ cargo run -p fdir-cli -- --help
 cargo run -p fdir-cli -- metadata --output json
 ```
 
-Cargo output is isolated under `.validation/rust-target`, and Cargo network access is disabled at this dependency-free foundation stage.
+Cargo output is isolated under `.validation/rust-target`, and Cargo network access remains disabled because every current dependency is an exact workspace path.
 
 ## Acyclic crate graph
 
@@ -34,9 +34,9 @@ The machine-readable graph is `quality/rust-workspace.json`.
 | Crate | Direct dependencies | Boundary |
 |---|---|---|
 | `fdir-contract` | none | Generated neutral model and canonical-vector metadata |
-| `fdir-core` | `fdir-contract` | Failure classes, exit semantics, build metadata, and unavailable-capability vocabulary |
-| `fdir-canonical` | `fdir-core` | Canonical JSON and identity boundary; implementation unavailable |
-| `fdir-storage` | `fdir-core` | Authoritative storage boundary; implementation unavailable |
+| `fdir-core` | `fdir-contract` | Failure classes, status semantics, build metadata, and capability vocabulary |
+| `fdir-canonical` | `fdir-core` | Implemented canonical JSON, digest, and identity-DAG boundary; development-unqualified |
+| `fdir-storage` | `fdir-core`, `fdir-canonical` | Implemented canonical snapshot and content-addressed evidence store; development-unqualified |
 | `fdir-adapter-sdk` | `fdir-core` | Protocol and process-isolation metadata only |
 | `fdir-accounting` | `fdir-core` | Exhaustive-accounting boundary; implementation unavailable |
 | `fdir-adapters` | `fdir-core`, `fdir-adapter-sdk` | Empty first-party adapter registry |
@@ -45,11 +45,19 @@ The machine-readable graph is `quality/rust-workspace.json`.
 | `fdir-test-support` | `fdir-core` | Deterministic clock/RNG and isolated temporary-store fixtures |
 | `fdir-cli` | `fdir-core`, `fdir-coordinator`; test-only `fdir-test-support` | Stable help/version/metadata interface and structured failures |
 
-Dependencies flow downward only. Format names and adapter-specific vocabulary are forbidden in `fdir-core`. There is no document parser, renderer, OCR engine, FFI dependency, unsafe block, or admitted runtime package.
+Dependencies flow downward only. Format names and adapter-specific vocabulary are forbidden in `fdir-core`. There is no document parser, renderer, OCR engine, FFI dependency, unsafe block, or admitted external runtime package.
+
+## Canonical snapshot and object-store rules
+
+`fdir-storage` writes current `fdir/snapshot/1` containers as exact canonical JSON and addresses both snapshots and evidence objects by plain SHA-256 content digests. A reader verifies the requested digest before parsing, rejects non-canonical bytes, negotiates the snapshot and canonical-JSON versions without implicit migration, validates the object-reference DAG, preserves explicit non-success states and provenance, and verifies every required object digest and byte length.
+
+Mutation transactions use a store-local exclusive lock. New bytes are synchronized to a temporary file and atomically renamed to their final content-addressed path. Temporary paths and stale locks are never accepted as complete state; cleanup requires the explicit recovery API. Portable exports write their completion marker last and are published by directory rename. Imports verify the marker, snapshot identity, canonical bytes, and every object before publishing the snapshot.
+
+Snapshot retention is explicit. Garbage collection treats every retained snapshot as a root, fails closed when any retained snapshot or required object is invalid, and can either report or delete only objects unreachable from all roots. Deleting a snapshot never silently deletes evidence; a subsequent explicit garbage-collection pass performs that action.
 
 ## CLI and failure semantics
 
-The `fdir` binary exposes only foundation operations: `metadata`, `capabilities`, `status-codes`, and `validate-config`. Conversion, extraction, persistence, projection, equivalence, and lineage commands are absent. `capabilities` reports every incomplete boundary as unavailable and non-production.
+The `fdir` binary exposes only foundation operations: `metadata`, `capabilities`, `status-codes`, and `validate-config`. Conversion, extraction, persistence, projection, equivalence, and lineage commands remain absent. `capabilities` reports implemented boundaries as available but non-production and incomplete boundaries as unavailable.
 
 Exit codes are stable:
 
