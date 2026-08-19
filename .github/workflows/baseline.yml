@@ -48,10 +48,6 @@ jobs:
           cargo --version
           rustfmt --version
           cargo clippy --version
-      - name: Bootstrap the admitted dependency lockfile
-        env:
-          CARGO_NET_OFFLINE: "false"
-        run: cargo generate-lockfile
       - name: Fetch admitted Rust dependencies
         env:
           CARGO_NET_OFFLINE: "false"
