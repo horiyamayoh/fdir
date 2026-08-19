@@ -5,7 +5,7 @@
   "generator": "tools/generate_rust_contract.py",
   "logicalModel": "machine/logical-model.yaml",
   "output": "crates/fdir-contract/src/generated.rs",
-  "outputSha256": "97fce664e986d53653b841c881cc8965f831ab8dbbfe1d24d4d88aedbd09b0ee",
+  "outputSha256": "11ac49045ab1d7319fcb26d052fee794c0ac7d8fbc396cae811ec2e36fc0aa5c",
   "schema": "fdir/rust-generated-contract/2",
   "strongIdCount": 21,
   "typedProjection": true

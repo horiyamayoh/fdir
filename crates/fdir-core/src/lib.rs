@@ -116,7 +116,7 @@ impl Display for CommandFailure {
 
 impl Error for CommandFailure {}
 
-/// Explicit metadata for an unavailable, non-production capability boundary.
+/// Explicit metadata for one capability boundary and its qualification state.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CapabilityStatus {
     /// Stable capability identifier.
@@ -130,13 +130,24 @@ pub struct CapabilityStatus {
 }
 
 impl CapabilityStatus {
-    /// Construct the only capability state permitted by the foundation issue.
+    /// Construct an explicitly unavailable capability boundary.
     #[must_use]
     pub const fn unavailable(id: &'static str, owning_issue: u32) -> Self {
         Self {
             id,
             owning_issue,
             available: false,
+            production_ready: false,
+        }
+    }
+
+    /// Construct an implemented capability that still carries no production qualification.
+    #[must_use]
+    pub const fn implemented_unqualified(id: &'static str, owning_issue: u32) -> Self {
+        Self {
+            id,
+            owning_issue,
+            available: true,
             production_ready: false,
         }
     }
@@ -202,6 +213,7 @@ pub fn json_quote(value: &str) -> String {
 
 mod foundation;
 
+pub use fdir_contract::{CanonicalValue, Digest, JsonError, JsonNumber, ObjectValue, ValueError};
 pub use foundation::{
     Budget, CapabilityRef, EvidenceLane, FoundationError, ProcessingResult, ProfileRef, Provenance,
     ResultState, StatusVector,
@@ -209,7 +221,7 @@ pub use foundation::{
 
 #[cfg(test)]
 mod tests {
-    use super::{CommandFailure, FailureClass, json_quote};
+    use super::{CapabilityStatus, CommandFailure, FailureClass, json_quote};
 
     #[test]
     fn failure_exit_codes_are_distinct() {
@@ -238,5 +250,12 @@ mod tests {
     #[test]
     fn json_quote_escapes_control_characters() {
         assert_eq!(json_quote("a\nb\"c"), "\"a\\nb\\\"c\"");
+    }
+
+    #[test]
+    fn implemented_capabilities_remain_unqualified() {
+        let capability = CapabilityStatus::implemented_unqualified("canonical-identity", 9);
+        assert!(capability.available);
+        assert!(!capability.production_ready);
     }
 }

@@ -5,7 +5,7 @@ use std::path::Path;
 
 use fdir_core::{BuildMetadata, CapabilityStatus, CommandFailure, FailureClass};
 
-/// Every capability boundary visible at the foundation stage.
+/// Every capability boundary visible at the current implementation stage.
 pub const CAPABILITIES: &[CapabilityStatus] = &[
     fdir_canonical::CAPABILITY,
     fdir_storage::CAPABILITY,
@@ -198,14 +198,19 @@ mod tests {
     use super::{CAPABILITIES, LogLevel, OutputFormat, display_path, parse_config};
 
     #[test]
-    fn every_foundation_capability_is_unavailable_and_non_production() {
+    fn implemented_capabilities_remain_explicitly_unqualified() {
         assert!(!CAPABILITIES.is_empty());
-        assert!(CAPABILITIES.iter().all(|capability| !capability.available));
         assert!(
             CAPABILITIES
                 .iter()
                 .all(|capability| !capability.production_ready)
         );
+        let available: Vec<&str> = CAPABILITIES
+            .iter()
+            .filter(|capability| capability.available)
+            .map(|capability| capability.id)
+            .collect();
+        assert_eq!(available, vec!["canonical-identity"]);
     }
 
     #[test]

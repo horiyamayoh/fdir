@@ -13,9 +13,9 @@ mod generated_contract {
     /// Root entity declared by the logical model.
     pub const ROOT_ENTITY: &str = "Snapshot";
     /// SHA-256 of the canonical-vector source bytes.
-    pub const CANONICAL_VECTOR_SHA256: &str = "7d1897743f643096a37625e50ac6deeb8cda8443ec63890f1f1ba17726f33dc5";
+    pub const CANONICAL_VECTOR_SHA256: &str = "1b455af0224e20dc9eb0737b84e13f50a389553ad0e0b54b21fafa1154b3070d";
     /// Byte length of the canonical-vector source.
-    pub const CANONICAL_VECTOR_LENGTH: usize = 342;
+    pub const CANONICAL_VECTOR_LENGTH: usize = 7597;
     /// Canonical vector compiled directly from the repository authority.
     pub const CANONICAL_VECTOR_JSON: &str = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
