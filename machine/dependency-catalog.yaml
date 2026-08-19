@@ -2,8 +2,66 @@
   "schema": "fdir/dependency-catalog/1",
   "releaseLine": "2.1.x",
   "policyRevision": 1,
-  "state": "foundation-no-runtime-dependencies-admitted",
-  "dependencies": [],
+  "state": "development-runtime-dependencies-admitted",
+  "dependencies": [
+    {
+      "schema": "fdir/dependency-manifest/1",
+      "id": "rusqlite-0.40.1-bundled",
+      "name": "rusqlite",
+      "kind": "rust-crate",
+      "version": "0.40.1",
+      "features": [
+        "bundled"
+      ],
+      "implementationLanguage": "Rust and C",
+      "evidenceLanes": [
+        "storage-codec"
+      ],
+      "inputKinds": [
+        "canonical snapshot JSON",
+        "generated SQLite DDL",
+        "bounded query parameters"
+      ],
+      "outputKinds": [
+        "rebuildable SQLite database",
+        "deterministically ordered query rows"
+      ],
+      "normalizations": [
+        "generated metadata integers are stored using SQLite INTEGER affinity",
+        "derived convenience rows retain an RFC 6901 source path to canonical JSON"
+      ],
+      "unavailableSourceDistinctions": [],
+      "unsafeCode": true,
+      "ffi": true,
+      "nativeCode": true,
+      "receivesUntrustedDocumentBytes": false,
+      "processBoundary": "trusted-core",
+      "nativeAuthority": false,
+      "independentCensus": false,
+      "license": {
+        "spdx": "MIT",
+        "reviewStatus": "accepted"
+      },
+      "advisorySnapshot": {
+        "asOf": "2026-08-19",
+        "source": "RustSec advisory database and rusqlite upstream security advisories",
+        "status": "pending"
+      },
+      "determinism": {
+        "claim": "deterministic",
+        "nondeterminismRecorded": false
+      },
+      "networkPolicy": "deny",
+      "resourceCharacteristics": {
+        "cpu": "bounded by canonical snapshot size and supported query complexity",
+        "memory": "bounded by canonical snapshot and materialized row counts",
+        "temporaryStorage": "one sibling database for full rebuild plus one rollback backup during replacement",
+        "output": "bounded by canonical snapshot size and generated projection tables"
+      },
+      "qualificationState": "admitted-unqualified",
+      "ownerIssue": 11
+    }
+  ],
   "candidateAssessmentPath": "references/dependency-candidate-assessments.md",
   "admissionRule": "A product dependency is usable only after an owning issue records an exact manifest, evidence lanes, isolation decision, normalization-loss review, license/security review, and qualification state.",
   "productionCapabilityClaim": false

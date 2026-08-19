@@ -1,8 +1,8 @@
 # Dependency candidate assessment baseline
 
-This document records the **assessment method and representative dependency classes** for FDIR 2.1 product development. It does not select a final crate, parser, renderer, OCR engine, evaluator, model, or native library. Exact selections belong to their implementation issues and become usable only after admission through `machine/dependency-catalog.yaml`.
+This document records the **assessment method and representative dependency classes** for FDIR 2.1 product development. It does not select a final crate, parser, renderer, OCR engine, evaluator, model, or native library unless an issue-specific admission section below says otherwise. Exact selections become usable only after admission through `machine/dependency-catalog.yaml`.
 
-**No product runtime dependency is admitted at this foundation point.** The catalog is intentionally empty. This document therefore creates no product capability, implementation-completeness, or production-qualification claim.
+The foundation began with no product runtime dependency admitted. Issue-specific implementation work may admit an exact dependency without creating a production-capability claim.
 
 ## Admission decision rule
 
@@ -36,7 +36,7 @@ Clean text, paragraphs, cells, object models, repaired structures, ASTs, rendere
 - **Default boundary:** `trusted-core` or `in-process` only when the crate does not receive untrusted document bytes through unsafe/FFI/native code and its input contract is bounded.
 - **Required evidence:** exact version/features, canonical-vector parity, deterministic output, no silent identity normalization, license/advisory review, and dependency graph review.
 - **Decision owner:** Issues #7, #9, #10, and #11 according to responsibility.
-- **Foundation decision:** viable category; no exact crate selected or admitted.
+- **Foundation decision:** viable category; exact selections require issue-owned admission.
 
 ### High-level Markdown, DOCX, XLSX, or PDF libraries
 
@@ -85,6 +85,19 @@ Clean text, paragraphs, cells, object models, repaired structures, ASTs, rendere
 - **Required evidence:** calculation engine/version, locale/timezone/date system, calculation mode, external-resource policy, nondeterminism, stale-cache behavior, and resource limits.
 - **Decision owner:** Issues #16, #12, and #33.
 - **Foundation decision:** optional candidate class; unrestricted spreadsheet recalculation is not assumed.
+
+## Issue #11 admission: `rusqlite` 0.40.1 with bundled SQLite
+
+Issue #11 admits exactly `rusqlite` 0.40.1 with only the `bundled` feature for the rebuildable SQLite materialization boundary. The bundled release contains SQLite 3.53.2. The Cargo requirement is exact (`=0.40.1`), and `Cargo.lock` fixes the complete transitive graph.
+
+- **Lane and authority:** `storage-codec` only. SQLite never becomes snapshot, evidence, assertion, provenance, completeness, or identity authority. The index stores a digest-bound canonical snapshot copy and exact source paths solely to validate the derived rows.
+- **Input boundary:** generated DDL, canonical snapshot JSON already accepted by `fdir-storage`, and bounded query parameters. It does not receive original untrusted document bytes.
+- **Isolation:** `trusted-core` is permitted because the unsafe/FFI/native dependency sees only the bounded storage representation, not document bytes. Runtime network policy is deny.
+- **Normalization-loss review:** SQLite INTEGER affinity is used only for generated lengths and operational counters. Every release-relevant record remains exact canonical JSON, and every convenience row links to an RFC 6901 canonical source path. Deleting the database and rebuilding restores the supported query rows.
+- **Positive evidence:** clean, full, incremental, and delete/rebuild paths produce identical projection digests and supported query rows.
+- **Negative and substitution evidence:** corrupt, incomplete, wrong-application, wrong-version, wrong-DDL, stale-snapshot, and logically divergent databases are rejected. SQLite rows cannot substitute for the canonical snapshot digest or canonical traversal checks.
+- **License and security:** upstream is MIT licensed. The Issue #11 admission is development-unqualified; the advisory snapshot remains pending and therefore creates no production qualification.
+- **Qualification:** `admitted-unqualified`, owned by Issue #11. Issue #23 and Issue #24 retain security and supply-chain qualification ownership.
 
 ## Review outcomes
 

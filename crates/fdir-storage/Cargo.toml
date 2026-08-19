@@ -10,6 +10,7 @@ publish.workspace = true
 [dependencies]
 fdir-canonical = { path = "../fdir-canonical" }
 fdir-core = { path = "../fdir-core" }
+rusqlite = { version = "=0.40.1", features = ["bundled"] }
 
 [lints]
 workspace = true
