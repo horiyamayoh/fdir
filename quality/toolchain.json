@@ -12,6 +12,19 @@
   },
   "qualityCommand": "python3 tools/quality.py --mode full --cache-policy off .",
   "runnerImage": "ubuntu-24.04",
+  "rust": {
+    "channel": "1.97.1",
+    "components": [
+      "clippy",
+      "rustfmt"
+    ],
+    "edition": "2024",
+    "minimumSupportedVersion": "1.97.1",
+    "profile": "minimal",
+    "targets": [
+      "x86_64-unknown-linux-gnu"
+    ]
+  },
   "schema": "fdir/quality-toolchain/1",
   "thirdPartyDependencies": []
 }
