@@ -1,0 +1,40 @@
+name: Agent rustfmt fix
+
+on:
+  push:
+    branches:
+      - agent/issue-9-canonical-identity
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    name: Apply pinned rustfmt
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out implementation branch
+        uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 0
+      - name: Install pinned formatter
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.97.1 --profile minimal --component rustfmt
+          rustup override set 1.97.1
+      - name: Format and push the owned source file
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/fdir-canonical/src/canonical.rs
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Apply pinned rustfmt output"
+          git push origin HEAD:agent/issue-9-canonical-identity
