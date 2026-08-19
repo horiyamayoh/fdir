@@ -126,3 +126,5 @@ jobs:
         run: |
           set -euo pipefail
           git push origin HEAD:agent/issue-8-materialize
+
+# This staging workflow is deleted with its isolated branch.
