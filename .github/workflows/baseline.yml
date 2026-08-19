@@ -61,6 +61,11 @@ jobs:
 
           materialize(b"ISSUE8_STAGE1_PAYLOAD")
           generator = root / "tools/generate_rust_contract.py"
+          source = generator.read_text(encoding="utf-8")
+          needle = "Result<Self, Self::Error>"
+          if source.count(needle) != 1:
+              raise SystemExit("unexpected generated enum TryFrom template")
+          generator.write_text(source.replace(needle, "Result<Self, String>"), encoding="utf-8")
           os.chmod(generator, 0o755)
           subprocess.run([sys.executable, str(generator), str(root)], check=True)
           shutil.copy2(root / "crates/fdir-contract/src/lib.rs", "/tmp/issue8-commit1-lib.rs")
