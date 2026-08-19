@@ -1,4 +1,4 @@
-name: Issue 8 staging validation and publication
+name: Issue 8 staging branch cleanup
 
 on:
   pull_request:
@@ -6,242 +6,30 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: issue-8-staging-${{ github.event.pull_request.head.sha }}
-  cancel-in-progress: true
-
 jobs:
-  materialize-validate-publish:
-    name: issue 8 / materialize, validate, and publish
+  cleanup:
+    name: issue 8 / delete merged and staging branches
     if: github.event.pull_request.head.ref == 'agent/issue-8-materialize'
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
     steps:
-      - name: Check out complete staging history
+      - name: Check out staging commit
         uses: actions/checkout@v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: true
-      - name: Set up Python
-        uses: actions/setup-python@v6.0.0
-        with:
-          python-version: "3.12"
-      - name: Materialize the two logical implementation units
+      - name: Verify merge and delete temporary branches
         shell: bash
         run: |
           set -euo pipefail
-          python3 - . <<'PY'
-          import base64
-          import json
-          import lzma
-          import os
-          import shutil
-          import subprocess
-          import sys
-          from pathlib import Path
-
-          root = Path(sys.argv[1]).resolve()
-          messages = subprocess.check_output(
-              ["git", "log", "--format=%B%x00"],
-          ).split(b"\x00")
-
-          def materialize(marker: bytes) -> None:
-              for message in messages:
-                  lines = message.strip().splitlines()
-                  if lines and lines[0] == marker:
-                      payload = b"".join(lines[1:])
-                      files = json.loads(lzma.decompress(base64.b64decode(payload)))
-                      for relative, content in sorted(files.items()):
-                          path = root / relative
-                          path.parent.mkdir(parents=True, exist_ok=True)
-                          path.write_text(content, encoding="utf-8")
-                      return
-              raise SystemExit(f"missing payload commit: {marker.decode()}")
-
-          materialize(b"ISSUE8_STAGE1_PAYLOAD")
-          generator = root / "tools/generate_rust_contract.py"
-          source = generator.read_text(encoding="utf-8")
-          needle = "Result<Self, Self::Error>"
-          if source.count(needle) != 1:
-              raise SystemExit("unexpected generated enum TryFrom template")
-          generator.write_text(
-              source.replace(needle, "Result<Self, crate::UnknownEnumValue>"),
-              encoding="utf-8",
-          )
-          os.chmod(generator, 0o755)
-          subprocess.run([sys.executable, str(generator), str(root)], check=True)
-          shutil.copy2(root / "crates/fdir-contract/src/lib.rs", "/tmp/issue8-commit1-lib.rs")
-          materialize(b"ISSUE8_STAGE2_PAYLOAD")
-
-          validation = root / "crates/fdir-contract/src/validation.rs"
-          validation_source = validation.read_text(encoding="utf-8")
-          replacements = (
-              (
-                  '''        if let Some(context_id) = string_value(assertion, "contextId") {\n            if !contexts.contains(context_id) {\n                codes.insert("UNKNOWN_CONTEXT_REF".to_owned());\n            }\n        }\n''',
-                  '''        if let Some(context_id) = string_value(assertion, "contextId")\n            && !contexts.contains(context_id)\n        {\n            codes.insert("UNKNOWN_CONTEXT_REF".to_owned());\n        }\n''',
-              ),
-              (
-                  '''        if let Some(expected) = domains\n            .get(domain_id)\n            .and_then(|domain| integer_value(domain, "expectedCount"))\n        {\n            if integer_value(receipt, "observedCount") != Some(expected) {\n                codes.insert("CENSUS_COUNT_MISMATCH".to_owned());\n            }\n        }\n''',
-                  '''        if let Some(expected) = domains\n            .get(domain_id)\n            .and_then(|domain| integer_value(domain, "expectedCount"))\n            && integer_value(receipt, "observedCount") != Some(expected)\n        {\n            codes.insert("CENSUS_COUNT_MISMATCH".to_owned());\n        }\n''',
-              ),
-          )
-          for old, new in replacements:
-              if validation_source.count(old) != 1:
-                  raise SystemExit("unexpected validation template while applying Clippy fix")
-              validation_source = validation_source.replace(old, new)
-          validation.write_text(validation_source, encoding="utf-8")
-          PY
-          git show origin/main:.github/workflows/baseline.yml > .github/workflows/baseline.yml
-          rm -f .github/workflows/issue8-materialize.yml
-      - name: Install the pinned Rust toolchain
-        shell: bash
-        run: |
-          set -euo pipefail
-          rustup toolchain install 1.97.1 \
-            --profile minimal \
-            --component clippy \
-            --component rustfmt \
-            --target x86_64-unknown-linux-gnu
-          rustup override set 1.97.1
-      - name: Apply the pinned formatter to both commit states
-        shell: bash
-        run: |
-          set -euo pipefail
-          cp crates/fdir-contract/src/lib.rs /tmp/issue8-full-lib.rs
-          cp /tmp/issue8-commit1-lib.rs crates/fdir-contract/src/lib.rs
-          cargo fmt --all
-          cp crates/fdir-contract/src/lib.rs /tmp/issue8-commit1-lib.rs
-          cp /tmp/issue8-full-lib.rs crates/fdir-contract/src/lib.rs
-          cargo fmt --all
-      - name: Record pinned toolchains
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 --version
-          rustc --version --verbose
-          cargo --version
-          rustfmt --version
-          cargo clippy --version
-      - name: Run clean full repository quality
-        shell: bash
-        run: |
-          set -euo pipefail
-          export FDIR_SOURCE_REVISION="$(git rev-parse HEAD)"
-          python3 tools/generate_rust_contract.py --check .
-          python3 -m unittest discover -s tests -p 'test_*.py' -v
-          python3 tools/quality.py --mode full --cache-policy off .
-      - name: Demonstrate intentional gate failures
-        shell: bash
-        run: |
-          set -euo pipefail
-          export FDIR_SOURCE_REVISION="$(git rev-parse HEAD)"
-          python3 tools/quality.py --self-test-gates .
-      - name: Build authoritative cache receipt
-        shell: bash
-        run: |
-          set -euo pipefail
-          export FDIR_SOURCE_REVISION="$(git rev-parse HEAD)"
-          python3 tools/quality.py --mode full --cache-policy read-write --receipt reports/quality/full-cache-write.json .
-      - name: Verify read-only cache equivalence
-        shell: bash
-        run: |
-          set -euo pipefail
-          export FDIR_SOURCE_REVISION="$(git rev-parse HEAD)"
-          python3 tools/quality.py --mode full --cache-policy read-only --receipt reports/quality/full-cache-read.json .
-      - name: Archive validated Issue 8 source and receipts
-        if: always()
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: issue-8-materialized-${{ github.event.pull_request.head.sha }}
-          path: |
-            tools/generate_rust_contract.py
-            crates/fdir-contract/src/generated.rs
-            crates/fdir-contract/src/lib.rs
-            crates/fdir-contract/src/schema.rs
-            crates/fdir-contract/src/value.rs
-            crates/fdir-contract/src/validation.rs
-            crates/fdir-contract/tests/model_fixture_parity.rs
-            crates/fdir-core/src/foundation.rs
-            crates/fdir-core/src/lib.rs
-            fixtures/positive/extensions-and-statuses.json
-            tests/test_rust_model_contract.py
-            quality/rust-generated-contract.json
-            quality/rust-workspace.json
-            reports/quality/*.json
-            .validation/quality-cache.json
-          if-no-files-found: warn
-          retention-days: 7
-      - name: Publish two logical commits to the implementation branch
-        shell: bash
-        run: |
-          set -euo pipefail
-          target_branch='agent/issue-8-generated-domain-model'
-          files=(
-            tools/generate_rust_contract.py
-            crates/fdir-contract/src/generated.rs
-            crates/fdir-contract/src/lib.rs
-            crates/fdir-contract/src/schema.rs
-            crates/fdir-contract/src/value.rs
-            crates/fdir-contract/src/validation.rs
-            crates/fdir-contract/tests/model_fixture_parity.rs
-            crates/fdir-core/src/foundation.rs
-            crates/fdir-core/src/lib.rs
-            fixtures/positive/extensions-and-statuses.json
-            tests/test_rust_model_contract.py
-            quality/rust-generated-contract.json
-            quality/rust-workspace.json
-          )
-          rm -rf /tmp/issue8-final
-          mkdir -p /tmp/issue8-final
-          for path in "${files[@]}"; do
-            mkdir -p "/tmp/issue8-final/$(dirname "$path")"
-            cp -p "$path" "/tmp/issue8-final/$path"
+          merged_head='c656c0c94938be1968f4a92b9914bb158dfe7e86'
+          git fetch origin main
+          git merge-base --is-ancestor "$merged_head" origin/main
+          for branch in \
+            agent/issue-8-generated-domain-model \
+            agent/issue-8-materialize
+          do
+            if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+              git push origin --delete "$branch"
+            fi
           done
-
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git reset --hard
-          git clean -fdx
-          git switch -C "$target_branch" origin/main
-
-          cp -p /tmp/issue8-final/tools/generate_rust_contract.py tools/generate_rust_contract.py
-          cp -p /tmp/issue8-final/crates/fdir-contract/src/generated.rs crates/fdir-contract/src/generated.rs
-          cp -p /tmp/issue8-commit1-lib.rs crates/fdir-contract/src/lib.rs
-          cp -p /tmp/issue8-final/crates/fdir-contract/src/schema.rs crates/fdir-contract/src/schema.rs
-          cp -p /tmp/issue8-final/crates/fdir-contract/src/value.rs crates/fdir-contract/src/value.rs
-          cp -p /tmp/issue8-final/quality/rust-generated-contract.json quality/rust-generated-contract.json
-          chmod +x tools/generate_rust_contract.py
-          git add \
-            tools/generate_rust_contract.py \
-            crates/fdir-contract/src/generated.rs \
-            crates/fdir-contract/src/lib.rs \
-            crates/fdir-contract/src/schema.rs \
-            crates/fdir-contract/src/value.rs \
-            quality/rust-generated-contract.json
-          git commit -m 'Generate typed Rust contract projection'
-
-          cp -p /tmp/issue8-final/crates/fdir-contract/src/lib.rs crates/fdir-contract/src/lib.rs
-          cp -p /tmp/issue8-final/crates/fdir-contract/src/validation.rs crates/fdir-contract/src/validation.rs
-          cp -p /tmp/issue8-final/crates/fdir-contract/tests/model_fixture_parity.rs crates/fdir-contract/tests/model_fixture_parity.rs
-          cp -p /tmp/issue8-final/crates/fdir-core/src/foundation.rs crates/fdir-core/src/foundation.rs
-          cp -p /tmp/issue8-final/crates/fdir-core/src/lib.rs crates/fdir-core/src/lib.rs
-          cp -p /tmp/issue8-final/fixtures/positive/extensions-and-statuses.json fixtures/positive/extensions-and-statuses.json
-          cp -p /tmp/issue8-final/tests/test_rust_model_contract.py tests/test_rust_model_contract.py
-          cp -p /tmp/issue8-final/quality/rust-workspace.json quality/rust-workspace.json
-          git add \
-            crates/fdir-contract/src/lib.rs \
-            crates/fdir-contract/src/validation.rs \
-            crates/fdir-contract/tests/model_fixture_parity.rs \
-            crates/fdir-core/src/foundation.rs \
-            crates/fdir-core/src/lib.rs \
-            fixtures/positive/extensions-and-statuses.json \
-            tests/test_rust_model_contract.py \
-            quality/rust-workspace.json
-          git commit -m 'Validate shared model invariants and explicit operation states'
-
-          for path in "${files[@]}"; do
-            test "$(sha256sum "/tmp/issue8-final/$path" | cut -d' ' -f1)" = "$(sha256sum "$path" | cut -d' ' -f1)"
-          done
-          test "$(git rev-list --count origin/main..HEAD)" -eq 2
-          git push --force-with-lease origin "HEAD:refs/heads/$target_branch"
