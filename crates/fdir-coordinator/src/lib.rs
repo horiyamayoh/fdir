@@ -9,6 +9,7 @@ use fdir_core::{BuildMetadata, CapabilityStatus, CommandFailure, FailureClass};
 pub const CAPABILITIES: &[CapabilityStatus] = &[
     fdir_canonical::CAPABILITY,
     fdir_storage::CAPABILITY,
+    fdir_storage::INDEX_CAPABILITY,
     fdir_adapter_sdk::CAPABILITY,
     fdir_accounting::CAPABILITY,
     fdir_adapters::CAPABILITY,
@@ -212,7 +213,11 @@ mod tests {
             .collect();
         assert_eq!(
             available,
-            vec!["canonical-identity", "authoritative-storage"]
+            vec![
+                "canonical-identity",
+                "authoritative-storage",
+                "rebuildable-sqlite-index",
+            ]
         );
     }
 

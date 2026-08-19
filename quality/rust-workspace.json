@@ -26,7 +26,7 @@
         "fdir-core"
       ],
       "name": "fdir-storage",
-      "responsibility": "canonical snapshots and content-addressed evidence storage boundary"
+      "responsibility": "canonical snapshots, content-addressed evidence storage, and rebuildable SQLite materialization"
     },
     {
       "dependencies": [
