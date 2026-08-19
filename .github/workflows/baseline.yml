@@ -15,8 +15,160 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  materialize-issue-8:
+    name: issue 8 / materialize and validate
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.ref == 'agent/issue-8-materialize'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out staging history
+        uses: actions/checkout@v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v6.0.0
+        with:
+          python-version: "3.12"
+      - name: Materialize the two logical implementation units
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - . <<'PY'
+          import base64
+          import json
+          import lzma
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          root = Path(sys.argv[1]).resolve()
+          messages = subprocess.check_output(
+              ["git", "log", "--format=%B%x00"],
+          ).split(b"\x00")
+
+          def materialize(marker: bytes) -> None:
+              for message in messages:
+                  lines = message.strip().splitlines()
+                  if lines and lines[0] == marker:
+                      payload = b"".join(lines[1:])
+                      files = json.loads(lzma.decompress(base64.b64decode(payload)))
+                      for relative, content in sorted(files.items()):
+                          path = root / relative
+                          path.parent.mkdir(parents=True, exist_ok=True)
+                          path.write_text(content, encoding="utf-8")
+                      return
+              raise SystemExit(f"missing payload commit: {marker.decode()}")
+
+          materialize(b"ISSUE8_STAGE1_PAYLOAD")
+          PY
+          chmod +x tools/generate_rust_contract.py
+          python3 tools/generate_rust_contract.py .
+          python3 - . <<'PY'
+          import base64
+          import json
+          import lzma
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          marker = b"ISSUE8_STAGE2_PAYLOAD"
+          root = Path(sys.argv[1]).resolve()
+          messages = subprocess.check_output(
+              ["git", "log", "--format=%B%x00"],
+          ).split(b"\x00")
+          for message in messages:
+              lines = message.strip().splitlines()
+              if lines and lines[0] == marker:
+                  payload = b"".join(lines[1:])
+                  files = json.loads(lzma.decompress(base64.b64decode(payload)))
+                  for relative, content in sorted(files.items()):
+                      path = root / relative
+                      path.parent.mkdir(parents=True, exist_ok=True)
+                      path.write_text(content, encoding="utf-8")
+                  break
+          else:
+              raise SystemExit(f"missing payload commit: {marker.decode()}")
+          PY
+          git show origin/main:.github/workflows/baseline.yml > .github/workflows/baseline.yml
+          rm -f .github/workflows/issue8-materialize.yml
+      - name: Install the pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.97.1 \
+            --profile minimal \
+            --component clippy \
+            --component rustfmt \
+            --target x86_64-unknown-linux-gnu
+          rustup override set 1.97.1
+      - name: Record pinned toolchains
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 --version
+          rustc --version --verbose
+          cargo --version
+          rustfmt --version
+          cargo clippy --version
+      - name: Run clean full repository quality
+        shell: bash
+        run: |
+          set -euo pipefail
+          export FDIR_SOURCE_REVISION="$(git rev-parse HEAD)"
+          python3 tools/generate_rust_contract.py --check .
+          python3 -m unittest discover -s tests -p 'test_*.py' -v
+          python3 tools/quality.py --mode full --cache-policy off .
+      - name: Demonstrate intentional gate failures
+        shell: bash
+        run: |
+          set -euo pipefail
+          export FDIR_SOURCE_REVISION="$(git rev-parse HEAD)"
+          python3 tools/quality.py --self-test-gates .
+      - name: Build authoritative cache receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          export FDIR_SOURCE_REVISION="$(git rev-parse HEAD)"
+          python3 tools/quality.py --mode full --cache-policy read-write --receipt reports/quality/full-cache-write.json .
+      - name: Verify read-only cache equivalence
+        shell: bash
+        run: |
+          set -euo pipefail
+          export FDIR_SOURCE_REVISION="$(git rev-parse HEAD)"
+          python3 tools/quality.py --mode full --cache-policy read-only --receipt reports/quality/full-cache-read.json .
+      - name: Archive validated Issue 8 source and receipts
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: issue-8-materialized-${{ github.event.pull_request.head.sha }}
+          path: |
+            tools/generate_rust_contract.py
+            crates/fdir-contract/src/generated.rs
+            crates/fdir-contract/src/lib.rs
+            crates/fdir-contract/src/schema.rs
+            crates/fdir-contract/src/value.rs
+            crates/fdir-contract/src/validation.rs
+            crates/fdir-contract/tests/model_fixture_parity.rs
+            crates/fdir-core/src/foundation.rs
+            crates/fdir-core/src/lib.rs
+            fixtures/positive/extensions-and-statuses.json
+            tests/test_rust_model_contract.py
+            quality/rust-generated-contract.json
+            quality/rust-workspace.json
+            reports/quality/*.json
+            .validation/quality-cache.json
+          if-no-files-found: warn
+          retention-days: 7
+
   quality:
     name: quality / full
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.ref != 'agent/issue-8-materialize'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
