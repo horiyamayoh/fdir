@@ -1,0 +1,8 @@
+{
+  "canonicalVector": "fixtures/canonical/vector.json",
+  "generator": "tools/generate_rust_contract.py",
+  "logicalModel": "machine/logical-model.yaml",
+  "output": "crates/fdir-contract/src/generated.rs",
+  "outputSha256": "ac6e6bc6d53b311ca5fc906a95e9c18f79d3bf9b6b37e6af1d5a1e1b2c84c742",
+  "schema": "fdir/rust-generated-contract/1"
+}

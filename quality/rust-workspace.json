@@ -1,0 +1,101 @@
+{
+  "capabilityState": "foundation-unqualified",
+  "crateGraph": [
+    {
+      "dependencies": [],
+      "name": "fdir-contract",
+      "responsibility": "generated language-neutral contract metadata"
+    },
+    {
+      "dependencies": [
+        "fdir-contract"
+      ],
+      "name": "fdir-core",
+      "responsibility": "neutral failure, metadata, and capability vocabulary"
+    },
+    {
+      "dependencies": [
+        "fdir-core"
+      ],
+      "name": "fdir-canonical",
+      "responsibility": "canonical serialization and identity boundary"
+    },
+    {
+      "dependencies": [
+        "fdir-core"
+      ],
+      "name": "fdir-storage",
+      "responsibility": "authoritative storage boundary"
+    },
+    {
+      "dependencies": [
+        "fdir-core"
+      ],
+      "name": "fdir-adapter-sdk",
+      "responsibility": "language-neutral adapter protocol metadata"
+    },
+    {
+      "dependencies": [
+        "fdir-core"
+      ],
+      "name": "fdir-accounting",
+      "responsibility": "exhaustive accounting boundary"
+    },
+    {
+      "dependencies": [
+        "fdir-adapter-sdk",
+        "fdir-core"
+      ],
+      "name": "fdir-adapters",
+      "responsibility": "first-party adapter registry boundary"
+    },
+    {
+      "dependencies": [
+        "fdir-core"
+      ],
+      "name": "fdir-semantics",
+      "responsibility": "projection, equivalence, alignment, and lineage boundary"
+    },
+    {
+      "dependencies": [
+        "fdir-accounting",
+        "fdir-adapter-sdk",
+        "fdir-adapters",
+        "fdir-canonical",
+        "fdir-core",
+        "fdir-semantics",
+        "fdir-storage"
+      ],
+      "name": "fdir-coordinator",
+      "responsibility": "trusted orchestration, configuration, and redaction conventions"
+    },
+    {
+      "dependencies": [
+        "fdir-core"
+      ],
+      "name": "fdir-test-support",
+      "responsibility": "deterministic clocks, randomness, fixtures, and isolated temporary state"
+    },
+    {
+      "dependencies": [
+        "fdir-coordinator",
+        "fdir-core",
+        "fdir-test-support"
+      ],
+      "name": "fdir-cli",
+      "responsibility": "public command-line product skeleton"
+    }
+  ],
+  "forbiddenCoreVocabulary": [
+    "docx",
+    "markdown",
+    "pdf",
+    "xlsx"
+  ],
+  "generatedContract": "crates/fdir-contract/src/generated.rs",
+  "modelVersion": "2.1.0",
+  "productionFeatures": [],
+  "protocolVersion": "0.1.0-dev.1",
+  "schema": "fdir/rust-workspace/1",
+  "workspaceManifest": "Cargo.toml"
+}
