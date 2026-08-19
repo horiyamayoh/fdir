@@ -1,0 +1,15 @@
+[package]
+name = "fdir-adapters"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+fdir-adapter-sdk = { path = "../fdir-adapter-sdk" }
+fdir-core = { path = "../fdir-core" }
+
+[lints]
+workspace = true

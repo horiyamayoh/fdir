@@ -8,6 +8,7 @@ __pycache__/
 dist/
 reports/
 indexes/
+target/
 *.pdf
 *.docx
 *.png
