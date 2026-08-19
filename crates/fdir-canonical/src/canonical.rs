@@ -274,19 +274,18 @@ fn format_python_float(value: f64, path: &str) -> Result<String, CanonicalError>
 
     let negative = value.is_sign_negative();
     let source = value.abs().to_string();
-    let (mantissa, explicit_exponent) =
-        if let Some(index) = source.find(['e', 'E']) {
-            let exponent = source[index + 1..].parse::<i32>().map_err(|error| {
-                CanonicalError::new(
-                    "FDIR-CANONICAL-NUMBER-INTERNAL",
-                    path,
-                    format!("Rust float exponent could not be parsed: {error}"),
-                )
-            })?;
-            (&source[..index], exponent)
-        } else {
-            (source.as_str(), 0)
-        };
+    let (mantissa, explicit_exponent) = if let Some(index) = source.find(['e', 'E']) {
+        let exponent = source[index + 1..].parse::<i32>().map_err(|error| {
+            CanonicalError::new(
+                "FDIR-CANONICAL-NUMBER-INTERNAL",
+                path,
+                format!("Rust float exponent could not be parsed: {error}"),
+            )
+        })?;
+        (&source[..index], exponent)
+    } else {
+        (source.as_str(), 0)
+    };
     let decimal_index = mantissa.find('.').unwrap_or(mantissa.len());
     let digits: String = mantissa
         .chars()
