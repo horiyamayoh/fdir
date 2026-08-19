@@ -224,6 +224,9 @@ mod tests {
 
     #[test]
     fn paths_are_redacted_by_default_convention() {
-        assert_eq!(display_path(Path::new("/secret/source"), true), "<redacted-path>");
+        assert_eq!(
+            display_path(Path::new("/secret/source"), true),
+            "<redacted-path>"
+        );
     }
 }

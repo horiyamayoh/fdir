@@ -4,9 +4,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use fdir_coordinator::{
-    CAPABILITIES, OutputFormat, RuntimeConfig, build_metadata, parse_config,
-};
+use fdir_coordinator::{CAPABILITIES, OutputFormat, RuntimeConfig, build_metadata, parse_config};
 use fdir_core::{CommandFailure, FailureClass, json_quote};
 
 /// Stable command help. No unavailable operation is advertised as successful.
@@ -168,7 +166,11 @@ fn parse_invocation(arguments: &[String]) -> Result<Invocation, CommandFailure> 
             value if value.starts_with('-') => {
                 return Err(usage_failure(format!("unknown option {value:?}")));
             }
-            value => return Err(usage_failure(format!("unknown command or operand {value:?}"))),
+            value => {
+                return Err(usage_failure(format!(
+                    "unknown command or operand {value:?}"
+                )));
+            }
         }
         index += 1;
     }
@@ -189,7 +191,9 @@ fn select_command(
 ) -> Result<Option<CommandKind>, CommandFailure> {
     match current {
         None => Ok(Some(next)),
-        Some(existing) if existing == next => Err(usage_failure("command may be supplied only once")),
+        Some(existing) if existing == next => {
+            Err(usage_failure("command may be supplied only once"))
+        }
         Some(_) => Err(usage_failure("only one command may be selected")),
     }
 }
@@ -322,9 +326,7 @@ fn render_status_codes(output: OutputFormat) -> String {
                 })
                 .collect::<Vec<_>>()
                 .join(",");
-            format!(
-                "{{\"status\":\"complete\",\"completeExitCode\":0,\"failures\":[{failures}]}}"
-            )
+            format!("{{\"status\":\"complete\",\"completeExitCode\":0,\"failures\":[{failures}]}}")
         }
     }
 }
@@ -384,10 +386,7 @@ mod tests {
     #[test]
     fn json_errors_retain_validation_class() {
         let result = run(&arguments(&["--output", "json", "--config"]));
-        assert_eq!(
-            result.status,
-            ExecutionStatus::Failed(FailureClass::Usage)
-        );
+        assert_eq!(result.status, ExecutionStatus::Failed(FailureClass::Usage));
         assert!(result.stderr.contains("\"class\":\"usage\""));
     }
 }
