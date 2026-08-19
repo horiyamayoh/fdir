@@ -18,6 +18,10 @@ pub use value::{
 
 include!("generated.rs");
 
+mod validation;
+
+pub use validation::{ValidationReport, validate_snapshot_json, validate_snapshot_value};
+
 #[cfg(test)]
 mod tests {
     use std::any::TypeId;
