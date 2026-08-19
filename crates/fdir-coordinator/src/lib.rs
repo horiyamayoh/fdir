@@ -210,7 +210,10 @@ mod tests {
             .filter(|capability| capability.available)
             .map(|capability| capability.id)
             .collect();
-        assert_eq!(available, vec!["canonical-identity"]);
+        assert_eq!(
+            available,
+            vec!["canonical-identity", "authoritative-storage"]
+        );
     }
 
     #[test]
