@@ -73,6 +73,24 @@ jobs:
           subprocess.run([sys.executable, str(generator), str(root)], check=True)
           shutil.copy2(root / "crates/fdir-contract/src/lib.rs", "/tmp/issue8-commit1-lib.rs")
           materialize(b"ISSUE8_STAGE2_PAYLOAD")
+
+          validation = root / "crates/fdir-contract/src/validation.rs"
+          validation_source = validation.read_text(encoding="utf-8")
+          replacements = (
+              (
+                  '''        if let Some(context_id) = string_value(assertion, "contextId") {\n            if !contexts.contains(context_id) {\n                codes.insert("UNKNOWN_CONTEXT_REF".to_owned());\n            }\n        }\n''',
+                  '''        if let Some(context_id) = string_value(assertion, "contextId")\n            && !contexts.contains(context_id)\n        {\n            codes.insert("UNKNOWN_CONTEXT_REF".to_owned());\n        }\n''',
+              ),
+              (
+                  '''        if let Some(expected) = domains\n            .get(domain_id)\n            .and_then(|domain| integer_value(domain, "expectedCount"))\n        {\n            if integer_value(receipt, "observedCount") != Some(expected) {\n                codes.insert("CENSUS_COUNT_MISMATCH".to_owned());\n            }\n        }\n''',
+                  '''        if let Some(expected) = domains\n            .get(domain_id)\n            .and_then(|domain| integer_value(domain, "expectedCount"))\n            && integer_value(receipt, "observedCount") != Some(expected)\n        {\n            codes.insert("CENSUS_COUNT_MISMATCH".to_owned());\n        }\n''',
+              ),
+          )
+          for old, new in replacements:
+              if validation_source.count(old) != 1:
+                  raise SystemExit("unexpected validation template while applying Clippy fix")
+              validation_source = validation_source.replace(old, new)
+          validation.write_text(validation_source, encoding="utf-8")
           PY
           git show origin/main:.github/workflows/baseline.yml > .github/workflows/baseline.yml
           rm -f .github/workflows/issue8-materialize.yml
