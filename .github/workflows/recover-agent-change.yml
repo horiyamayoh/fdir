@@ -49,11 +49,16 @@ jobs:
           fi
           find recovery-artifact/extracted -type f -print | sort > recovery-artifact/extracted-files.txt
           cat recovery-artifact/extracted-files.txt | tee -a recovery-artifact/inspection.txt
-      - name: Upload recovered payload
+          tar --create --gzip --file recovery-artifact/source-tree.tar.gz \
+            --exclude=.git \
+            --exclude=recovery-artifact \
+            .
+      - name: Upload recovered payload and source tree
         if: always()
         uses: actions/upload-artifact@v7.0.1
         with:
           name: interrupted-issue-11-payload-${{ github.sha }}
           path: recovery-artifact
           if-no-files-found: error
+          include-hidden-files: true
           retention-days: 7
