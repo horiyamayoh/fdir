@@ -1,0 +1,29 @@
+name: Export Issue 12 checkout
+
+on:
+  push:
+    branches:
+      - agent/issue-12-adapter-process-boundary
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out the issue branch
+        uses: actions/checkout@v6.0.2
+        with:
+          ref: agent/issue-12-adapter-process-boundary
+          persist-credentials: false
+      - name: Archive source tree
+        shell: bash
+        run: tar --create --gzip --file /tmp/fdir-issue-12.tar.gz --exclude=.git .
+      - name: Upload source archive
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: fdir-issue-12-checkout-${{ github.sha }}
+          path: /tmp/fdir-issue-12.tar.gz
+          if-no-files-found: error
+          retention-days: 2
