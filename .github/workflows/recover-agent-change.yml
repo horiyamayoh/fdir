@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/issue-11-sqlite-index
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
