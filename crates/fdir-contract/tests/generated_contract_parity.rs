@@ -17,7 +17,7 @@ fn generated_metadata_is_bound_to_repository_authorities() {
     assert_eq!(CANONICAL_VECTOR_LENGTH, CANONICAL_VECTOR.len());
     assert_eq!(
         CANONICAL_VECTOR_SHA256,
-        "7d1897743f643096a37625e50ac6deeb8cda8443ec63890f1f1ba17726f33dc5"
+        "1b455af0224e20dc9eb0737b84e13f50a389553ad0e0b54b21fafa1154b3070d"
     );
     assert_eq!(ENTITY_NAMES.first().copied(), Some("Artifact"));
     assert_eq!(ENTITY_NAMES.last().copied(), Some("Snapshot"));
