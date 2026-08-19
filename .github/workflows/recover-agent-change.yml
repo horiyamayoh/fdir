@@ -1,4 +1,4 @@
-name: Apply interrupted issue 11 recovery
+name: Finalize Issue 11 implementation
 
 on:
   push:
@@ -12,57 +12,66 @@ permissions:
   contents: write
 
 jobs:
-  apply:
+  finalize:
+    if: github.event_name == 'push' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - name: Check out the implementation branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
         with:
           ref: agent/issue-11-sqlite-index
           fetch-depth: 0
           persist-credentials: true
-      - name: Recover, verify, and commit the intact implementation files
+      - name: Set up Python
+        uses: actions/setup-python@v6.0.0
+        with:
+          python-version: "3.12"
+      - name: Install the pinned Rust toolchain
         shell: bash
         run: |
           set -euo pipefail
-          if [[ ! -d .agent-change ]]; then
-            echo "Recovery payload already applied."
-            exit 0
-          fi
-          cat .agent-change/part-* > /tmp/issue-11.b64
-          base64 --decode /tmp/issue-11.b64 > /tmp/issue-11.gz
-          set +e
-          gzip --decompress --stdout /tmp/issue-11.gz > /tmp/issue-11.tar
-          gzip_status=$?
-          set -e
-          test "$gzip_status" -eq 1
-          rm -rf /tmp/issue-11-recovered
-          mkdir -p /tmp/issue-11-recovered
-          tar --extract --file /tmp/issue-11.tar --directory /tmp/issue-11-recovered --ignore-zeros || true
-
-          files=(
-            crates/fdir-storage/Cargo.toml
-            crates/fdir-storage/src/index.rs
-            crates/fdir-storage/src/index_tests.rs
-            crates/fdir-storage/src/lib.rs
-            machine/dependency-catalog.yaml
-            quality/rust-workspace.json
-            references/dependency-candidate-assessments.md
-            references/sqlite-index.md
-            schemas/fdir.sql
-            schemas/generated-manifest.json
-            tests/test_rust_workspace.py
-          )
-          for relative in "${files[@]}"; do
-            test -s "/tmp/issue-11-recovered/${relative}"
-            mkdir -p "$(dirname "$relative")"
-            cp "/tmp/issue-11-recovered/${relative}" "$relative"
-          done
-
-          rm -rf .agent-change
+          rustup toolchain install 1.97.1 \
+            --profile minimal \
+            --component clippy \
+            --component rustfmt \
+            --target x86_64-unknown-linux-gnu
+          rustup override set 1.97.1
+      - name: Restore final source and remove recovery scaffolding
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .issue11-final/part-* > /tmp/issue11-final-files.b64
+          base64 --decode /tmp/issue11-final-files.b64 > /tmp/issue11-final-files.tar.gz
+          tar --extract --gzip --file /tmp/issue11-final-files.tar.gz --directory .
+          rm -rf .agent-change .issue11-final
+          rm -f \
+            .github/workflows/export-agent-checkout.yml \
+            .github/workflows/recover-agent-change.yml
+      - name: Resolve and fetch the admitted dependency graph
+        env:
+          CARGO_NET_OFFLINE: "false"
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo generate-lockfile
+          cargo fetch --locked
+      - name: Format and validate the implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all
+          python3 tools/generate_contracts.py --check .
+          python3 tools/validate_implementation_policy.py .
+          python3 -m unittest discover -s tests -p 'test_*.py'
+      - name: Commit the finalized implementation
+        shell: bash
+        run: |
+          set -euo pipefail
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add -A
+          git add --all
           git diff --cached --check
-          git commit -m "Recover rebuildable SQLite index implementation [recovery-applied]"
+          git commit -m "Finalize rebuildable SQLite index implementation (#11)"
           git push origin HEAD:refs/heads/agent/issue-11-sqlite-index
+          git rev-parse HEAD
