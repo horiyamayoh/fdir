@@ -25,6 +25,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [[ ! -d .agent-change ]]; then
+            echo "Recovery payload already applied."
+            exit 0
+          fi
           cat .agent-change/part-* > /tmp/issue-11.b64
           base64 --decode /tmp/issue-11.b64 > /tmp/issue-11.gz
           set +e
@@ -37,8 +41,6 @@ jobs:
           tar --extract --file /tmp/issue-11.tar --directory /tmp/issue-11-recovered --ignore-zeros || true
 
           files=(
-            .github/workflows/baseline.yml
-            .github/workflows/delete-merged-agent-branch.yml
             crates/fdir-storage/Cargo.toml
             crates/fdir-storage/src/index.rs
             crates/fdir-storage/src/index_tests.rs
@@ -58,7 +60,6 @@ jobs:
           done
 
           rm -rf .agent-change
-          rm .github/workflows/recover-agent-change.yml
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add -A
