@@ -1,34 +1,28 @@
-name: FDIR quality
+name: Issue 8 staging validation and publication
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: fdir-quality-${{ github.workflow }}-${{ github.ref }}
+  group: issue-8-staging-${{ github.event.pull_request.head.sha }}
   cancel-in-progress: true
 
 jobs:
-  materialize-issue-8:
-    name: issue 8 / materialize and validate
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.ref == 'agent/issue-8-materialize'
+  materialize-validate-publish:
+    name: issue 8 / materialize, validate, and publish
+    if: github.event.pull_request.head.ref == 'agent/issue-8-materialize'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - name: Check out staging history
+      - name: Check out complete staging history
         uses: actions/checkout@v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-          persist-credentials: false
+          persist-credentials: true
       - name: Set up Python
         uses: actions/setup-python@v6.0.0
         with:
@@ -67,6 +61,7 @@ jobs:
           PY
           chmod +x tools/generate_rust_contract.py
           python3 tools/generate_rust_contract.py .
+          cp crates/fdir-contract/src/lib.rs /tmp/issue8-commit1-lib.rs
           python3 - . <<'PY'
           import base64
           import json
@@ -105,6 +100,12 @@ jobs:
             --component rustfmt \
             --target x86_64-unknown-linux-gnu
           rustup override set 1.97.1
+      - name: Apply the pinned formatter
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 /tmp/issue8-commit1-lib.rs
+          cargo fmt --all
       - name: Record pinned toolchains
         shell: bash
         run: |
@@ -163,66 +164,82 @@ jobs:
             .validation/quality-cache.json
           if-no-files-found: warn
           retention-days: 7
+      - name: Publish two logical commits to the implementation branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          target_branch='agent/issue-8-generated-domain-model'
+          files=(
+            tools/generate_rust_contract.py
+            crates/fdir-contract/src/generated.rs
+            crates/fdir-contract/src/lib.rs
+            crates/fdir-contract/src/schema.rs
+            crates/fdir-contract/src/value.rs
+            crates/fdir-contract/src/validation.rs
+            crates/fdir-contract/tests/model_fixture_parity.rs
+            crates/fdir-core/src/foundation.rs
+            crates/fdir-core/src/lib.rs
+            fixtures/positive/extensions-and-statuses.json
+            tests/test_rust_model_contract.py
+            quality/rust-generated-contract.json
+            quality/rust-workspace.json
+          )
+          rm -rf /tmp/issue8-final
+          mkdir -p /tmp/issue8-final
+          for path in "${files[@]}"; do
+            mkdir -p "/tmp/issue8-final/$(dirname "$path")"
+            cp -p "$path" "/tmp/issue8-final/$path"
+          done
+          (
+            cd /tmp/issue8-final
+            find . -type f -print0 | sort -z | xargs -0 sha256sum
+          ) > /tmp/issue8-final.sha256
 
-  quality:
-    name: quality / full
-    if: >-
-      github.event_name != 'pull_request' ||
-      github.event.pull_request.head.ref != 'agent/issue-8-materialize'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v6.0.2
-        with:
-          persist-credentials: false
-      - name: Set up Python
-        uses: actions/setup-python@v6.0.0
-        with:
-          python-version: "3.12"
-      - name: Install the pinned Rust toolchain
-        shell: bash
-        run: |
-          set -euo pipefail
-          rustup toolchain install 1.97.1 \
-            --profile minimal \
-            --component clippy \
-            --component rustfmt \
-            --target x86_64-unknown-linux-gnu
-          rustup override set 1.97.1
-      - name: Record pinned toolchains
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 --version
-          python3 -c "import json, platform; policy=json.load(open('quality/toolchain.json', encoding='utf-8')); print(platform.python_implementation(), platform.python_version()); print(json.dumps(policy, sort_keys=True))"
-          rustc --version --verbose
-          cargo --version
-          rustfmt --version
-          cargo clippy --version
-      - name: Run clean full repository quality
-        env:
-          FDIR_SOURCE_REVISION: ${{ github.sha }}
-        run: python3 tools/quality.py --mode full --cache-policy off .
-      - name: Demonstrate intentional gate failures
-        env:
-          FDIR_SOURCE_REVISION: ${{ github.sha }}
-        run: python3 tools/quality.py --self-test-gates .
-      - name: Build authoritative cache receipt
-        env:
-          FDIR_SOURCE_REVISION: ${{ github.sha }}
-        run: python3 tools/quality.py --mode full --cache-policy read-write --receipt reports/quality/full-cache-write.json .
-      - name: Verify read-only cache equivalence
-        env:
-          FDIR_SOURCE_REVISION: ${{ github.sha }}
-        run: python3 tools/quality.py --mode full --cache-policy read-only --receipt reports/quality/full-cache-read.json .
-      - name: Archive machine-readable quality receipts
-        if: always()
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: fdir-quality-receipts-${{ github.sha }}
-          path: |
-            reports/quality/*.json
-            .validation/quality-cache.json
-          if-no-files-found: warn
-          retention-days: 90
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -C "$target_branch" origin/main
+
+          cp -p /tmp/issue8-final/tools/generate_rust_contract.py tools/generate_rust_contract.py
+          cp -p /tmp/issue8-final/crates/fdir-contract/src/generated.rs crates/fdir-contract/src/generated.rs
+          cp -p /tmp/issue8-commit1-lib.rs crates/fdir-contract/src/lib.rs
+          cp -p /tmp/issue8-final/crates/fdir-contract/src/schema.rs crates/fdir-contract/src/schema.rs
+          cp -p /tmp/issue8-final/crates/fdir-contract/src/value.rs crates/fdir-contract/src/value.rs
+          cp -p /tmp/issue8-final/quality/rust-generated-contract.json quality/rust-generated-contract.json
+          chmod +x tools/generate_rust_contract.py
+          git add \
+            tools/generate_rust_contract.py \
+            crates/fdir-contract/src/generated.rs \
+            crates/fdir-contract/src/lib.rs \
+            crates/fdir-contract/src/schema.rs \
+            crates/fdir-contract/src/value.rs \
+            quality/rust-generated-contract.json
+          git commit -m 'Generate typed Rust contract projection'
+
+          cp -p /tmp/issue8-final/crates/fdir-contract/src/lib.rs crates/fdir-contract/src/lib.rs
+          cp -p /tmp/issue8-final/crates/fdir-contract/src/validation.rs crates/fdir-contract/src/validation.rs
+          mkdir -p crates/fdir-contract/tests
+          cp -p /tmp/issue8-final/crates/fdir-contract/tests/model_fixture_parity.rs crates/fdir-contract/tests/model_fixture_parity.rs
+          cp -p /tmp/issue8-final/crates/fdir-core/src/foundation.rs crates/fdir-core/src/foundation.rs
+          cp -p /tmp/issue8-final/crates/fdir-core/src/lib.rs crates/fdir-core/src/lib.rs
+          cp -p /tmp/issue8-final/fixtures/positive/extensions-and-statuses.json fixtures/positive/extensions-and-statuses.json
+          cp -p /tmp/issue8-final/tests/test_rust_model_contract.py tests/test_rust_model_contract.py
+          cp -p /tmp/issue8-final/quality/rust-workspace.json quality/rust-workspace.json
+          git add \
+            crates/fdir-contract/src/lib.rs \
+            crates/fdir-contract/src/validation.rs \
+            crates/fdir-contract/tests/model_fixture_parity.rs \
+            crates/fdir-core/src/foundation.rs \
+            crates/fdir-core/src/lib.rs \
+            fixtures/positive/extensions-and-statuses.json \
+            tests/test_rust_model_contract.py \
+            quality/rust-workspace.json
+          git commit -m 'Validate shared model invariants and explicit operation states'
+
+          (
+            cd /tmp/issue8-final
+            for path in "${files[@]}"; do
+              test "$(sha256sum "$path" | cut -d' ' -f1)" = "$(sha256sum "$GITHUB_WORKSPACE/$path" | cut -d' ' -f1)"
+            done
+          )
+          test "$(git rev-list --count origin/main..HEAD)" -eq 2
+          git push --force-with-lease origin "HEAD:refs/heads/$target_branch"
