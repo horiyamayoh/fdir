@@ -17,19 +17,11 @@ pub enum VersionDecision {
     /// The snapshot is supported by the current reader.
     Supported,
     /// The schema is recognized, but this older version requires an explicit migration.
-    Deprecated {
-        found: u64,
-        current: u64,
-    },
+    Deprecated { found: u64, current: u64 },
     /// The schema is recognized, but the snapshot was produced by a newer writer.
-    FutureUnknown {
-        found: u64,
-        current: u64,
-    },
+    FutureUnknown { found: u64, current: u64 },
     /// The container schema is not compatible with this reader.
-    IncompatibleSchema {
-        found: String,
-    },
+    IncompatibleSchema { found: String },
     /// The snapshot names a different canonical JSON contract.
     IncompatibleCanonicalJson {
         found: String,
@@ -76,30 +68,22 @@ pub(crate) fn require_supported(decision: VersionDecision) -> Result<(), Storage
         VersionDecision::Deprecated { found, current } => Err(StorageError::new(
             "FDIR-SNAPSHOT-VERSION-DEPRECATED",
             "$/version",
-            format!(
-                "snapshot version {found} requires an explicit migration to version {current}"
-            ),
+            format!("snapshot version {found} requires an explicit migration to version {current}"),
         )),
         VersionDecision::FutureUnknown { found, current } => Err(StorageError::new(
             "FDIR-SNAPSHOT-VERSION-FUTURE",
             "$/version",
-            format!(
-                "snapshot version {found} is newer than supported version {current}"
-            ),
+            format!("snapshot version {found} is newer than supported version {current}"),
         )),
         VersionDecision::IncompatibleSchema { found } => Err(StorageError::new(
             "FDIR-SNAPSHOT-SCHEMA-INCOMPATIBLE",
             "$/schema",
             format!("snapshot schema {found:?} is incompatible with {SNAPSHOT_SCHEMA}"),
         )),
-        VersionDecision::IncompatibleCanonicalJson { found, supported } => {
-            Err(StorageError::new(
-                "FDIR-SNAPSHOT-CANONICAL-INCOMPATIBLE",
-                "$/canonicalJson",
-                format!(
-                    "canonical JSON contract {found:?} is incompatible with {supported}"
-                ),
-            ))
-        }
+        VersionDecision::IncompatibleCanonicalJson { found, supported } => Err(StorageError::new(
+            "FDIR-SNAPSHOT-CANONICAL-INCOMPATIBLE",
+            "$/canonicalJson",
+            format!("canonical JSON contract {found:?} is incompatible with {supported}"),
+        )),
     }
 }

@@ -103,10 +103,7 @@ impl ObjectDescriptor {
             "mediaType".to_owned(),
             CanonicalValue::String(self.media_type.clone()),
         );
-        value.insert(
-            "role".to_owned(),
-            CanonicalValue::String(self.role.clone()),
-        );
+        value.insert("role".to_owned(), CanonicalValue::String(self.role.clone()));
         Ok(CanonicalValue::Object(value))
     }
 }
@@ -640,11 +637,7 @@ pub fn parse_snapshot_bytes(bytes: &[u8]) -> Result<SnapshotManifest, StorageErr
     let schema = required_string(object, "schema", "$/schema")?;
     let version = required_u64(object, "version", "$/version")?;
     let canonical_json = required_string(object, "canonicalJson", "$/canonicalJson")?;
-    require_supported(negotiate_snapshot_version(
-        schema,
-        version,
-        canonical_json,
-    ))?;
+    require_supported(negotiate_snapshot_version(schema, version, canonical_json))?;
     reject_unknown_fields(object, &TOP_LEVEL_FIELDS, "$", "snapshot")?;
 
     let payload = required_field(object, "payload", "$/payload")?.clone();
@@ -661,15 +654,11 @@ pub fn parse_snapshot_bytes(bytes: &[u8]) -> Result<SnapshotManifest, StorageErr
         .enumerate()
         .map(|(index, item)| parse_reference(item, index))
         .collect::<Result<Vec<_>, _>>()?;
-    let status_transitions = required_array(
-        object,
-        "statusTransitions",
-        "$/statusTransitions",
-    )?
-    .iter()
-    .enumerate()
-    .map(|(index, item)| parse_transition(item, index))
-    .collect::<Result<Vec<_>, _>>()?;
+    let status_transitions = required_array(object, "statusTransitions", "$/statusTransitions")?
+        .iter()
+        .enumerate()
+        .map(|(index, item)| parse_transition(item, index))
+        .collect::<Result<Vec<_>, _>>()?;
 
     let manifest = SnapshotManifest::new(
         payload,
@@ -720,10 +709,7 @@ fn parse_object_descriptor(
     )
 }
 
-fn parse_reference(
-    value: &CanonicalValue,
-    index: usize,
-) -> Result<ObjectReference, StorageError> {
+fn parse_reference(value: &CanonicalValue, index: usize) -> Result<ObjectReference, StorageError> {
     let path = format!("$/references/{index}");
     let object = value.as_object().ok_or_else(|| {
         StorageError::new(
@@ -745,16 +731,15 @@ fn parse_reference(
             )
         })?)
     };
-    let target = Digest::new(
-        required_string(object, "target", &format!("{path}/target"))?.to_owned(),
-    )
-    .map_err(|error| {
-        StorageError::new(
-            "FDIR-SNAPSHOT-REFERENCE-TARGET",
-            format!("{path}/target"),
-            error.to_string(),
-        )
-    })?;
+    let target =
+        Digest::new(required_string(object, "target", &format!("{path}/target"))?.to_owned())
+            .map_err(|error| {
+                StorageError::new(
+                    "FDIR-SNAPSHOT-REFERENCE-TARGET",
+                    format!("{path}/target"),
+                    error.to_string(),
+                )
+            })?;
     ObjectReference::new_at(
         source,
         target,
@@ -819,15 +804,13 @@ fn required_string<'a>(
     key: &str,
     path: &str,
 ) -> Result<&'a str, StorageError> {
-    required_field(object, key, path)?
-        .as_str()
-        .ok_or_else(|| {
-            StorageError::new(
-                "FDIR-SNAPSHOT-FIELD-TYPE",
-                path,
-                format!("field {key:?} must be a string"),
-            )
-        })
+    required_field(object, key, path)?.as_str().ok_or_else(|| {
+        StorageError::new(
+            "FDIR-SNAPSHOT-FIELD-TYPE",
+            path,
+            format!("field {key:?} must be a string"),
+        )
+    })
 }
 
 fn required_u64(object: &ObjectValue, key: &str, path: &str) -> Result<u64, StorageError> {

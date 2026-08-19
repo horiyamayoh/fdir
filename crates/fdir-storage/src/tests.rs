@@ -59,9 +59,8 @@ fn example_manifest(
     let payload = parsed_json(
         r#"{"documents":[{"id":"document-1","state":"partial"}],"operation":{"state":"failed"}}"#,
     )?;
-    let provenance = parsed_json(
-        r#"{"producer":"fdir-storage-tests","source":"fixture","version":"1"}"#,
-    )?;
+    let provenance =
+        parsed_json(r#"{"producer":"fdir-storage-tests","source":"fixture","version":"1"}"#)?;
     let transitions = vec![
         StatusTransition::new(ResultState::Incomplete, ResultState::Partial)?,
         StatusTransition::new(ResultState::Partial, ResultState::Complete)?,
@@ -84,7 +83,8 @@ fn assert_error_code<T>(result: Result<T, StorageError>, expected: &str) {
 }
 
 #[test]
-fn canonical_snapshot_round_trip_is_byte_identical_and_deduplicated() -> Result<(), Box<dyn Error>> {
+fn canonical_snapshot_round_trip_is_byte_identical_and_deduplicated() -> Result<(), Box<dyn Error>>
+{
     let directory = TestDirectory::new("round-trip")?;
     let store = SnapshotStore::open(directory.path().join("store"))?;
     let transaction = store.begin_write()?;
@@ -152,8 +152,8 @@ fn missing_and_corrupt_objects_fail_with_stable_diagnostics() -> Result<(), Box<
 }
 
 #[test]
-fn cycles_unreachable_objects_and_invalid_status_transitions_are_rejected(
-) -> Result<(), Box<dyn Error>> {
+fn cycles_unreachable_objects_and_invalid_status_transitions_are_rejected()
+-> Result<(), Box<dyn Error>> {
     let directory = TestDirectory::new("semantic-errors")?;
     let store = SnapshotStore::open(directory.path().join("store"))?;
     let first = store
@@ -165,11 +165,7 @@ fn cycles_unreachable_objects_and_invalid_status_transitions_are_rejected(
     let cyclic = example_manifest(
         vec![first.clone(), second.clone()],
         vec![
-            ObjectReference::new(
-                ReferenceSource::Snapshot,
-                first.digest().clone(),
-                "root",
-            )?,
+            ObjectReference::new(ReferenceSource::Snapshot, first.digest().clone(), "root")?,
             ObjectReference::new(
                 ReferenceSource::Object(first.digest().clone()),
                 second.digest().clone(),
@@ -182,11 +178,13 @@ fn cycles_unreachable_objects_and_invalid_status_transitions_are_rejected(
             )?,
         ],
     )?;
-    assert!(cyclic
-        .validation_report()
-        .diagnostics()
-        .iter()
-        .any(|diagnostic| diagnostic.code() == "FDIR-SNAPSHOT-REFERENCE-CYCLE"));
+    assert!(
+        cyclic
+            .validation_report()
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| diagnostic.code() == "FDIR-SNAPSHOT-REFERENCE-CYCLE")
+    );
     assert_error_code(
         store.write_snapshot(&cyclic),
         "FDIR-SNAPSHOT-REFERENCE-CYCLE",
@@ -237,8 +235,8 @@ fn reader_rejects_deprecated_future_and_incompatible_versions() -> Result<(), Bo
 }
 
 #[test]
-fn interrupted_temporary_state_is_never_accepted_and_requires_explicit_recovery(
-) -> Result<(), Box<dyn Error>> {
+fn interrupted_temporary_state_is_never_accepted_and_requires_explicit_recovery()
+-> Result<(), Box<dyn Error>> {
     let directory = TestDirectory::new("recovery")?;
     let store = SnapshotStore::open(directory.path().join("store"))?;
     let manifest = example_manifest(Vec::new(), Vec::new())?;
@@ -254,10 +252,7 @@ fn interrupted_temporary_state_is_never_accepted_and_requires_explicit_recovery(
     fs::create_dir(store.root().join(".fdir-mutation-lock"))?;
 
     assert_error_code(store.read_snapshot(&digest), "FDIR-SNAPSHOT-MISSING");
-    assert_error_code(
-        store.begin_write(),
-        "FDIR-STORAGE-LOCKED",
-    );
+    assert_error_code(store.begin_write(), "FDIR-STORAGE-LOCKED");
     let recovery = store.recover_interrupted_state()?;
     assert!(recovery.stale_lock_removed);
     assert_eq!(recovery.temporary_paths_removed, 1);
@@ -296,8 +291,8 @@ fn portable_export_cleanly_reimports_with_the_same_identity() -> Result<(), Box<
 }
 
 #[test]
-fn garbage_collection_retains_all_snapshot_references_and_deletes_only_unreachable_objects(
-) -> Result<(), Box<dyn Error>> {
+fn garbage_collection_retains_all_snapshot_references_and_deletes_only_unreachable_objects()
+-> Result<(), Box<dyn Error>> {
     let directory = TestDirectory::new("garbage-collection")?;
     let store = SnapshotStore::open(directory.path().join("store"))?;
     let transaction = store.begin_write()?;
@@ -327,10 +322,7 @@ fn garbage_collection_retains_all_snapshot_references_and_deletes_only_unreachab
     let deletion = store.garbage_collect(GarbageCollectionMode::DeleteUnreachable)?;
     assert_eq!(deletion.deleted, vec![orphan.digest().clone()]);
     assert_eq!(store.read_object(&retained)?, b"retained");
-    assert_error_code(
-        store.read_object(&orphan),
-        "FDIR-OBJECT-MISSING",
-    );
+    assert_error_code(store.read_object(&orphan), "FDIR-OBJECT-MISSING");
 
     assert!(store.delete_snapshot(snapshot.digest())?);
     let final_deletion = store.garbage_collect(GarbageCollectionMode::DeleteUnreachable)?;
@@ -340,8 +332,8 @@ fn garbage_collection_retains_all_snapshot_references_and_deletes_only_unreachab
 }
 
 #[test]
-fn raw_reader_rejects_noncanonical_bytes_and_snapshot_digest_mismatch(
-) -> Result<(), Box<dyn Error>> {
+fn raw_reader_rejects_noncanonical_bytes_and_snapshot_digest_mismatch() -> Result<(), Box<dyn Error>>
+{
     let directory = TestDirectory::new("snapshot-corruption")?;
     let store = SnapshotStore::open(directory.path().join("store"))?;
     let manifest = example_manifest(Vec::new(), Vec::new())?;

@@ -580,10 +580,9 @@ impl SnapshotStore {
                     .map(|descriptor| descriptor.digest().clone()),
             );
         }
-        let stored: BTreeSet<Digest> =
-            list_content_digests(&self.root.join(OBJECTS_DIRECTORY))?
-                .into_iter()
-                .collect();
+        let stored: BTreeSet<Digest> = list_content_digests(&self.root.join(OBJECTS_DIRECTORY))?
+            .into_iter()
+            .collect();
         let unreachable: Vec<Digest> = stored.difference(&reachable).cloned().collect();
         let mut deleted = Vec::new();
         if mode == GarbageCollectionMode::DeleteUnreachable {
@@ -769,23 +768,20 @@ fn verify_existing_content(
     if existing == expected_bytes {
         return Ok(WriteDisposition::Deduplicated);
     }
-    let actual = raw_content_digest(&existing)
-        .map_err(|error| StorageError::new(error.code(), path.display().to_string(), error.message()))?;
+    let actual = raw_content_digest(&existing).map_err(|error| {
+        StorageError::new(error.code(), path.display().to_string(), error.message())
+    })?;
     if actual != *expected_digest {
         return Err(StorageError::new(
             "FDIR-STORAGE-EXISTING-CORRUPT",
             path.display().to_string(),
-            format!(
-                "existing path for {expected_digest} contains bytes with digest {actual}"
-            ),
+            format!("existing path for {expected_digest} contains bytes with digest {actual}"),
         ));
     }
     Err(StorageError::new(
         "FDIR-STORAGE-DIGEST-COLLISION",
         path.display().to_string(),
-        format!(
-            "existing bytes differ despite sharing content digest {expected_digest}"
-        ),
+        format!("existing bytes differ despite sharing content digest {expected_digest}"),
     ))
 }
 
@@ -803,8 +799,9 @@ fn read_content(
         };
         io_storage_error(code, path, "could not read content-addressed file", error)
     })?;
-    let actual = raw_content_digest(&bytes)
-        .map_err(|error| StorageError::new(error.code(), path.display().to_string(), error.message()))?;
+    let actual = raw_content_digest(&bytes).map_err(|error| {
+        StorageError::new(error.code(), path.display().to_string(), error.message())
+    })?;
     if actual != *expected_digest {
         return Err(StorageError::new(
             mismatch_code,
@@ -874,13 +871,14 @@ fn list_content_digests(base: &Path) -> Result<Vec<Digest>, StorageError> {
                         "invalid content-addressed file name",
                     ));
                 }
-                let digest = Digest::new(format!("sha256:{prefix}{remainder}")).map_err(|error| {
-                    StorageError::new(
-                        "FDIR-STORAGE-DIGEST",
-                        object_path.display().to_string(),
-                        error.to_string(),
-                    )
-                })?;
+                let digest =
+                    Digest::new(format!("sha256:{prefix}{remainder}")).map_err(|error| {
+                        StorageError::new(
+                            "FDIR-STORAGE-DIGEST",
+                            object_path.display().to_string(),
+                            error.to_string(),
+                        )
+                    })?;
                 digests.push(digest);
             }
         }
@@ -944,7 +942,8 @@ fn read_export_marker(source: &Path) -> Result<Digest, StorageError> {
             "export complete marker must be an object",
         )
     })?;
-    if object.len() != 2 || !object.contains_key("schema") || !object.contains_key("snapshotDigest") {
+    if object.len() != 2 || !object.contains_key("schema") || !object.contains_key("snapshotDigest")
+    {
         return Err(StorageError::new(
             "FDIR-IMPORT-MARKER-FIELDS",
             path.display().to_string(),

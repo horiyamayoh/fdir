@@ -14,11 +14,7 @@ pub struct StorageDiagnostic {
 impl StorageDiagnostic {
     /// Construct a diagnostic with a machine-readable code and JSON-style path.
     #[must_use]
-    pub fn new(
-        code: &'static str,
-        path: impl Into<String>,
-        message: impl Into<String>,
-    ) -> Self {
+    pub fn new(code: &'static str, path: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             code,
             path: path.into(),
@@ -64,11 +60,7 @@ pub struct StorageError {
 impl StorageError {
     /// Construct a storage failure.
     #[must_use]
-    pub fn new(
-        code: &'static str,
-        path: impl Into<String>,
-        message: impl Into<String>,
-    ) -> Self {
+    pub fn new(code: &'static str, path: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             diagnostic: StorageDiagnostic::new(code, path, message),
         }
