@@ -10,6 +10,7 @@ use fdir_core::CapabilityStatus;
 
 mod canonical;
 mod identity;
+mod raw;
 mod sha256;
 
 pub use canonical::{
@@ -20,6 +21,7 @@ pub use identity::{
     IDENTITY_MATERIAL_SCHEMA, IdentityDag, IdentityDigest, IdentityError, IdentityKind,
     IdentityNode, IdentityReference, IdentityResult,
 };
+pub use raw::raw_content_digest;
 
 /// Implemented canonical/identity boundary without a production qualification claim.
 pub const CAPABILITY: CapabilityStatus =

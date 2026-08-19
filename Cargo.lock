@@ -75,6 +75,7 @@ dependencies = [
 name = "fdir-storage"
 version = "0.1.0"
 dependencies = [
+ "fdir-canonical",
  "fdir-core",
 ]
 
