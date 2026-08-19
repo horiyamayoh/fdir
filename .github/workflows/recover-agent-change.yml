@@ -16,25 +16,44 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Decode and inspect saved payload
+      - name: Decode and preserve saved payload
         shell: bash
         run: |
           set -euo pipefail
-          cat .agent-change/part-* > /tmp/agent-change.b64
-          base64 --decode /tmp/agent-change.b64 > /tmp/agent-change.gz
-          gzip --decompress --stdout /tmp/agent-change.gz > /tmp/agent-change
-          echo "payload-bytes=$(wc -c < /tmp/agent-change)"
-          sha256sum /tmp/agent-change
-          file /tmp/agent-change
-          python3 - <<'PY'
+          mkdir -p recovery-artifact/extracted
+          cat .agent-change/part-* > recovery-artifact/agent-change.b64
+          base64 --decode recovery-artifact/agent-change.b64 > recovery-artifact/agent-change.gz
+          set +e
+          gzip --decompress --stdout recovery-artifact/agent-change.gz > recovery-artifact/payload.partial
+          gzip_status=$?
+          set -e
+          {
+            echo "gzip-status=${gzip_status}"
+            echo "base64-bytes=$(wc -c < recovery-artifact/agent-change.b64)"
+            echo "gzip-bytes=$(wc -c < recovery-artifact/agent-change.gz)"
+            echo "payload-bytes=$(wc -c < recovery-artifact/payload.partial)"
+            sha256sum recovery-artifact/agent-change.gz recovery-artifact/payload.partial
+            file recovery-artifact/payload.partial
+          } | tee recovery-artifact/inspection.txt
+          python3 - <<'PY' | tee -a recovery-artifact/inspection.txt
           from pathlib import Path
-          data = Path('/tmp/agent-change').read_bytes()
-          print('payload-prefix=', repr(data[:256]))
+          data = Path('recovery-artifact/payload.partial').read_bytes()
+          print('payload-prefix=', repr(data[:512]))
+          print('payload-suffix=', repr(data[-512:]))
           PY
-          if tar --list --file /tmp/agent-change >/tmp/agent-change.list 2>/dev/null; then
-            echo 'payload-kind=tar'
-            cat /tmp/agent-change.list
+          if tar --list --file recovery-artifact/payload.partial > recovery-artifact/tar-list.txt 2> recovery-artifact/tar-error.txt; then
+            echo 'payload-kind=complete-tar' | tee -a recovery-artifact/inspection.txt
           else
-            echo 'payload-kind=plain'
-            sed -n '1,80p' /tmp/agent-change
+            echo 'payload-kind=plain-or-truncated-tar' | tee -a recovery-artifact/inspection.txt
+            tar --extract --file recovery-artifact/payload.partial --directory recovery-artifact/extracted --ignore-zeros 2>> recovery-artifact/tar-error.txt || true
           fi
+          find recovery-artifact/extracted -type f -print | sort > recovery-artifact/extracted-files.txt
+          cat recovery-artifact/extracted-files.txt | tee -a recovery-artifact/inspection.txt
+      - name: Upload recovered payload
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: interrupted-issue-11-payload-${{ github.sha }}
+          path: recovery-artifact
+          if-no-files-found: error
+          retention-days: 7
