@@ -35,6 +35,8 @@ jobs:
           import base64
           import json
           import lzma
+          import os
+          import shutil
           import subprocess
           import sys
           from pathlib import Path
@@ -58,35 +60,11 @@ jobs:
               raise SystemExit(f"missing payload commit: {marker.decode()}")
 
           materialize(b"ISSUE8_STAGE1_PAYLOAD")
-          PY
-          chmod +x tools/generate_rust_contract.py
-          python3 tools/generate_rust_contract.py .
-          cp crates/fdir-contract/src/lib.rs /tmp/issue8-commit1-lib.rs
-          python3 - . <<'PY'
-          import base64
-          import json
-          import lzma
-          import subprocess
-          import sys
-          from pathlib import Path
-
-          marker = b"ISSUE8_STAGE2_PAYLOAD"
-          root = Path(sys.argv[1]).resolve()
-          messages = subprocess.check_output(
-              ["git", "log", "--format=%B%x00"],
-          ).split(b"\x00")
-          for message in messages:
-              lines = message.strip().splitlines()
-              if lines and lines[0] == marker:
-                  payload = b"".join(lines[1:])
-                  files = json.loads(lzma.decompress(base64.b64decode(payload)))
-                  for relative, content in sorted(files.items()):
-                      path = root / relative
-                      path.parent.mkdir(parents=True, exist_ok=True)
-                      path.write_text(content, encoding="utf-8")
-                  break
-          else:
-              raise SystemExit(f"missing payload commit: {marker.decode()}")
+          generator = root / "tools/generate_rust_contract.py"
+          os.chmod(generator, 0o755)
+          subprocess.run([sys.executable, str(generator), str(root)], check=True)
+          shutil.copy2(root / "crates/fdir-contract/src/lib.rs", "/tmp/issue8-commit1-lib.rs")
+          materialize(b"ISSUE8_STAGE2_PAYLOAD")
           PY
           git show origin/main:.github/workflows/baseline.yml > .github/workflows/baseline.yml
           rm -f .github/workflows/issue8-materialize.yml
@@ -100,11 +78,15 @@ jobs:
             --component rustfmt \
             --target x86_64-unknown-linux-gnu
           rustup override set 1.97.1
-      - name: Apply the pinned formatter
+      - name: Apply the pinned formatter to both commit states
         shell: bash
         run: |
           set -euo pipefail
-          rustfmt --edition 2024 /tmp/issue8-commit1-lib.rs
+          cp crates/fdir-contract/src/lib.rs /tmp/issue8-full-lib.rs
+          cp /tmp/issue8-commit1-lib.rs crates/fdir-contract/src/lib.rs
+          cargo fmt --all
+          cp crates/fdir-contract/src/lib.rs /tmp/issue8-commit1-lib.rs
+          cp /tmp/issue8-full-lib.rs crates/fdir-contract/src/lib.rs
           cargo fmt --all
       - name: Record pinned toolchains
         shell: bash
@@ -190,13 +172,11 @@ jobs:
             mkdir -p "/tmp/issue8-final/$(dirname "$path")"
             cp -p "$path" "/tmp/issue8-final/$path"
           done
-          (
-            cd /tmp/issue8-final
-            find . -type f -print0 | sort -z | xargs -0 sha256sum
-          ) > /tmp/issue8-final.sha256
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git reset --hard
+          git clean -fdx
           git switch -C "$target_branch" origin/main
 
           cp -p /tmp/issue8-final/tools/generate_rust_contract.py tools/generate_rust_contract.py
@@ -217,7 +197,6 @@ jobs:
 
           cp -p /tmp/issue8-final/crates/fdir-contract/src/lib.rs crates/fdir-contract/src/lib.rs
           cp -p /tmp/issue8-final/crates/fdir-contract/src/validation.rs crates/fdir-contract/src/validation.rs
-          mkdir -p crates/fdir-contract/tests
           cp -p /tmp/issue8-final/crates/fdir-contract/tests/model_fixture_parity.rs crates/fdir-contract/tests/model_fixture_parity.rs
           cp -p /tmp/issue8-final/crates/fdir-core/src/foundation.rs crates/fdir-core/src/foundation.rs
           cp -p /tmp/issue8-final/crates/fdir-core/src/lib.rs crates/fdir-core/src/lib.rs
@@ -235,11 +214,8 @@ jobs:
             quality/rust-workspace.json
           git commit -m 'Validate shared model invariants and explicit operation states'
 
-          (
-            cd /tmp/issue8-final
-            for path in "${files[@]}"; do
-              test "$(sha256sum "$path" | cut -d' ' -f1)" = "$(sha256sum "$GITHUB_WORKSPACE/$path" | cut -d' ' -f1)"
-            done
-          )
+          for path in "${files[@]}"; do
+            test "$(sha256sum "/tmp/issue8-final/$path" | cut -d' ' -f1)" = "$(sha256sum "$path" | cut -d' ' -f1)"
+          done
           test "$(git rev-list --count origin/main..HEAD)" -eq 2
           git push --force-with-lease origin "HEAD:refs/heads/$target_branch"
