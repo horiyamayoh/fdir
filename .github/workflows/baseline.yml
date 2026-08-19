@@ -18,7 +18,7 @@ jobs:
   quality:
     name: quality / full
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Check out source
         uses: actions/checkout@v6.0.2
@@ -48,6 +48,14 @@ jobs:
           cargo --version
           rustfmt --version
           cargo clippy --version
+      - name: Bootstrap the admitted dependency lockfile
+        env:
+          CARGO_NET_OFFLINE: "false"
+        run: cargo generate-lockfile
+      - name: Fetch admitted Rust dependencies
+        env:
+          CARGO_NET_OFFLINE: "false"
+        run: cargo fetch --locked
       - name: Run clean full repository quality
         env:
           FDIR_SOURCE_REVISION: ${{ github.sha }}
@@ -64,7 +72,7 @@ jobs:
         env:
           FDIR_SOURCE_REVISION: ${{ github.sha }}
         run: python3 tools/quality.py --mode full --cache-policy read-only --receipt reports/quality/full-cache-read.json .
-      - name: Archive machine-readable quality receipts
+      - name: Archive machine-readable quality receipts and lockfile
         if: always()
         uses: actions/upload-artifact@v7.0.1
         with:
@@ -72,5 +80,6 @@ jobs:
           path: |
             reports/quality/*.json
             .validation/quality-cache.json
+            Cargo.lock
           if-no-files-found: warn
           retention-days: 90

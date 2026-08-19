@@ -3,7 +3,7 @@
     "schemas/context.jsonld": "728290aa364edbf1f2cd97607eb4a36dbe547b297308b2b779a4cf44b84b5b8e",
     "schemas/fdir.cddl": "ad4c2d4255addc74d91a9c5ffb841e43b974f2989bf139caa7dcffb4feaa20f0",
     "schemas/fdir.schema.json": "6772c63d0c421a0d6fbfeb71ba4e43b592830c08168a30cb725a082868938710",
-    "schemas/fdir.sql": "69435bc8d6c1986cea9d5ac994b62127900b6fac1b5bc93a8d87a81af0ab0a7e",
+    "schemas/fdir.sql": "c0a94b60e5f35221400e3a6edaa0ebd159ffcab76d01bbc67fa72a43733eec74",
     "spec/generated/logical-model.md": "fa526a6b506175d1550197307ee105a37b1c88c46d501629bd4fa7ec8bdbd585"
   },
   "generator": "tools/generate_contracts.py",

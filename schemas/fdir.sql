@@ -15,6 +15,10 @@ CREATE TABLE index_meta (
   generation INTEGER NOT NULL CHECK(generation >= 1),
   state TEXT NOT NULL CHECK(state IN ('building', 'complete'))
 );
+CREATE TABLE snapshot_meta (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
 CREATE TABLE canonical_nodes (
   path TEXT PRIMARY KEY,
   kind TEXT NOT NULL CHECK(kind IN ('null', 'boolean', 'number', 'string', 'array', 'object')),

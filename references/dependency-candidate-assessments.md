@@ -2,7 +2,7 @@
 
 This document records the **assessment method and representative dependency classes** for FDIR 2.1 product development. It does not select a final crate, parser, renderer, OCR engine, evaluator, model, or native library unless an issue-specific admission section below says otherwise. Exact selections become usable only after admission through `machine/dependency-catalog.yaml`.
 
-The foundation began with no product runtime dependency admitted. Issue-specific implementation work may admit an exact dependency without creating a production-capability claim.
+The frozen foundation statement was **No product runtime dependency is admitted**. Issue-specific implementation work may supersede that starting state by admitting an exact dependency without creating a production-capability claim; Issue #11 makes the first such bounded admission below.
 
 ## Admission decision rule
 

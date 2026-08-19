@@ -1,0 +1,32 @@
+name: Delete merged agent branches
+
+on:
+  pull_request_target:
+    types:
+      - closed
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Merged agent branch to delete
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  delete-branch:
+    if: >-
+      (github.event_name == 'pull_request_target' &&
+       github.event.pull_request.merged == true &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       startsWith(github.event.pull_request.head.ref, 'agent/')) ||
+      (github.event_name == 'workflow_dispatch' &&
+       startsWith(inputs.branch, 'agent/'))
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Delete the merged branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.event.pull_request.head.ref }}
+        run: gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${HEAD_REF}"
