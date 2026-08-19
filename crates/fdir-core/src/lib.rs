@@ -200,6 +200,13 @@ pub fn json_quote(value: &str) -> String {
     output
 }
 
+mod foundation;
+
+pub use foundation::{
+    Budget, CapabilityRef, EvidenceLane, FoundationError, ProcessingResult, ProfileRef, Provenance,
+    ResultState, StatusVector,
+};
+
 #[cfg(test)]
 mod tests {
     use super::{CommandFailure, FailureClass, json_quote};

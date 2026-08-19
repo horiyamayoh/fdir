@@ -4,14 +4,14 @@
     {
       "dependencies": [],
       "name": "fdir-contract",
-      "responsibility": "generated language-neutral contract metadata"
+      "responsibility": "generated language-neutral types, descriptors, and validation boundary"
     },
     {
       "dependencies": [
         "fdir-contract"
       ],
       "name": "fdir-core",
-      "responsibility": "neutral failure, metadata, and capability vocabulary"
+      "responsibility": "neutral failure, status, budget, provenance, and capability vocabulary"
     },
     {
       "dependencies": [
