@@ -1,0 +1,37 @@
+name: Recover interrupted agent change
+
+on:
+  push:
+    branches:
+      - agent/issue-11-sqlite-index
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Decode and inspect saved payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .agent-change/part-* > /tmp/agent-change.b64
+          base64 --decode /tmp/agent-change.b64 > /tmp/agent-change.gz
+          gzip --decompress --stdout /tmp/agent-change.gz > /tmp/agent-change
+          echo "payload-bytes=$(wc -c < /tmp/agent-change)"
+          sha256sum /tmp/agent-change
+          file /tmp/agent-change
+          python3 - <<'PY'
+          from pathlib import Path
+          data = Path('/tmp/agent-change').read_bytes()
+          print('payload-prefix=', repr(data[:256]))
+          PY
+          if tar --list --file /tmp/agent-change >/tmp/agent-change.list 2>/dev/null; then
+            echo 'payload-kind=tar'
+            cat /tmp/agent-change.list
+          else
+            echo 'payload-kind=plain'
+            sed -n '1,80p' /tmp/agent-change
+          fi
