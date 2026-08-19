@@ -80,20 +80,15 @@ fn rich_manifest() -> Result<SnapshotManifest, Box<dyn Error>> {
             ]
         }"#,
     )?;
-    let digest = Digest::new(
-        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    )?;
+    let digest =
+        Digest::new("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")?;
     let descriptor = ObjectDescriptor::new(
         digest.clone(),
         4,
         "application/octet-stream",
         "source-evidence",
     )?;
-    let reference = ObjectReference::new(
-        ReferenceSource::Snapshot,
-        digest,
-        "source-evidence",
-    )?;
+    let reference = ObjectReference::new(ReferenceSource::Snapshot, digest, "source-evidence")?;
     let transition = StatusTransition::new(ResultState::Incomplete, ResultState::Unsupported)?;
     Ok(SnapshotManifest::new(
         payload,
@@ -170,8 +165,7 @@ fn clean_full_incremental_and_deleted_rebuilds_are_equivalent() -> Result<(), Bo
 
     let clean_index = SqliteIndex::open(&clean_path, clean.snapshot_digest())?;
     let full_index = SqliteIndex::open(&full_path, full.snapshot_digest())?;
-    let incremental_index =
-        SqliteIndex::open(&incremental_path, incremental.snapshot_digest())?;
+    let incremental_index = SqliteIndex::open(&incremental_path, incremental.snapshot_digest())?;
     assert_eq!(clean_index.canonical_dump()?, full_index.canonical_dump()?);
     assert_eq!(
         clean_index.canonical_dump()?,
@@ -190,8 +184,8 @@ fn clean_full_incremental_and_deleted_rebuilds_are_equivalent() -> Result<(), Bo
 }
 
 #[test]
-fn stale_corrupt_wrong_version_and_logically_divergent_indexes_are_rejected(
-) -> Result<(), Box<dyn Error>> {
+fn stale_corrupt_wrong_version_and_logically_divergent_indexes_are_rejected()
+-> Result<(), Box<dyn Error>> {
     let directory = TestDirectory::new("invalid-indexes")?;
     let manifest = rich_manifest()?;
     let path = directory.join("valid.sqlite");
@@ -199,11 +193,7 @@ fn stale_corrupt_wrong_version_and_logically_divergent_indexes_are_rejected(
     let valid_index = SqliteIndex::open(&path, receipt.snapshot_digest())?;
 
     let other_path = directory.join("other.sqlite");
-    let other = SqliteIndex::build(
-        &other_path,
-        &minimal_manifest()?,
-        IndexBuildMode::Clean,
-    )?;
+    let other = SqliteIndex::build(&other_path, &minimal_manifest()?, IndexBuildMode::Clean)?;
     let stale = require_error(SqliteIndex::open(&path, other.snapshot_digest()))?;
     assert_eq!(stale.code(), "FDIR-INDEX-SNAPSHOT-MISMATCH");
 
@@ -240,8 +230,8 @@ fn stale_corrupt_wrong_version_and_logically_divergent_indexes_are_rejected(
 }
 
 #[test]
-fn supported_queries_match_canonical_traversal_for_all_required_domains(
-) -> Result<(), Box<dyn Error>> {
+fn supported_queries_match_canonical_traversal_for_all_required_domains()
+-> Result<(), Box<dyn Error>> {
     let directory = TestDirectory::new("query-consistency")?;
     let manifest = rich_manifest()?;
     let path = directory.join("index.sqlite");

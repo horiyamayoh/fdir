@@ -236,8 +236,7 @@ impl IndexConsistencyReport {
     /// Whether every generated projection table matches canonical traversal.
     #[must_use]
     pub fn is_consistent(&self) -> bool {
-        self.differences.is_empty()
-            && self.expected_content_digest == self.actual_content_digest
+        self.differences.is_empty() && self.expected_content_digest == self.actual_content_digest
     }
 
     /// Snapshot content identity bound to the comparison.
@@ -412,10 +411,7 @@ impl SqliteIndex {
     }
 
     /// Open an index only after integrity, version, DDL, snapshot, and projection validation.
-    pub fn open(
-        path: impl AsRef<Path>,
-        expected_snapshot: &Digest,
-    ) -> Result<Self, StorageError> {
+    pub fn open(path: impl AsRef<Path>, expected_snapshot: &Digest) -> Result<Self, StorageError> {
         let index = Self {
             path: path.as_ref().to_path_buf(),
             snapshot_digest: expected_snapshot.clone(),
@@ -454,7 +450,9 @@ impl SqliteIndex {
         manifest: &SnapshotManifest,
         query: IndexQuery,
     ) -> Result<Vec<IndexQueryRow>, StorageError> {
-        Ok(ProjectionSource::from_manifest(manifest)?.projection.query(query))
+        Ok(ProjectionSource::from_manifest(manifest)?
+            .projection
+            .query(query))
     }
 
     /// Compare all generated table rows with a supplied canonical snapshot.
@@ -708,10 +706,7 @@ impl Projection {
             for row in self.rows(spec.name) {
                 let mut value = ObjectValue::new();
                 for (column, cell) in spec.columns.iter().zip(row) {
-                    value.insert(
-                        (*column).to_owned(),
-                        CanonicalValue::String(cell.clone()),
-                    );
+                    value.insert((*column).to_owned(), CanonicalValue::String(cell.clone()));
                 }
                 values.push(CanonicalValue::Object(value));
             }
@@ -997,11 +992,7 @@ fn project_entity_array(
         )
     })?;
     for (index, item) in array.iter().enumerate() {
-        let source_path = format!(
-            "/payload/{}/{}",
-            pointer_escape(spec.payload_field),
-            index
-        );
+        let source_path = format!("/payload/{}/{}", pointer_escape(spec.payload_field), index);
         let object = item.as_object().ok_or_else(|| {
             StorageError::new(
                 "FDIR-INDEX-ENTITY-TYPE",
@@ -1016,13 +1007,7 @@ fn project_entity_array(
             vec![identity.to_owned(), source_path.clone(), json.clone()],
         );
         if let Some(category) = spec.query_category {
-            add_materialized(
-                projection,
-                category,
-                identity,
-                &source_path,
-                &json,
-            );
+            add_materialized(projection, category, identity, &source_path, &json);
         }
         if spec.payload_field == "assertions" {
             project_assertion_evidence(object, identity, &source_path, projection)?;
@@ -1109,13 +1094,7 @@ fn project_snapshot_objects(
                 source_path.clone(),
             ],
         );
-        add_materialized(
-            projection,
-            "evidence-object",
-            digest,
-            &source_path,
-            &json,
-        );
+        add_materialized(projection, "evidence-object", digest, &source_path, &json);
     }
     Ok(())
 }
@@ -1190,10 +1169,7 @@ fn project_status_transitions(
     Ok(())
 }
 
-fn project_provenance(
-    root: &ObjectValue,
-    projection: &mut Projection,
-) -> Result<(), StorageError> {
+fn project_provenance(root: &ObjectValue, projection: &mut Projection) -> Result<(), StorageError> {
     let provenance = root.get("provenance").ok_or_else(|| {
         StorageError::new(
             "FDIR-INDEX-PROVENANCE-MISSING",
@@ -1204,15 +1180,13 @@ fn project_provenance(
     let json = provenance.to_json();
     projection.push(
         "provenance_records",
-        vec!["snapshot".to_owned(), "/provenance".to_owned(), json.clone()],
+        vec![
+            "snapshot".to_owned(),
+            "/provenance".to_owned(),
+            json.clone(),
+        ],
     );
-    add_materialized(
-        projection,
-        "provenance",
-        "snapshot",
-        "/provenance",
-        &json,
-    );
+    add_materialized(projection, "provenance", "snapshot", "/provenance", &json);
     Ok(())
 }
 
@@ -1230,15 +1204,12 @@ fn project_capabilities_and_profiles(
         &["capabilityId", "id"],
         &mut capabilities,
     )?;
-    collect_named_entities(
-        root,
-        "",
-        "profiles",
-        &["profileId", "id"],
-        &mut profiles,
-    )?;
+    collect_named_entities(root, "", "profiles", &["profileId", "id"], &mut profiles)?;
 
-    if let Some(statuses) = payload.get("guaranteeStatuses").and_then(CanonicalValue::as_array) {
+    if let Some(statuses) = payload
+        .get("guaranteeStatuses")
+        .and_then(CanonicalValue::as_array)
+    {
         for (index, status) in statuses.iter().enumerate() {
             let Some(object) = status.as_object() else {
                 continue;
@@ -1259,26 +1230,14 @@ fn project_capabilities_and_profiles(
             "capabilities",
             vec![identifier.clone(), source_path.clone(), json.clone()],
         );
-        add_materialized(
-            projection,
-            "capability",
-            &identifier,
-            &source_path,
-            &json,
-        );
+        add_materialized(projection, "capability", &identifier, &source_path, &json);
     }
     for (identifier, (source_path, json)) in profiles {
         projection.push(
             "profiles",
             vec![identifier.clone(), source_path.clone(), json.clone()],
         );
-        add_materialized(
-            projection,
-            "profile",
-            &identifier,
-            &source_path,
-            &json,
-        );
+        add_materialized(projection, "profile", &identifier, &source_path, &json);
     }
     Ok(())
 }
@@ -1344,13 +1303,7 @@ fn collect_named_entities(
                         }
                     }
                 }
-                collect_named_entities(
-                    child,
-                    &child_path,
-                    field_name,
-                    identity_fields,
-                    output,
-                )?;
+                collect_named_entities(child, &child_path, field_name, identity_fields, output)?;
             }
         }
         CanonicalValue::Array(values) => {
@@ -1391,13 +1344,7 @@ fn project_outcomes(value: &CanonicalValue, path: &str, projection: &mut Project
                             json.clone(),
                         ],
                     );
-                    add_materialized(
-                        projection,
-                        "outcome",
-                        &outcome_key,
-                        &source_path,
-                        &json,
-                    );
+                    add_materialized(projection, "outcome", &outcome_key, &source_path, &json);
                 }
             }
             for (key, child) in object {
@@ -1419,7 +1366,11 @@ fn project_outcomes(value: &CanonicalValue, path: &str, projection: &mut Project
 fn walk_canonical_nodes(value: &CanonicalValue, path: &str, projection: &mut Projection) {
     projection.push(
         "canonical_nodes",
-        vec![path.to_owned(), value_kind(value).to_owned(), value.to_json()],
+        vec![
+            path.to_owned(),
+            value_kind(value).to_owned(),
+            value.to_json(),
+        ],
     );
     match value {
         CanonicalValue::Object(object) => {
@@ -1733,17 +1684,23 @@ fn validate_root(
     expected_snapshot: Option<&Digest>,
 ) -> Result<ValidatedRoot, StorageError> {
     validate_integrity(connection, path)?;
-    let application_id = scalar_i64(connection, "SELECT application_id FROM pragma_application_id", path)?;
+    let application_id = scalar_i64(
+        connection,
+        "SELECT application_id FROM pragma_application_id",
+        path,
+    )?;
     if application_id != INDEX_APPLICATION_ID {
         return Err(StorageError::new(
             "FDIR-INDEX-APPLICATION-ID",
             display_path(path),
-            format!(
-                "SQLite application id {application_id} does not identify an FDIR index"
-            ),
+            format!("SQLite application id {application_id} does not identify an FDIR index"),
         ));
     }
-    let user_version = scalar_i64(connection, "SELECT user_version FROM pragma_user_version", path)?;
+    let user_version = scalar_i64(
+        connection,
+        "SELECT user_version FROM pragma_user_version",
+        path,
+    )?;
     match negotiate_index_version(user_version) {
         IndexVersionDecision::Current => {}
         IndexVersionDecision::RebuildRequired { found, supported } => {
@@ -1759,9 +1716,7 @@ fn validate_root(
             return Err(StorageError::new(
                 "FDIR-INDEX-SCHEMA-VERSION",
                 display_path(path),
-                format!(
-                    "index schema {found} is newer than supported schema {supported}"
-                ),
+                format!("index schema {found} is newer than supported schema {supported}"),
             ));
         }
     }
@@ -1882,14 +1837,17 @@ fn validate_integrity(connection: &Connection, path: &Path) -> Result<(), Storag
             error,
         )
     })?;
-    if rows.next().map_err(|error| {
-        sqlite_error(
-            "FDIR-INDEX-CORRUPT",
-            path,
-            "SQLite foreign-key check could not be read",
-            error,
-        )
-    })?.is_some()
+    if rows
+        .next()
+        .map_err(|error| {
+            sqlite_error(
+                "FDIR-INDEX-CORRUPT",
+                path,
+                "SQLite foreign-key check could not be read",
+                error,
+            )
+        })?
+        .is_some()
     {
         return Err(StorageError::new(
             "FDIR-INDEX-CORRUPT",
@@ -1948,9 +1906,7 @@ fn read_metadata(connection: &Connection, path: &Path) -> Result<IndexMetadata, 
         return Err(StorageError::new(
             "FDIR-INDEX-MATERIALIZER-VERSION",
             display_path(path),
-            format!(
-                "materializer {materializer} differs from {INDEX_MATERIALIZER_VERSION}"
-            ),
+            format!("materializer {materializer} differs from {INDEX_MATERIALIZER_VERSION}"),
         ));
     }
     let expected_ddl = ddl_digest()?;
@@ -1958,9 +1914,7 @@ fn read_metadata(connection: &Connection, path: &Path) -> Result<IndexMetadata, 
         return Err(StorageError::new(
             "FDIR-INDEX-DDL-MISMATCH",
             display_path(path),
-            format!(
-                "stored DDL digest {stored_ddl} differs from generated digest {expected_ddl}"
-            ),
+            format!("stored DDL digest {stored_ddl} differs from generated digest {expected_ddl}"),
         ));
     }
     if state != "complete" {
@@ -2078,10 +2032,7 @@ fn projection_from_index_root(
     Projection::from_root(&root)
 }
 
-fn projection_differences(
-    expected: &Projection,
-    actual: &Projection,
-) -> Vec<IndexDifference> {
+fn projection_differences(expected: &Projection, actual: &Projection) -> Vec<IndexDifference> {
     let mut differences = Vec::new();
     for spec in TABLE_SPECS {
         let expected_rows = expected.rows(spec.name);
@@ -2375,24 +2326,11 @@ fn sqlite_error(
     context: &str,
     error: rusqlite::Error,
 ) -> StorageError {
-    StorageError::new(
-        code,
-        display_path(path),
-        format!("{context}: {error}"),
-    )
+    StorageError::new(code, display_path(path), format!("{context}: {error}"))
 }
 
-fn io_error(
-    code: &'static str,
-    path: &Path,
-    context: &str,
-    error: std::io::Error,
-) -> StorageError {
-    StorageError::new(
-        code,
-        display_path(path),
-        format!("{context}: {error}"),
-    )
+fn io_error(code: &'static str, path: &Path, context: &str, error: std::io::Error) -> StorageError {
+    StorageError::new(code, display_path(path), format!("{context}: {error}"))
 }
 
 fn display_path(path: &Path) -> String {
