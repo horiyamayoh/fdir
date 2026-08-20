@@ -34,6 +34,7 @@ EXPECTED_CASES = 134
 EXPECTED_LEAF_ISSUES = 20
 EXPECTED_UMBRELLA_ISSUE = 47
 EXPECTED_LEAF_ISSUE_RANGE = range(48, 68)
+EXPECTED_E2E_ISSUE = 68
 
 REQUIRED_EXAMPLES = {
     "callout.json",
@@ -259,6 +260,10 @@ def check_issue_plan() -> dict[str, int]:
     for number in EXPECTED_LEAF_ISSUE_RANGE:
         key = f"DFIR-I-{number - 47:03d}"
         require(mapped_by_key[key]["issueNumber"] == number, f"github issue mapping is not contiguous at #{number}")
+    blocker = github_map.get("releaseBlocker")
+    require(isinstance(blocker, dict), "github issue map has no E2E release blocker")
+    require(blocker.get("issueNumber") == EXPECTED_E2E_ISSUE, "github issue map E2E blocker must be issue #68")
+    require(blocker.get("key") == "DFIR-E2E-001", "github issue map E2E blocker key is wrong")
 
     return {
         "issue_plan_entries": len(entries),
@@ -266,6 +271,7 @@ def check_issue_plan() -> dict[str, int]:
         "umbrella_issue": EXPECTED_UMBRELLA_ISSUE,
         "first_leaf_issue": min(expected_numbers),
         "last_leaf_issue": max(expected_numbers),
+        "e2e_issue": EXPECTED_E2E_ISSUE,
     }
 
 
@@ -353,6 +359,33 @@ def check_examples() -> dict[str, int]:
 
     require({"docx", "xlsx", "pdf", "markdown"}.issubset(formats), "examples do not cover DOCX, XLSX, PDF, and Markdown")
     return {"json_examples": len(paths), "source_formats": len(formats)}
+
+
+def check_real_input_e2e_assets() -> dict[str, int]:
+    """Ensure the release contains a real-input path for every required format."""
+
+    required = {
+        "tools/adapter_common.py",
+        "tools/adapter_docx.py",
+        "tools/adapter_xlsx.py",
+        "tools/adapter_pdf.py",
+        "tools/adapter_markdown.py",
+        "tools/ir_validation.py",
+        "tools/convert_document.py",
+        "tools/generate_e2e_fixtures.py",
+        "tools/run_e2e.py",
+        "e2e/README.md",
+        "e2e/fixtures/README.md",
+    }
+    missing = sorted(relative(ROOT / item) for item in required if not (ROOT / item).is_file())
+    require(not missing, "real-input E2E assets are missing: " + ", ".join(missing))
+    generator = (ROOT / "tools" / "generate_e2e_fixtures.py").read_text(encoding="utf-8")
+    runner = (ROOT / "tools" / "run_e2e.py").read_text(encoding="utf-8")
+    for phrase in ("write_zip", "pdf_bytes", "MARKDOWN"):
+        require(phrase in generator, f"E2E fixture generator lacks real {phrase} implementation")
+    for phrase in ("real-input", "evidence", "validate", "canonical", "query", "malformed", "resource-limit", "consumed"):
+        require(phrase.casefold() in runner.casefold(), f"E2E runner lacks required check: {phrase}")
+    return {"required_assets": len(required), "formats": 4, "e2e_issue": EXPECTED_E2E_ISSUE}
 
 
 def check_documents() -> dict[str, int]:
@@ -461,6 +494,7 @@ def main(argv: list[str] | None = None) -> int:
     for name, display, command in (
         ("design_validation", "python tools/validate_design.py", ["tools/validate_design.py"]),
         ("acceptance_all", "python tools/run_acceptance.py --all", ["tools/run_acceptance.py", "--all"]),
+        ("real_input_e2e", "python tools/run_e2e.py --all", ["tools/run_e2e.py", "--all"]),
     ):
         command_result = run_command(name, display, command)
         commands.append(command_result)
@@ -482,6 +516,7 @@ def main(argv: list[str] | None = None) -> int:
         ("traceability", check_traceability),
         ("schema", check_schema),
         ("examples", check_examples),
+        ("real_input_e2e_assets", check_real_input_e2e_assets),
         ("documents_and_boundaries", check_documents),
     )
     for name, function in check_functions:
@@ -513,6 +548,7 @@ def main(argv: list[str] | None = None) -> int:
             "umbrella_issue": EXPECTED_UMBRELLA_ISSUE,
             "leaf_issue_first": min(EXPECTED_LEAF_ISSUE_RANGE),
             "leaf_issue_last": max(EXPECTED_LEAF_ISSUE_RANGE),
+            "e2e_issue": EXPECTED_E2E_ISSUE,
         },
         "checks": checks,
         "commands": commands,

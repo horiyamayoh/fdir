@@ -8,4 +8,14 @@ dist/
 build/
 reports/
 tmp/
+e2e/.run/
+e2e/run-debug/
+e2e/fixtures/sample.docx
+e2e/fixtures/sample.xlsx
+e2e/fixtures/sample.pdf
+e2e/fixtures/sample.md
+e2e/fixtures/malformed.docx
+e2e/fixtures/malformed.xlsx
+e2e/fixtures/malformed.pdf
+e2e/fixtures/malformed.md
 .DS_Store

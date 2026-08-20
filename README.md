@@ -46,6 +46,15 @@ FDIR は、DOCX、XLSX、PDF、Markdown などに記録された構造・表現�
 
     python tools/validate_design.py
 
+### Current implementation status
+
+The reset note above is historical. The current repository includes bounded
+stdlib adapters that consume real DOCX, XLSX, PDF, and Markdown files through
+`tools/convert_document.py`. `tools/run_e2e.py --all` proves source
+consumption, generated IR, execution evidence, malformed-input handling, and
+resource-limit failures. Unsupported format features remain explicit
+diagnostics; renderer and OCR outputs remain optional observations.
+
 ### Executable release gate
 
 The design release is executable and fail-closed. Run the following commands
@@ -53,16 +62,29 @@ from the repository root:
 
     python tools/validate_design.py
     python tools/run_acceptance.py --all
+    python tools/run_e2e.py --all
     python tools/release_gate.py
 
 The first command validates the authority graph (134 requirements, 16
-acceptance families, and the 20 leaf issues). The second executes every
+acceptance families, and the 20 planned leaf issues). The second executes every
 acceptance case, including positive, negative, partial-conversion,
-unknown-extension, query, and resource-boundary cases. The final command is the
-integration gate and fails if any command, fixture, schema, documentation, or
-product-boundary check fails. The four format adapters are deliberately bounded
-form-mapping contracts and fixtures; they do not claim semantic interpretation
-or preservation of source bytes.
+unknown-extension, query, and resource-boundary cases. The third command opens
+real DOCX/XLSX/PDF/Markdown inputs through the public converter, checks the
+generated IR and execution-evidence sidecar, and exercises malformed and input
+limit failures. The final command runs all three checks and fails if any
+command, adapter, fixture, schema, documentation, or product-boundary check
+fails. Issue #68 is the release-blocking real-input E2E tracker.
+
+### Real-input conversion
+
+The public bounded adapter entry point is:
+
+    python tools/convert_document.py inspect <input>
+    python tools/convert_document.py convert <input> --out document-form.json --evidence execution.json
+
+The evidence sidecar is ingestion metadata outside the IR. It records the
+input path, size, SHA-256, adapter module, and whether the file was consumed;
+source bytes are never copied into the IR.
 
 GitHub issue key/number mapping is recorded in [machine/github-issue-map.json](machine/github-issue-map.json). The disposition of superseded legacy issues is recorded in [machine/legacy-issue-map.json](machine/legacy-issue-map.json).
 

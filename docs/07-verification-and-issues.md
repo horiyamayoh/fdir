@@ -60,28 +60,33 @@ The machine-readable plan is backed by three standard-library-only commands:
 ```text
 python tools/validate_design.py
 python tools/run_acceptance.py --all
+python tools/run_e2e.py --all
 python tools/release_gate.py
 ```
 
 `validate_design.py` is the authority check. It verifies the complete
-requirement-to-test-to-family-to-owner mapping, the 20 leaf issue plan, the
-GitHub issue map, the schema boundary, examples, and the required documents.
-`run_acceptance.py --all` expands all 16 families into their declared case
-counts and executes all 134 cases. A single case can be reproduced with
-`--family AT-<family> --case <number>` and machine-readable output with
-`--json`.
+requirement-to-test-to-family-to-owner mapping, the 20 planned leaf issues, the
+GitHub issue map, the schema boundary, examples, adapter paths, and required
+documents. `run_acceptance.py --all` expands all 16 families into their
+declared case counts and executes all 134 cases. Its cross-format QA case also
+invokes the real-input gate. `run_e2e.py --all` invokes the public converter in
+child processes for real DOCX/XLSX/PDF/Markdown inputs, then checks generated
+IR, execution evidence, malformed inputs, and resource limits. A single
+acceptance case can be reproduced with `--family AT-<family> --case <number>`
+and machine-readable output with `--json`.
 
-The release gate invokes both commands and performs the final integration
-checks. It is fail-closed: a missing fixture, malformed JSON, unexplained
-partial outcome, critical unknown extension, unbounded property bag, semantic
-predicate, source-byte store, forensic accounting, or lineage certificate is a
-release blocker. Renderer and OCR results remain observations and never replace
-source-declared facts.
+The release gate invokes all three commands and performs the final integration
+checks. It is fail-closed: a missing adapter, real-input fixture, execution
+evidence, malformed JSON, unexplained partial outcome, critical unknown
+extension, unbounded property bag, semantic predicate, source-byte store,
+forensic accounting, or lineage certificate is a release blocker. Renderer and
+OCR results remain observations and never replace source-declared facts.
 
-The acceptance runner is a qualification tool, not a production converter. The
-DOCX, XLSX, PDF, and Markdown deliverables are bounded mapping contracts and
-executable examples; unsupported or unavailable capabilities are represented as
-diagnostics and are not promoted to success.
+The acceptance runner checks the design contract; the public converter and
+real-input E2E gate prove that the four bounded adapters actually consume
+source files. Unsupported or unavailable capabilities are represented as
+diagnostics and are not promoted to success. Issue #68 tracked this E2E release
+blocker and is completed only with the green gate and its evidence comment.
 
 ### Acceptance vocabulary
 

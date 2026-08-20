@@ -20,3 +20,5 @@ jobs:
         run: python tools/validate_design.py
       - name: Run final release gate
         run: python tools/release_gate.py
+      - name: Run real-input adapter E2E
+        run: python tools/run_e2e.py --all

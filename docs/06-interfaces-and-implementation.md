@@ -79,4 +79,24 @@ fdir explain <document-form.json> --node <id>
 fdir export <document-form.json> --target json|markdown|html
 ~~~
 
+## 6.7 Executable adapter entry point
+
+The repository reference implementation exposes the bounded adapter contract
+through `tools/convert_document.py`. It accepts real DOCX, XLSX, PDF, and
+Markdown files, emits Document Form IR plus an external execution-evidence
+sidecar, and fails closed on malformed input or configured resource limits:
+
+~~~text
+python tools/convert_document.py inspect <input>
+python tools/convert_document.py convert <input> --out <document-form.json> --evidence <execution.json>
+python tools/convert_document.py validate <document-form.json>
+~~~
+
+`tools/run_e2e.py --all` generates real source files, invokes that public
+entry point in child processes, and verifies source-derived content,
+diagnostics, malformed-input handling, and limits for all four formats. This
+is the executable reference for the adapter and release-gate contract; it
+does not promote renderer/OCR observations or parser output into business
+meaning.
+
 compare、equivalence、lineage、assert、knowledge graph は FDIR CLI の command にしません。構造差・表示差を比較する補助 command を将来追加する場合も、semantic equivalence とは別 namespace と型で設計します。

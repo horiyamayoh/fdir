@@ -146,15 +146,20 @@ def validate_github_issue_map(github_map: dict, issue_plan: dict[str, dict]) -> 
 def validate_release_gate_manifest(manifest: dict) -> None:
     expected = manifest.get("expected")
     require(isinstance(expected, dict), "release gate manifest has no expected counts")
-    for key, value in {"requirements": 134, "acceptanceFamilies": 16, "acceptanceCases": 134, "leafIssues": 20}.items():
+    for key, value in {"requirements": 134, "acceptanceFamilies": 16, "acceptanceCases": 134, "leafIssues": 20, "e2eIssue": 68}.items():
         require(expected.get(key) == value, f"release gate expected count mismatch: {key}")
     commands = manifest.get("commands")
-    require(isinstance(commands, list) and "python tools/validate_design.py" in commands and "python tools/run_acceptance.py --all" in commands,
+    require(isinstance(commands, list) and "python tools/validate_design.py" in commands and "python tools/run_acceptance.py --all" in commands and "python tools/run_e2e.py --all" in commands,
             "release gate commands are incomplete")
+    for relative in manifest.get("requiredAdapters", []):
+        require((ROOT / relative).is_file(), f"release gate adapter is missing: {relative}")
+    e2e_issue = manifest.get("e2eIssue")
+    require(isinstance(e2e_issue, dict) and e2e_issue.get("number") == 68 and e2e_issue.get("releaseBlocker") is True,
+            "release gate E2E issue metadata is incomplete")
     require(set(manifest.get("requiredFormats", [])) == {"docx", "xlsx", "pdf", "markdown"}, "release gate formats are incomplete")
     for relative in manifest.get("requiredExamples", []):
         require((ROOT / relative).is_file(), f"release gate example is missing: {relative}")
-    require(len(manifest.get("checks", [])) >= 8, "release gate checks are incomplete")
+    require(len(manifest.get("checks", [])) >= 9 and "real-input-e2e" in manifest.get("checks", []), "release gate checks are incomplete")
 
 
 def validate_schema(schema: dict) -> None:
@@ -222,7 +227,15 @@ def validate_docs() -> None:
     all_text = "\n".join((ROOT / relative).read_text(encoding="utf-8") for relative in required_docs)
     for phrase in ["Parser / Adapter", "Document Form IR", "Semantic IR", "source map", "property bag"]:
         require(phrase.lower() in all_text.lower(), f"documentation is missing boundary phrase: {phrase}")
-    for relative in ["tools/run_acceptance.py", "tools/release_gate.py", "tools/canonicalize_ir.py", "tools/query_ir.py"]:
+    for relative in [
+        "tools/run_acceptance.py",
+        "tools/release_gate.py",
+        "tools/canonicalize_ir.py",
+        "tools/query_ir.py",
+        "tools/convert_document.py",
+        "tools/run_e2e.py",
+        "tools/generate_e2e_fixtures.py",
+    ]:
         require((ROOT / relative).is_file(), f"executable release artifact is missing: {relative}")
 
 

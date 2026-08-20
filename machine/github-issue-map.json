@@ -28,5 +28,11 @@
     {"key":"DFIR-I-018","issueNumber":65,"url":"https://github.com/horiyamayoh/fdir/issues/65"},
     {"key":"DFIR-I-019","issueNumber":66,"url":"https://github.com/horiyamayoh/fdir/issues/66"},
     {"key":"DFIR-I-020","issueNumber":67,"url":"https://github.com/horiyamayoh/fdir/issues/67"}
-  ]
+  ],
+  "releaseBlocker": {
+    "key": "DFIR-E2E-001",
+    "issueNumber": 68,
+    "url": "https://github.com/horiyamayoh/fdir/issues/68",
+    "title": "true E2E document analysis"
+  }
 }

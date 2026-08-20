@@ -1,8 +1,9 @@
 """Execute the machine-readable Document Form IR acceptance matrix.
 
-The repository is a bounded design and contract release, so this runner tests
-the authority files, schema shape, examples, boundary rules, and the small
-standard-library runtime helpers. It deliberately does not parse user files.
+The runner tests authority files, schema shape, examples, boundary rules,
+runtime helpers, and the real-input adapter E2E gate.  Pre-authored examples
+remain useful for contract coverage, but they are not treated as proof that an
+input parser exists.
 """
 
 from __future__ import annotations
@@ -619,6 +620,16 @@ def check_qa(ctx: Context, case: int) -> None:
     elif case == 3:
         ensure({doc["sourceFormat"]["name"] for doc in ctx.examples.values()} >= {"docx", "xlsx", "pdf", "markdown"}, "cross-format fixtures are incomplete")
         ensure(not has_token(ctx.examples, "semanticEquivalence"), "cross-format fixture makes a semantic equivalence claim")
+        completed = subprocess.run(
+            [sys.executable, str(ROOT / "tools" / "run_e2e.py"), "--all"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            timeout=90,
+            check=False,
+        )
+        ensure(completed.returncode == 0, f"real-input E2E failed: {(completed.stdout + completed.stderr).strip()}")
+        ensure("e2e valid:" in completed.stdout.casefold(), "real-input E2E did not emit a passing summary")
     elif case == 4:
         ensure(example(ctx, "callout.json").get("geometries"), "geometry fixture is missing")
         ensure(example(ctx, "pdf-observation.json").get("geometries"), "PDF geometry fixture is missing")
@@ -638,6 +649,7 @@ def check_qa(ctx: Context, case: int) -> None:
     elif case == 8:
         manifest = ctx.manifest
         ensure("resource-and-package-boundary" in manifest.get("checks", []), "resource boundary is not a release check")
+        ensure("real-input-e2e" in manifest.get("checks", []), "real-input E2E is not a release check")
         ensure((ROOT / "tools/release_gate.py").is_file(), "release gate is missing")
 
 
