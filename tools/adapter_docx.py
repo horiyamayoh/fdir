@@ -200,7 +200,7 @@ def _drawing(builder: DocumentBuilder, parent_id: str, drawing: ET.Element, line
                         "DFIR-DOCX-CONNECTOR-TARGET-UNRESOLVED",
                         f"connector endpoint target is not represented by a parsed node: {target}",
                         target_id=node_id,
-                        phase="map",
+                        phase="normalize",
                     )
                     _extension(builder, node_id, "connector-target", {"endpoint": endpoint_kind, "sourceId": target}, criticality="non-critical")
                     builder.add_feature("connector-target", "ambiguous", target_id=node_id, diagnostic_ids=[diagnostic])

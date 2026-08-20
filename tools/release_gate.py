@@ -383,7 +383,7 @@ def check_real_input_e2e_assets() -> dict[str, int]:
     runner = (ROOT / "tools" / "run_e2e.py").read_text(encoding="utf-8")
     for phrase in ("write_zip", "pdf_bytes", "MARKDOWN"):
         require(phrase in generator, f"E2E fixture generator lacks real {phrase} implementation")
-    for phrase in ("real-input", "evidence", "validate", "canonical", "query", "malformed", "resource-limit", "consumed"):
+    for phrase in ("real-input", "evidence", "validate", "canonical", "query", "malformed", "unsupported", "resource-limit", "consumed"):
         require(phrase.casefold() in runner.casefold(), f"E2E runner lacks required check: {phrase}")
     return {"required_assets": len(required), "formats": 4, "e2e_issue": EXPECTED_E2E_ISSUE}
 

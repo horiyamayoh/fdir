@@ -18,4 +18,8 @@ e2e/fixtures/malformed.docx
 e2e/fixtures/malformed.xlsx
 e2e/fixtures/malformed.pdf
 e2e/fixtures/malformed.md
+e2e/fixtures/unsupported.docx
+e2e/fixtures/unsupported.xlsx
+e2e/fixtures/unsupported.pdf
+e2e/fixtures/unsupported.md
 .DS_Store

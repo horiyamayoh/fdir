@@ -200,6 +200,37 @@ def check_resource_limit(format_name: str, input_path: Path, work: Path) -> dict
     return {"format": format_name, "case": "resource-limit", "commandExitCode": result.returncode, "diagnostics": len(document.get("diagnostics", []))}
 
 
+def check_unsupported(format_name: str, input_path: Path, work: Path) -> dict[str, Any]:
+    output = work / f"unsupported-{format_name}.json"
+    evidence_path = work / f"unsupported-{format_name}.evidence.json"
+    result = run_command(
+        [str(CONVERTER), "convert", str(input_path), "--format", format_name, "--out", str(output), "--evidence", str(evidence_path)],
+        cwd=ROOT,
+    )
+    if result.returncode != 0:
+        raise E2EFailure(f"{format_name} unsupported-feature input failed the adapter boundary: {result.stdout}; {result.stderr}")
+    document = load_json(output)
+    validate_document(document)
+    evidence = load_json(evidence_path)
+    if evidence.get("input", {}).get("consumed") is not True:
+        raise E2EFailure(f"{format_name} unsupported evidence does not prove input consumption")
+    if document.get("conversion", {}).get("status") != "partial":
+        raise E2EFailure(f"{format_name} unsupported feature did not produce partial status")
+    features = document.get("conversion", {}).get("features", [])
+    if not any(item.get("status") == "unsupported" for item in features if isinstance(item, dict)):
+        raise E2EFailure(f"{format_name} unsupported feature was not represented in conversion features")
+    if not document.get("diagnostics"):
+        raise E2EFailure(f"{format_name} unsupported feature has no diagnostic")
+    return {
+        "format": format_name,
+        "input": str(input_path),
+        "case": "unsupported-partial",
+        "commandExitCode": result.returncode,
+        "conversionStatus": document["conversion"]["status"],
+        "diagnostics": [item.get("code") for item in document.get("diagnostics", [])],
+    }
+
+
 def run_all(keep: Path | None = None) -> dict[str, Any]:
     if keep is None:
         # Some managed Windows workstations deny chmod/rmtree in generated
@@ -224,7 +255,10 @@ def run_all(keep: Path | None = None) -> dict[str, Any]:
         cases.append(check_case(format_name, paths[format_name], work, expected[format_name]))
     for format_name in FORMATS:
         cases.append(check_malformed(format_name, paths[f"malformed_{format_name}"], work))
-    cases.append(check_resource_limit("markdown", paths["markdown"], work))
+    for format_name in FORMATS:
+        cases.append(check_unsupported(format_name, paths[f"unsupported_{format_name}"], work))
+    for format_name in FORMATS:
+        cases.append(check_resource_limit(format_name, paths[format_name], work))
     report = {
         "schema": "fdir/e2e-report",
         "version": "1.0.0",

@@ -188,6 +188,22 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
             index += 1
             paragraph_start = index + 1
             continue
+        if line.startswith(":::"):
+            flush()
+            end = next((j for j in range(index + 1, len(lines)) if lines[j].startswith(":::")), None)
+            body_lines = lines[index + 1 : end] if end is not None else lines[index + 1 :]
+            node_id = _paragraph(builder, builder.root_id, "\n".join(body_lines), number)
+            diagnostic = builder.add_diagnostic(
+                "DFIR-MD-DIRECTIVE-UNSUPPORTED",
+                "Markdown directive syntax is outside the bounded CommonMark adapter.",
+                target_id=node_id,
+                phase="normalize",
+            )
+            _extension(builder, node_id, "unsupported-directive", {"opening": line, "body": body_lines}, criticality="non-critical")
+            builder.add_feature("directive", "unsupported", target_id=node_id, diagnostic_ids=[diagnostic])
+            index = len(lines) if end is None else end + 1
+            paragraph_start = index + 1
+            continue
         if line.startswith("```") or line.startswith("~~~"):
             flush()
             fence = line[:3]

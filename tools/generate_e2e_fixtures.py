@@ -95,6 +95,16 @@ def docx_parts() -> dict[str, str | bytes]:
     }
 
 
+def unsupported_docx_parts() -> dict[str, str | bytes]:
+    parts = docx_parts()
+    document = str(parts["word/document.xml"])
+    parts["word/document.xml"] = document.replace(
+        " </w:body>",
+        '  <w:customXml w:element="unsupported-extension"/>\n </w:body>',
+    )
+    return parts
+
+
 def xlsx_parts() -> dict[str, str | bytes]:
     content_types = '''<?xml version="1.0" encoding="UTF-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -127,12 +137,22 @@ def xlsx_parts() -> dict[str, str | bytes]:
     }
 
 
-def pdf_bytes() -> bytes:
+def unsupported_xlsx_parts() -> dict[str, str | bytes]:
+    parts = xlsx_parts()
+    parts["xl/pivotTables/pivot1.xml"] = "<?xml version=\"1.0\"?><pivotTableDefinition xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" name=\"UnsupportedPivot\"/>"
+    return parts
+
+
+def pdf_bytes(*, unsupported: bool = False) -> bytes:
+    stream = b"BT /F1 18 Tf 72 720 Td (FDIR PDF E2E) Tj ET\n"
+    if unsupported:
+        stream += b"/XUnsupported Do\n"
+    stream += b"0 0 m 120 120 l 120 0 l h W n\n72 680 m 200 680 l S\n"
     objects = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
         b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
-        b"<< /Length 91 >>\nstream\nBT /F1 18 Tf 72 720 Td (FDIR PDF E2E) Tj ET\n0 0 m 120 120 l 120 0 l h W n\n72 680 m 200 680 l S\nendstream",
+        b"<< /Length " + str(len(stream)).encode("ascii") + b" >>\nstream\n" + stream + b"endstream",
         b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
     ]
     out = bytearray(b"%PDF-1.7\n%\xe2\xe3\xcf\xd3\n")
@@ -181,6 +201,12 @@ print('e2e')
 [ref]: https://example.invalid/reference "Reference"
 """
 
+UNSUPPORTED_MARKDOWN = MARKDOWN + """
+::: unsupported-extension
+This directive is intentionally outside the bounded Markdown dialect.
+:::
+"""
+
 
 def write_fixtures(root: Path = ROOT) -> dict[str, Path]:
     root.mkdir(parents=True, exist_ok=True)
@@ -193,6 +219,10 @@ def write_fixtures(root: Path = ROOT) -> dict[str, Path]:
         "malformed_xlsx": root / "malformed.xlsx",
         "malformed_pdf": root / "malformed.pdf",
         "malformed_markdown": root / "malformed.md",
+        "unsupported_docx": root / "unsupported.docx",
+        "unsupported_xlsx": root / "unsupported.xlsx",
+        "unsupported_pdf": root / "unsupported.pdf",
+        "unsupported_markdown": root / "unsupported.md",
     }
     write_zip(paths["docx"], docx_parts())
     write_zip(paths["xlsx"], xlsx_parts())
@@ -202,6 +232,10 @@ def write_fixtures(root: Path = ROOT) -> dict[str, Path]:
     paths["malformed_xlsx"].write_bytes(b"not a zip workbook")
     paths["malformed_pdf"].write_bytes(b"%PDF-1.7\nnot a valid xref")
     paths["malformed_markdown"].write_text("# malformed\n\x00\x00\n", encoding="utf-8", newline="\n")
+    write_zip(paths["unsupported_docx"], unsupported_docx_parts())
+    write_zip(paths["unsupported_xlsx"], unsupported_xlsx_parts())
+    paths["unsupported_pdf"].write_bytes(pdf_bytes(unsupported=True))
+    paths["unsupported_markdown"].write_text(UNSUPPORTED_MARKDOWN, encoding="utf-8", newline="\n")
     return paths
 
 

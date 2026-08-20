@@ -111,6 +111,14 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
             diagnostic = builder.add_diagnostic("DFIR-PDF-PAGE-MISSING", "PDF contains no page object", severity="error", phase="parse")
             builder.add_feature("pages", "failed", diagnostic_ids=[diagnostic])
             return builder.finish(status="failed")
+        if re.search(r"\bDo\b", content):
+            diagnostic = builder.add_diagnostic(
+                "DFIR-PDF-OPERATOR-UNSUPPORTED",
+                "PDF XObject invocation is retained only as an unsupported form feature.",
+                phase="normalize",
+                target_id=builder.root_id,
+            )
+            builder.add_feature("xobject-operator", "unsupported", target_id=builder.root_id, diagnostic_ids=[diagnostic])
         document_part = safe_id("part", "pdf-document")
         builder.add_item("parts", {"partId": document_part, "kind": "document", "name": "PDF document", "rootNodeIds": [builder.root_id], "status": "preserved"}, "partId")
         streams = re.findall(r"stream\r?\n(.*?)\r?\nendstream", content, flags=re.S)

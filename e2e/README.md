@@ -12,9 +12,9 @@ The runner generates deterministic DOCX, XLSX, PDF, and Markdown files with
 `tools/generate_e2e_fixtures.py`. It then invokes the public converter in
 child processes. Each valid format case executes `inspect`, `convert`, IR
 validation, canonicalization, and a typed query, and verifies execution
-evidence plus source-derived content. The suite also runs one malformed-input
-case for each format and a Markdown input-size-limit case: 9 real-input cases
-in total.
+evidence plus source-derived content. The suite also runs one malformed-input,
+one unsupported-feature/partial-conversion, and one input-size-limit case for
+each format: 16 real-input cases in total.
 
 Expected source-derived checks are:
 
