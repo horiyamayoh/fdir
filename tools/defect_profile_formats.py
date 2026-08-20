@@ -10,8 +10,11 @@ declared test infrastructure; product source remains the archived base SHA.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
+import os
 from pathlib import Path
-import tempfile
+import shutil
+import time
 from typing import Any
 
 from generate_e2e_fixtures import MARKDOWN, UNSUPPORTED_MARKDOWN, docx_parts, pdf_bytes, write_zip, xlsx_parts
@@ -26,6 +29,20 @@ from adapter_xlsx import _typed, convert as convert_xlsx
 
 class ProbeFailure(RuntimeError):
     pass
+
+
+@contextmanager
+def _probe_directory(root: Path, prefix: str):
+    """Use the checkout's ignored scratch area for managed Windows runners."""
+
+    scratch = root / "e2e" / ".run" / "defect-probes"
+    scratch.mkdir(parents=True, exist_ok=True)
+    directory = scratch / f"{prefix}{os.getpid()}-{time.time_ns()}"
+    directory.mkdir()
+    try:
+        yield directory
+    finally:
+        shutil.rmtree(directory, ignore_errors=True)
 
 
 def require(condition: bool, message: str) -> None:
@@ -80,7 +97,7 @@ def _docx_package(path: Path, *, header: bool = False, missing_relationship: boo
 
 
 def probe_docx(probe: str, root: Path) -> None:
-    with tempfile.TemporaryDirectory(prefix="fdir-docx-probe-") as temporary:
+    with _probe_directory(root, "docx-") as temporary:
         path = Path(temporary) / "probe.docx"
         if probe in {"docx-hyperlink-run", "docx-story-processing"}:
             _docx_package(path, header=True)
@@ -104,7 +121,7 @@ def probe_docx(probe: str, root: Path) -> None:
 
 
 def probe_xlsx(probe: str, root: Path) -> None:
-    with tempfile.TemporaryDirectory(prefix="fdir-xlsx-probe-") as temporary:
+    with _probe_directory(root, "xlsx-") as temporary:
         path = Path(temporary) / "probe.xlsx"
         write_zip(path, xlsx_parts())
         if probe == "xlsx-binary-float":
@@ -159,7 +176,7 @@ def _pdf_document(streams: list[bytes], *, object_order: list[int] | None = None
 
 
 def probe_pdf(probe: str, root: Path) -> None:
-    with tempfile.TemporaryDirectory(prefix="fdir-pdf-probe-") as temporary:
+    with _probe_directory(root, "pdf-") as temporary:
         path = Path(temporary) / "probe.pdf"
         if probe == "pdf-page-order":
             path.write_bytes(_pdf_document([b"BT 12 Tf 10 700 Td (FIRST) Tj ET", b"BT 12 Tf 10 700 Td (SECOND) Tj ET", b"BT 12 Tf 10 700 Td (THIRD) Tj ET"], object_order=[1, 2, 5, 6, 7, 8, 3, 4]))
@@ -197,7 +214,7 @@ def probe_pdf(probe: str, root: Path) -> None:
 
 
 def probe_markdown(probe: str, root: Path) -> None:
-    with tempfile.TemporaryDirectory(prefix="fdir-markdown-probe-") as temporary:
+    with _probe_directory(root, "markdown-") as temporary:
         path = Path(temporary) / "probe.md"
         source = UNSUPPORTED_MARKDOWN if probe == "markdown-unsupported-construct" else MARKDOWN
         if probe == "markdown-delimiter-resolution":

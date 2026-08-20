@@ -12,9 +12,11 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import os
 from pathlib import Path
+import shutil
 import sys
-import tempfile
+import time
 from typing import Any
 
 
@@ -25,9 +27,20 @@ if str(ROOT / "tools") not in sys.path:
 import release_gate  # type: ignore  # noqa: E402
 
 
+def _probe_directory(prefix: str) -> Path:
+    """Allocate probe state in the checkout's ignored scratch directory."""
+
+    scratch = ROOT / "e2e" / ".run" / "defect-probes"
+    scratch.mkdir(parents=True, exist_ok=True)
+    directory = scratch / f"{prefix}{os.getpid()}-{time.time_ns()}"
+    directory.mkdir()
+    return directory
+
+
 def _claim_probe() -> int:
     original = release_gate.RELEASE_CLAIM_MANIFEST_PATH
-    with tempfile.TemporaryDirectory(prefix="fdir-release-defect-claim-") as directory:
+    directory = _probe_directory("release-claim-")
+    try:
         target = Path(directory) / "release-claim-manifest.json"
         value = json.loads(original.read_text(encoding="utf-8"))
         value = copy.deepcopy(value)
@@ -39,12 +52,15 @@ def _claim_probe() -> int:
         except release_gate.GateError:
             return 0
         return 1
+    finally:
+        shutil.rmtree(directory, ignore_errors=True)
 
 
 def _orchestration_probe(failing_command: str) -> int:
     original_run_command = release_gate.run_command
     original_runtime = release_gate.check_runtime_evidence
     original_audit = getattr(release_gate, "check_audit_recovery_release_boundary", None)
+    original_clean_room = getattr(release_gate, "check_clean_room_replay", None)
 
     def fake_run_command(name: str, display_command: str, argv: list[str]) -> dict[str, Any]:
         return {
@@ -71,6 +87,12 @@ def _orchestration_probe(failing_command: str) -> int:
     release_gate.check_runtime_evidence = fake_runtime  # type: ignore[assignment]
     if original_audit is not None:
         release_gate.check_audit_recovery_release_boundary = lambda: {"recovery_children": 18, "umbrella_issue": 87}  # type: ignore[assignment]
+    if original_clean_room is not None:
+        # The release defect probe exercises orchestration in a disposable
+        # worktree, where the real two-run clean-room report is intentionally
+        # not present.  Keep that probe focused on its injected failing
+        # command while preserving the normal gate's strict clean-room check.
+        release_gate.check_clean_room_replay = lambda: {"runs": 2, "difference_count": 0, "diff_digest": "0" * 64}  # type: ignore[assignment]
     try:
         result = int(release_gate.main([]))
         return 0 if result != 0 else 1
@@ -79,6 +101,8 @@ def _orchestration_probe(failing_command: str) -> int:
         release_gate.check_runtime_evidence = original_runtime  # type: ignore[assignment]
         if original_audit is not None:
             release_gate.check_audit_recovery_release_boundary = original_audit  # type: ignore[assignment]
+        if original_clean_room is not None:
+            release_gate.check_clean_room_replay = original_clean_room  # type: ignore[assignment]
 
 
 def main(argv: list[str] | None = None) -> int:

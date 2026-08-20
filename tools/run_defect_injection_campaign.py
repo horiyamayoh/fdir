@@ -25,7 +25,6 @@ import shutil
 import subprocess
 import sys
 import tarfile
-import tempfile
 import time
 from typing import Any, Iterable
 
@@ -56,6 +55,28 @@ _CRASH_MARKERS = (
 
 class CampaignError(RuntimeError):
     """A contract or disposable-checkout error that must fail closed."""
+
+
+def _workspace_tempdir(root: Path, prefix: str) -> Path:
+    """Create disposable campaign state in the repository's ignored scratch area.
+
+    ``tempfile.mkdtemp`` creates restrictive ACLs on some managed Windows
+    runners.  Those ACLs can prevent Git from creating the archive used by the
+    campaign even though the checkout itself is writable.  The repository's
+    ignored ``e2e/.run`` area is already the project-approved scratch location
+    and remains writable on those runners.
+    """
+
+    scratch = root / "e2e" / ".run" / "defect-campaign"
+    scratch.mkdir(parents=True, exist_ok=True)
+    for attempt in range(100):
+        candidate = scratch / f"{prefix}{os.getpid()}-{time.time_ns()}-{attempt}"
+        try:
+            candidate.mkdir()
+        except FileExistsError:
+            continue
+        return candidate
+    raise CampaignError(f"cannot allocate unique campaign scratch directory under {scratch}")
 
 
 def _json_bytes(value: Any) -> bytes:
@@ -764,7 +785,7 @@ def _run_case(
     support_files: Iterable[str] = (),
 ) -> dict[str, Any]:
     case_id = str(case["id"])
-    work_dir = Path(tempfile.mkdtemp(prefix=f"fdir-defect-campaign-{case_id}-"))
+    work_dir = _workspace_tempdir(root, f"case-{case_id}-")
     report: dict[str, Any] = _case_report_base(case, base_sha)
     patch_storage = work_dir / "patches"
     try:
@@ -939,7 +960,7 @@ def _run_base_command(
     max_output_bytes: int,
     support_files: Iterable[str] = (),
 ) -> dict[str, Any]:
-    work_dir = Path(tempfile.mkdtemp(prefix="fdir-defect-campaign-base-"))
+    work_dir = _workspace_tempdir(root, "base-")
     try:
         checkout = work_dir / "base"
         _extract_archive(archive, checkout)
@@ -1180,7 +1201,7 @@ def run_campaign(
         report["report_digest"] = _report_digest(report)
         return report
 
-    temporary_root = Path(tempfile.mkdtemp(prefix="fdir-defect-campaign-archive-"))
+    temporary_root = _workspace_tempdir(root, "archive-")
     try:
         try:
             archive = _create_archive(root, base_sha, temporary_root)
@@ -1279,7 +1300,7 @@ def _self_test_script(value: str) -> str:
 
 
 def _init_self_test_repo() -> tuple[Path, Path, str]:
-    parent = Path(tempfile.mkdtemp(prefix="fdir-defect-self-test-"))
+    parent = _workspace_tempdir(ROOT, "self-test-")
     repo = parent / "repo"
     repo.mkdir()
     _write_text(repo / "target.py", "VALUE = 1\n")
