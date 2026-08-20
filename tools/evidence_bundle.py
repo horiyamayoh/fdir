@@ -14,6 +14,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import subprocess
 import sys
 import tempfile
@@ -297,19 +298,105 @@ def verify_bundle(bundle_path: Path, *, index_path: Path | None = None, require_
     return {"status": "passed", "sourceHeadSha": source["headSha"], "bundleDigest": bundle["integrity"]["bundleDigest"], "indexDigest": bundle["index"]["digest"], "artifactCount": len(artifacts)}
 
 
+def _normalize_runtime_string(value: str) -> str:
+    root_text = str(ROOT.resolve())
+    normalized = value.replace(root_text, "<repo>").replace(root_text.replace("\\", "/"), "<repo>")
+    normalized = re.sub(r"e2e[\\/]\.run[\\/][^\"'\\s]+", "e2e/.run/<run>", normalized)
+    return normalized
+
+
+def _normalize_runtime_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        result = {}
+        for key, child in value.items():
+            if str(key).casefold().endswith("durationmilliseconds") or str(key).casefold() in {"duration", "elapsedmilliseconds"}:
+                continue
+            result[key] = _normalize_runtime_value(child)
+        return result
+    if isinstance(value, list):
+        return [_normalize_runtime_value(child) for child in value]
+    if isinstance(value, str):
+        return _normalize_runtime_string(value)
+    return value
+
+
+def _normalize_campaign_report(value: dict[str, Any]) -> dict[str, Any]:
+    """Keep campaign outcomes while excluding nested subprocess log digests.
+
+    The defect campaign deliberately creates disposable mutation workspaces.
+    Their subprocess logs contain run-specific paths, so the campaign's own
+    stdout/stderr digests are execution evidence rather than a stable result.
+    Mutation identity, classification, detection, and all gate counts remain
+    compared below.
+    """
+
+    normalized = _normalize_runtime_value(value)
+    for suite in normalized.get("baseSuite", []):
+        if isinstance(suite, dict):
+            suite.pop("stdoutDigest", None)
+            suite.pop("stderrDigest", None)
+    for case in normalized.get("cases", []):
+        if isinstance(case, dict) and isinstance(case.get("execution"), dict):
+            case["execution"].pop("stdoutDigest", None)
+            case["execution"].pop("stderrDigest", None)
+    return normalized
+
+
+def _normalized_log_digest(path: Path) -> tuple[str, int]:
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise EvidenceError("CLEAN_ROOM_OUTPUT_UNREADABLE", str(exc)) from exc
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        normalized = _normalize_runtime_string(raw).replace("\r\n", "\n")
+        data = normalized.encode("utf-8")
+    else:
+        if isinstance(parsed, dict) and parsed.get("schema") == "fdir/defect-injection-campaign-report":
+            parsed = _normalize_campaign_report(parsed)
+        else:
+            parsed = _normalize_runtime_value(parsed)
+        data = canonical(parsed)
+    return digest_bytes(data), len(data)
+
+
 def _clean_room_projection(bundle: dict[str, Any]) -> dict[str, Any]:
     """Remove only declared volatile execution fields before replay comparison."""
 
     value = json.loads(json.dumps(bundle))
     value.pop("integrity", None)
     value.pop("environment", None)
+    value.get("index", {}).pop("path", None)
     for command in value.get("commands", []):
         command.pop("durationMilliseconds", None)
+        normalized_outputs = []
+        for reference in command.get("outputDigests", []):
+            normalized_sha, normalized_size = _normalized_log_digest(root_path(reference["path"]))
+            reference["sha256"] = normalized_sha
+            reference["bytes"] = normalized_size
+            normalized_outputs.append((normalized_sha, normalized_size))
+        if normalized_outputs:
+            command["stdoutDigest"] = normalized_outputs[0][0]
+            if len(normalized_outputs) > 1:
+                command["stderrDigest"] = normalized_outputs[1][0]
         for collection in ("inputDigests", "outputDigests"):
             for reference in command.get(collection, []):
                 reference.pop("path", None)
+    normalized_artifacts = {}
     for item in value.get("artifacts", []):
+        if item.get("kind") == "log":
+            normalized_sha, normalized_size = _normalized_log_digest(root_path(item["path"]))
+            item["sha256"] = normalized_sha
+            item["bytes"] = normalized_size
+        normalized_artifacts[item.get("id")] = item.get("sha256")
         item.pop("path", None)
+    index = value.get("index", {})
+    for entry in index.get("entries", []):
+        if entry.get("artifactId") in normalized_artifacts:
+            entry["sha256"] = normalized_artifacts[entry["artifactId"]]
+    index_core = {key: index.get(key) for key in ("schema", "version", "entries")}
+    index["digest"] = digest_bytes(canonical(index_core))
     return value
 
 
@@ -328,7 +415,7 @@ def compare_clean_room(first_path: Path, second_path: Path) -> dict[str, Any]:
         right = _clean_room_projection(second)
         differences = [] if left == right else ["normalized evidence bundle differs"]
     diff_digest = digest_bytes(canonical(differences))
-    return {"schema":"fdir/clean-room-replay-report","version":"1.0.0","status":"passed" if not differences else "failed","runs":2,"volatileFields":["integrity","environment","commands[*].durationMilliseconds","commands[*].*.path","artifacts[*].path"],"diffCount":len(differences),"diffDigest":diff_digest,"differences":differences}
+    return {"schema":"fdir/clean-room-replay-report","version":"1.0.0","status":"passed" if not differences else "failed","runs":2,"volatileFields":["integrity","environment","commands[*].durationMilliseconds","commands[*].*.path","artifacts[*].path","defect-injection-report.baseSuite[*].*Digest","defect-injection-report.cases[*].execution.*Digest"],"diffCount":len(differences),"diffDigest":diff_digest,"differences":differences}
 
 
 def load_clean_room_report(path: Path) -> dict[str, Any]:
