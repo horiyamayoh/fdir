@@ -445,12 +445,19 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
                                 phase="observe",
                                 target_id=cell_id,
                             )
+                            cached_value = _typed(raw_value, cell_type, number_format=cell_format, date_system=context["dateSystem"])
                             values: dict[str, Any] = {
                                 "raw": _typed(formula_source, "str"),
                                 "stored": deepcopy(typed_value),
-                                "cached": deepcopy(typed_value),
+                                "cached": cached_value,
                                 "computed": {"type": "blank", "value": None, "status": "unavailable"},
                                 "displayed": {"text": displayed, "status": "preserved"},
+                                "laneProvenance": {
+                                    "stored": "worksheet-cell-value",
+                                    "cached": "worksheet-formula-cache",
+                                    "computed": "calculation-engine-unavailable",
+                                    "displayed": "number-format-renderer",
+                                },
                             }
                             builder.add_item("formulas", {"formulaId": formula_id, "ownerCellId": cell_id, "kind": "spreadsheetFormula", "expression": {"source": formula_source, "language": "excel-a1", "status": "preserved"}, "values": values, "numberFormat": {"code": number_formats.get(style_index, "General"), "locale": "unknown"}, "calculationContext": context, "status": "preserved"}, "formulaId")
                             builder.find("nodes", "nodeId", cell_id)["formulaId"] = formula_id

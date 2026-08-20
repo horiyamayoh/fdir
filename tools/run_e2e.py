@@ -19,11 +19,11 @@ from typing import Any
 try:
     from generate_e2e_fixtures import write_fixtures
     from ir_validation import validate_document
-    from qualification_evidence import case_evidence
+    from qualification_evidence import case_evidence, validate_source_feature_closure
 except ImportError:  # pragma: no cover
     from tools.generate_e2e_fixtures import write_fixtures
     from tools.ir_validation import validate_document
-    from tools.qualification_evidence import case_evidence
+    from tools.qualification_evidence import case_evidence, validate_source_feature_closure
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +35,16 @@ FORMATS = ("docx", "xlsx", "pdf", "markdown")
 
 class E2EFailure(RuntimeError):
     pass
+
+
+def require_source_closure(document: dict[str, Any], evidence: dict[str, Any], label: str) -> dict[str, Any]:
+    """Run the shared source occurrence closure check and fail closed."""
+
+    closure = validate_source_feature_closure(document, evidence)
+    evidence["sourceClosure"] = closure
+    if closure.get("status") != "passed":
+        raise E2EFailure(f"{label} source occurrence closure failed: {json.dumps(closure.get('mismatches', []), ensure_ascii=False)}")
+    return closure
 
 
 def run_command(args: list[str], *, cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -148,6 +158,7 @@ def check_case(format_name: str, input_path: Path, work: Path, expected: tuple[s
     for disposition in feature_evidence["dispositions"]:
         if disposition["status"] in {"approximated", "ambiguous", "unsupported", "omitted-by-policy", "failed"} and not disposition["diagnosticIds"]:
             raise E2EFailure(f"{format_name} non-preserved feature lacks a diagnostic: {disposition['featureId']}")
+    require_source_closure(document, feature_evidence, format_name)
     return {
         "format": format_name,
         "input": str(input_path),
@@ -158,6 +169,7 @@ def check_case(format_name: str, input_path: Path, work: Path, expected: tuple[s
         "canonicalDigest": canonical_digest,
         "query": {"kind": query_kind, "count": len(query_nodes)},
         "output": str(output),
+        "documentPath": str(output),
         "evidence": str(evidence_path),
         "conversionStatus": document["conversion"]["status"],
         "nodes": len(document.get("nodes", [])),
@@ -189,9 +201,11 @@ def check_malformed(format_name: str, input_path: Path, work: Path) -> dict[str,
     evidence = case_evidence(input_path, format_name, document)
     if not evidence["sourceFeatureIds"] or evidence["queryParity"].get("status") != "passed":
         raise E2EFailure(f"{format_name} malformed evidence lacks source/query parity")
+    require_source_closure(document, evidence, f"{format_name} malformed")
     return {
         "format": format_name,
         "input": str(input_path),
+        "documentPath": str(output),
         "case": "malformed",
         "commandExitCode": result.returncode,
         "conversionStatus": document["conversion"]["status"],
@@ -219,7 +233,8 @@ def check_resource_limit(format_name: str, input_path: Path, work: Path) -> dict
     evidence = case_evidence(input_path, format_name, document)
     if not evidence["sourceFeatureIds"] or evidence["queryParity"].get("status") != "passed":
         raise E2EFailure(f"{format_name} resource-limit evidence lacks source/query parity")
-    return {"format": format_name, "case": "resource-limit", "commandExitCode": result.returncode, "diagnostics": len(document.get("diagnostics", [])), **evidence}
+    require_source_closure(document, evidence, f"{format_name} resource-limit")
+    return {"format": format_name, "case": "resource-limit", "commandExitCode": result.returncode, "documentPath": str(output), "diagnostics": len(document.get("diagnostics", [])), **evidence}
 
 
 def check_unsupported(format_name: str, input_path: Path, work: Path) -> dict[str, Any]:
@@ -248,9 +263,11 @@ def check_unsupported(format_name: str, input_path: Path, work: Path) -> dict[st
         raise E2EFailure(f"{format_name} unsupported evidence has no source feature inventory")
     if evidence["queryParity"].get("status") != "passed":
         raise E2EFailure(f"{format_name} unsupported case direct/index query parity did not pass")
+    require_source_closure(document, evidence, f"{format_name} unsupported")
     return {
         "format": format_name,
         "input": str(input_path),
+        "documentPath": str(output),
         "case": "unsupported-partial",
         "commandExitCode": result.returncode,
         "conversionStatus": document["conversion"]["status"],

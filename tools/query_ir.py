@@ -10,27 +10,61 @@ from typing import Any, Iterable
 
 try:
     from ir_validation import COLLECTION_KEYS, IRValidationError, validate_document
-    from canonicalize_ir import canonical_digest
+    from canonicalize_ir import canonical_digest, canonical_value_digest
 except ImportError:  # pragma: no cover
     from tools.ir_validation import COLLECTION_KEYS, IRValidationError, validate_document
-    from tools.canonicalize_ir import canonical_digest
+    from tools.canonicalize_ir import canonical_digest, canonical_value_digest
 
 
 class QueryError(ValueError):
     """Raised for an invalid query or malformed IR input."""
 
 
+INDEX_SCHEMA = "fdir/document-form-index"
+INDEX_VERSION = "1.1.0"
+REPRESENTATIONS = {"source", "normalized", "stored", "computed", "displayed", "rendered", "observed"}
+
+
+def _unique_object_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON object key: {key}")
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(token: str) -> Any:
+    raise ValueError(f"non-JSON numeric constant: {token}")
+
+
+def _ensure_document(document: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(document, dict):
+        raise QueryError("IR must be an object")
+    try:
+        validate_document(document)
+    except IRValidationError as exc:
+        raise QueryError(f"IR failed authority validation: {exc}") from exc
+    return document
+
+
 def load_document(path: Path) -> dict[str, Any]:
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        value = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_unique_object_pairs, parse_constant=_reject_json_constant)
+    except (OSError, json.JSONDecodeError, ValueError, UnicodeError) as exc:
         raise QueryError(f"cannot load IR: {exc}") from exc
     if not isinstance(value, dict):
         raise QueryError("IR document must be an object")
+    return _ensure_document(value)
+
+
+def load_index(path: Path) -> dict[str, Any]:
     try:
-        validate_document(value)
-    except IRValidationError as exc:
-        raise QueryError(f"IR failed authority validation: {exc}") from exc
+        value = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_unique_object_pairs, parse_constant=_reject_json_constant)
+    except (OSError, json.JSONDecodeError, ValueError, UnicodeError) as exc:
+        raise QueryError(f"cannot load index: {exc}") from exc
+    if not isinstance(value, dict):
+        raise QueryError("index must be an object")
     return value
 
 
@@ -43,6 +77,7 @@ def _items(document: dict[str, Any], key: str) -> list[dict[str, Any]]:
 
 def list_nodes(document: dict[str, Any], kind: str | None = None, part_id: str | None = None,
                status: str | None = None) -> list[dict[str, Any]]:
+    document = _ensure_document(document)
     result = _items(document, "nodes")
     return [
         node for node in result
@@ -53,6 +88,9 @@ def list_nodes(document: dict[str, Any], kind: str | None = None, part_id: str |
 
 
 def get_text(document: dict[str, Any], node_id: str, representation: str = "source") -> list[dict[str, Any]]:
+    document = _ensure_document(document)
+    if representation not in REPRESENTATIONS:
+        raise QueryError(f"unknown text representation: {representation}")
     node = next((item for item in _items(document, "nodes") if item.get("nodeId") == node_id), None)
     if node is None:
         raise QueryError(f"unknown node: {node_id}")
@@ -76,7 +114,12 @@ def _collection_name(collection: str) -> str:
 
 def list_entities(document: dict[str, Any], collection: str, *, kind: str | None = None, status: str | None = None,
                   identifier: str | None = None, offset: int = 0, limit: int | None = None) -> list[dict[str, Any]]:
+    document = _ensure_document(document)
     collection = _collection_name(collection)
+    if offset < 0:
+        raise QueryError("offset must be non-negative")
+    if limit is not None and limit < 0:
+        raise QueryError("limit must be non-negative")
     identifier_key = COLLECTION_KEYS[collection]
     items = _items(document, collection)
     result = [item for item in items if (identifier is None or item.get(identifier_key) == identifier) and (kind is None or item.get("kind") == kind) and (status is None or item.get("status") == status)]
@@ -86,6 +129,7 @@ def list_entities(document: dict[str, Any], collection: str, *, kind: str | None
 
 
 def get_entity(document: dict[str, Any], collection: str, identifier: str) -> dict[str, Any]:
+    document = _ensure_document(document)
     values = list_entities(document, collection, identifier=identifier)
     if not values:
         raise QueryError(f"unknown {collection} entity: {identifier}")
@@ -93,6 +137,7 @@ def get_entity(document: dict[str, Any], collection: str, identifier: str) -> di
 
 
 def descendants(document: dict[str, Any], node_id: str) -> list[dict[str, Any]]:
+    document = _ensure_document(document)
     nodes = {item.get("nodeId"): item for item in _items(document, "nodes")}
     if node_id not in nodes:
         raise QueryError(f"unknown node: {node_id}")
@@ -107,6 +152,7 @@ def descendants(document: dict[str, Any], node_id: str) -> list[dict[str, Any]]:
 
 
 def ancestors(document: dict[str, Any], node_id: str) -> list[dict[str, Any]]:
+    document = _ensure_document(document)
     nodes = {item.get("nodeId"): item for item in _items(document, "nodes")}
     if node_id not in nodes:
         raise QueryError(f"unknown node: {node_id}")
@@ -119,30 +165,109 @@ def ancestors(document: dict[str, Any], node_id: str) -> list[dict[str, Any]]:
     return result
 
 
-def rebuild_index(document: dict[str, Any]) -> dict[str, Any]:
+def _reference_pairs(item: dict[str, Any], identifier_key: str, known_ids: set[str]) -> Iterable[tuple[str, str]]:
+    """Yield nested ID references without treating the index as authority."""
+
+    def walk(value: Any, field_path: str) -> Iterable[tuple[str, str]]:
+        if isinstance(value, dict):
+            for key, child in value.items():
+                path = f"{field_path}.{key}" if field_path else key
+                if key.endswith("Id") and key != identifier_key and isinstance(child, str) and child in known_ids:
+                    yield path, child
+                elif key.endswith("Ids") and isinstance(child, list):
+                    for target in child:
+                        if isinstance(target, str) and target in known_ids:
+                            yield path, target
+                yield from walk(child, path)
+        elif isinstance(value, list):
+            for index, child in enumerate(value):
+                yield from walk(child, f"{field_path}[{index}]")
+
+    for field, value in item.items():
+        if field in {identifier_key, "schemaId", "documentId"}:
+            continue
+        yield from walk(value, field)
+
+
+def _build_index(document: dict[str, Any]) -> dict[str, Any]:
     """Build a deterministic, non-authoritative projection from validated IR."""
 
     entities: list[dict[str, Any]] = []
+    facts: list[dict[str, Any]] = []
     reverse: list[dict[str, Any]] = []
+    known_ids = {
+        item[identifier_key]
+        for collection, identifier_key in COLLECTION_KEYS.items()
+        for item in _items(document, collection)
+    }
     for collection, identifier_key in COLLECTION_KEYS.items():
         for item in sorted(_items(document, collection), key=lambda value: str(value.get(identifier_key, ""))):
             identifier = item[identifier_key]
             entities.append({"id": identifier, "collection": collection, "kind": item.get("kind"), "status": item.get("status")})
-            for field, value in item.items():
-                if field in {identifier_key, "schemaId", "documentId"}:
-                    continue
-                if field.endswith("Id") and isinstance(value, str):
-                    reverse.append({"fromId": identifier, "field": field, "toId": value})
-                elif field.endswith("Ids") and isinstance(value, list):
-                    reverse.extend({"fromId": identifier, "field": field, "toId": target} for target in value if isinstance(target, str))
+            facts.append({"collection": collection, "id": identifier, "digest": canonical_value_digest(item)})
+            reverse.extend(
+                {"fromId": identifier, "field": field, "toId": target}
+                for field, target in _reference_pairs(item, identifier_key, known_ids)
+            )
     entities.sort(key=lambda value: (value["collection"], value["id"]))
+    facts.sort(key=lambda value: (value["collection"], value["id"]))
     reverse.sort(key=lambda value: (value["toId"], value["fromId"], value["field"]))
     return {
-        "schema": "fdir/document-form-index",
-        "version": "1.0.0",
-        "authority": {"documentId": document["documentId"], "canonicalDigest": canonical_digest(document), "schema": document["schema"]},
+        "schema": INDEX_SCHEMA,
+        "version": INDEX_VERSION,
+        "authority": {
+            "documentId": document["documentId"],
+            "canonicalDigest": canonical_digest(document),
+            "projection": "source-map-excluded",
+            "schema": document["schema"],
+        },
         "entities": entities,
+        "facts": facts,
         "reverseReferences": reverse,
+    }
+
+
+def rebuild_index(document: dict[str, Any]) -> dict[str, Any]:
+    return _build_index(_ensure_document(document))
+
+
+def validate_index(document: dict[str, Any], index: dict[str, Any]) -> dict[str, Any]:
+    """Fail closed when an index is stale, corrupt, incomplete, or unqueryable."""
+
+    document = _ensure_document(document)
+    if not isinstance(index, dict):
+        raise QueryError("index must be an object")
+    expected = _build_index(document)
+    if index.get("schema") != INDEX_SCHEMA or index.get("version") != INDEX_VERSION:
+        raise QueryError("index is corrupt: schema or version is invalid")
+    if index.get("authority") != expected["authority"]:
+        raise QueryError("index is stale or corrupt: authority fingerprint does not match IR")
+    for field in ("entities", "facts", "reverseReferences"):
+        if index.get(field) != expected[field]:
+            raise QueryError(f"index is stale or corrupt: {field} does not match authoritative IR")
+    if set(index) != set(expected):
+        raise QueryError("index is corrupt: unexpected or missing index fields")
+    return {"status": "passed", "validated": True}
+
+
+def index_parity(document: dict[str, Any], index: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Compare every entity and full entity fact digest with a derived index."""
+
+    document = _ensure_document(document)
+    candidate = rebuild_index(document) if index is None else index
+    validate_index(document, candidate)
+    direct_entity_count = sum(len(_items(document, collection)) for collection in COLLECTION_KEYS)
+    fact_count = direct_entity_count
+    return {
+        "status": "passed",
+        "directEntityCount": direct_entity_count,
+        "indexEntityCount": len(candidate["entities"]),
+        "directFactCount": fact_count,
+        "indexFactCount": len(candidate["facts"]),
+        "reverseReferenceCount": len(candidate["reverseReferences"]),
+        "operations": ["list-entities", "get-entity", "rebuild-index", "validate-index"],
+        "unqueryableFacts": [],
+        "mismatches": [],
     }
 
 
@@ -152,16 +277,19 @@ def _filter(items: Iterable[dict[str, Any]], **criteria: str | None) -> list[dic
 
 def find_relations(document: dict[str, Any], kind: str | None = None,
                    from_id: str | None = None, to_id: str | None = None) -> list[dict[str, Any]]:
+    document = _ensure_document(document)
     return _filter(_items(document, "relations"), kind=kind, fromId=from_id, toId=to_id)
 
 
 def find_extensions(document: dict[str, Any], namespace: str | None = None,
                     extension_type: str | None = None, target_id: str | None = None) -> list[dict[str, Any]]:
+    document = _ensure_document(document)
     return _filter(_items(document, "extensions"), namespace=namespace, type=extension_type, targetId=target_id)
 
 
 def find_observations(document: dict[str, Any], target_id: str | None = None,
                       observation_kind: str | None = None) -> list[dict[str, Any]]:
+    document = _ensure_document(document)
     return _filter(_items(document, "observations"), targetId=target_id, kind=observation_kind)
 
 
@@ -200,6 +328,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     index = sub.add_parser("rebuild-index")
     index.add_argument("--out", type=Path)
+
+    validate_index_parser = sub.add_parser("validate-index")
+    validate_index_parser.add_argument("index", type=Path)
 
     relation = sub.add_parser("find-relations")
     relation.add_argument("--kind")
@@ -248,6 +379,8 @@ def main(argv: list[str] | None = None) -> int:
             result = rebuild_index(document)
             if args.out:
                 args.out.write_text(json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8", newline="\n")
+        elif args.operation == "validate-index":
+            result = index_parity(document, load_index(args.index))
         else:  # pragma: no cover - argparse enforces the operation
             raise QueryError(f"unknown operation: {args.operation}")
         json.dump(result, sys.stdout, ensure_ascii=False, sort_keys=True, separators=(",", ":"))

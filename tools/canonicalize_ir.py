@@ -12,6 +12,7 @@ import copy
 import hashlib
 import json
 import sys
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +36,28 @@ class CanonicalizationError(ValueError):
 CANONICALIZATION_PATH = Path(__file__).resolve().parents[1] / "machine" / "canonicalization.json"
 
 
+def _utf16_sort_key(value: str) -> tuple[int, ...]:
+    """Return the JSON contract's UTF-16 code-unit lexical sort key."""
+
+    encoded = value.encode("utf-16-be", "surrogatepass")
+    return tuple(int.from_bytes(encoded[offset : offset + 2], "big") for offset in range(0, len(encoded), 2))
+
+
+def _unique_object_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Reject duplicate JSON object members before Python collapses them."""
+
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON object key: {key}")
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(token: str) -> Any:
+    raise ValueError(f"non-JSON numeric constant: {token}")
+
+
 def _canonicalization_config() -> dict[str, Any]:
     try:
         value = json.loads(CANONICALIZATION_PATH.read_text(encoding="utf-8"))
@@ -56,8 +79,16 @@ def _walk(value: Any, path: str = "$") -> None:
     elif isinstance(value, list):
         for index, child in enumerate(value):
             _walk(child, f"{path}[{index}]")
-    elif isinstance(value, float) and (value != value or value in (float("inf"), float("-inf"))):
-        raise CanonicalizationError(f"non-finite number at {path}")
+    elif isinstance(value, float):
+        if value != value or value in (float("inf"), float("-inf")):
+            raise CanonicalizationError(f"non-finite number at {path}")
+        # Exact form values are strings in the IR.  Rejecting JSON floating
+        # point values prevents Python's exponent spelling and binary float
+        # rounding from becoming part of an authoritative digest.  JSON
+        # integers remain valid for schema fields such as ordinals and zIndex.
+        raise CanonicalizationError(f"floating-point JSON number must be an exact decimal string at {path}")
+    elif isinstance(value, Decimal):
+        raise CanonicalizationError(f"Decimal objects are not JSON IR values at {path}")
 
 
 def _validate_authority(document: dict[str, Any]) -> None:
@@ -68,29 +99,48 @@ def _validate_authority(document: dict[str, Any]) -> None:
     validate_document(document)
 
 
-def _canonical_bytes(document: dict[str, Any], *, validate: bool) -> bytes:
+def _canonical_bytes(value: Any, *, validate: bool) -> bytes:
     if validate:
-        _validate_authority(document)
-    _walk(document)
-    normalized = _normalize(document)
+        if not isinstance(value, dict):
+            raise CanonicalizationError("IR document must be a JSON object")
+        _validate_authority(value)
+    _walk(value)
+    normalized = _normalize(value)
     try:
-        return json.dumps(
+        encoded = json.dumps(
             normalized,
             ensure_ascii=False,
-            sort_keys=True,
+            sort_keys=False,
             separators=(",", ":"),
             allow_nan=False,
-        ).encode("utf-8")
-    except (TypeError, ValueError) as exc:
+        )
+        return encoded.encode("utf-8")
+    except (TypeError, ValueError, UnicodeError) as exc:
         raise CanonicalizationError(f"document is not canonicalizable: {exc}") from exc
 
 
-def canonical_bytes(document: dict[str, Any]) -> bytes:
-    """Return authoritative deterministic UTF-8 JSON bytes for a valid IR."""
+def canonical_bytes(document: dict[str, Any], projection: str = "full") -> bytes:
+    """Return deterministic UTF-8 JSON bytes for a named IR projection."""
 
     if not isinstance(document, dict):
         raise CanonicalizationError("IR document must be a JSON object")
-    return _canonical_bytes(document, validate=True)
+    _validate_authority(document)
+    projected = projection_document(document, projection)
+    return _canonical_bytes(projected, validate=False)
+
+
+def canonical_value_bytes(value: Any) -> bytes:
+    """Canonicalize a JSON value using the same ordering and number rules.
+
+    This is used by the rebuildable query index for per-entity fact digests;
+    it does not make an entity fragment authoritative on its own.
+    """
+
+    return _canonical_bytes(value, validate=False)
+
+
+def canonical_value_digest(value: Any) -> str:
+    return hashlib.sha256(canonical_value_bytes(value)).hexdigest()
 
 
 _ID_ARRAYS = {str(key): str(value) for key, value in _canonicalization_config()["entityCollections"].items()}
@@ -105,13 +155,14 @@ def _normalize(value: Any, field: str | None = None) -> Any:
     """
 
     if isinstance(value, dict):
-        return {key: _normalize(child, key) for key, child in value.items()}
+        normalized = ((key, _normalize(child, key)) for key, child in value.items())
+        return {key: child for key, child in sorted(normalized, key=lambda item: _utf16_sort_key(item[0]))}
     if isinstance(value, list):
         result = [_normalize(child) for child in value]
         id_field = _ID_ARRAYS.get(field or "")
         if id_field and all(isinstance(item, dict) and isinstance(item.get(id_field), str) for item in result):
             return sorted(result, key=lambda item: item[id_field])
-        if field == "items" and all(isinstance(item, dict) and isinstance(item.get("ordinal"), int) for item in result):
+        if field == "items" and all(isinstance(item, dict) and isinstance(item.get("ordinal"), int) and not isinstance(item.get("ordinal"), bool) for item in result):
             return sorted(result, key=lambda item: item["ordinal"])
         return result
     return value
@@ -135,9 +186,7 @@ def projection_document(document: dict[str, Any], projection: str = "source-map-
 def canonical_digest(document: dict[str, Any], projection: str = "source-map-excluded") -> str:
     """Return a SHA-256 digest for the named, validated IR projection."""
 
-    _validate_authority(document)
-    projected = projection_document(document, projection)
-    return hashlib.sha256(_canonical_bytes(projected, validate=False)).hexdigest()
+    return hashlib.sha256(canonical_bytes(document, projection)).hexdigest()
 
 
 def full_canonical_digest(document: dict[str, Any]) -> str:
@@ -162,10 +211,14 @@ def migrate_document(document: dict[str, Any], target_version: str) -> tuple[dic
 
 def load_document(path: Path) -> dict[str, Any]:
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
+        value = json.loads(
+            path.read_text(encoding="utf-8"),
+            object_pairs_hook=_unique_object_pairs,
+            parse_constant=_reject_json_constant,
+        )
     except FileNotFoundError as exc:
         raise CanonicalizationError(f"missing input: {path}") from exc
-    except json.JSONDecodeError as exc:
+    except (json.JSONDecodeError, ValueError, UnicodeError) as exc:
         raise CanonicalizationError(f"invalid JSON in {path}: {exc}") from exc
     if not isinstance(value, dict):
         raise CanonicalizationError("IR document must be a JSON object")
@@ -186,14 +239,16 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         document = load_document(args.input)
-        encoded = canonical_bytes(document)
+        encoded = canonical_bytes(document, args.projection)
         canonical_file = encoded + b"\n"
+        if args.check and args.projection != "full":
+            raise CanonicalizationError("--check is only defined for the full document projection")
         if args.check and args.input.read_bytes() not in {encoded, canonical_file}:
             raise CanonicalizationError("input is not in canonical JSON form")
         if args.output:
             args.output.write_bytes(canonical_file)
         elif args.digest:
-            print(canonical_digest(document, args.projection))
+            print(hashlib.sha256(encoded).hexdigest())
         else:
             sys.stdout.buffer.write(canonical_file)
     except (OSError, CanonicalizationError) as exc:

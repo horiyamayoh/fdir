@@ -138,6 +138,20 @@ def _pdf_font_mappings(objects: dict[tuple[int, int], bytes]) -> list[dict[str, 
     return fonts
 
 
+def _pdf_font_resource_map(objects: dict[tuple[int, int], bytes], fonts: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Resolve resource names such as ``/F1`` to parsed font mappings."""
+
+    by_object = {f"{font['object'][0]} {font['object'][1]}": font for font in fonts}
+    result: dict[str, dict[str, Any]] = {}
+    for object_data in objects.values():
+        for match in re.finditer(rb"/Font\s*<<(?P<body>.*?)>>", object_data, flags=re.S):
+            for name, number, generation in re.findall(rb"/([A-Za-z0-9_.-]+)\s+(\d+)\s+(\d+)\s+R\b", match.group("body")):
+                font = by_object.get(f"{int(number)} {int(generation)}")
+                if font is not None:
+                    result[name.decode("latin-1")] = font
+    return result
+
+
 def _decode_stream(object_data: bytes) -> bytes:
     marker = STREAM_MARKER_RE.search(object_data)
     if marker is None:
@@ -275,19 +289,68 @@ def _point(matrix: list[Decimal], x: Decimal, y: Decimal) -> dict[str, str]:
     return {"x": decimal(matrix[0] * x + matrix[2] * y + matrix[4]), "y": decimal(matrix[1] * x + matrix[3] * y + matrix[5])}
 
 
-def _interpret_content(data: bytes) -> tuple[list[str], list[dict[str, Any]], list[str], list[dict[str, Any]]]:
+def _text_character_codes(value: str) -> list[str]:
+    """Return the one-byte character-code spelling available to this lexer.
+
+    The bounded parser does not claim to decode an arbitrary PDF composite
+    font.  It does, however, retain the byte spelling for the simple literal
+    and hex-string lane so a registered ToUnicode map can be applied without
+    replacing the authored source text.
+    """
+
+    return [f"{byte:02X}" for byte in value.encode("latin-1", errors="replace")]
+
+
+def _json_operands(values: list[Any]) -> list[Any]:
+    if isinstance(values, list):
+        return [_json_operands(value) if isinstance(value, list) else decimal(value) if isinstance(value, Decimal) else str(value) for value in values]
+    return values
+
+
+def _graphics_state_snapshot(state: dict[str, Any], matrix: list[Decimal]) -> dict[str, Any]:
+    return {
+        "ctm": [decimal(value) for value in matrix],
+        "lineWidth": state["lineWidth"],
+        "lineCap": state["lineCap"],
+        "lineJoin": state["lineJoin"],
+        "miterLimit": state["miterLimit"],
+        "dashPattern": state["dashPattern"],
+        "renderingIntent": state["renderingIntent"],
+        "extGState": state["extGState"],
+        "shading": state["shading"],
+        "fillColor": state["fillColor"],
+        "strokeColor": state["strokeColor"],
+    }
+
+
+def _interpret_content(data: bytes) -> tuple[list[str], list[dict[str, Any]], list[str], list[dict[str, Any]], list[dict[str, Any]]]:
     operations = _pdf_operations(data.decode("latin-1", errors="replace"))
     texts: list[str] = []
     paths: list[dict[str, Any]] = []
     unsupported: list[str] = []
     text_positions: list[dict[str, Any]] = []
+    graphics_states: list[dict[str, Any]] = []
     matrix = [Decimal(1), Decimal(0), Decimal(0), Decimal(1), Decimal(0), Decimal(0)]
     stack: list[list[Decimal]] = []
+    state_stack: list[dict[str, Any]] = []
+    state: dict[str, Any] = {
+        "lineWidth": "1",
+        "lineCap": 0,
+        "lineJoin": 0,
+        "miterLimit": "10",
+        "dashPattern": {"array": [], "phase": "0"},
+        "renderingIntent": None,
+        "extGState": None,
+        "shading": None,
+        "fillColor": ["0"],
+        "strokeColor": ["0"],
+    }
     current: list[dict[str, Any]] = []
     clip_pending = False
     text_x = Decimal(0)
     text_y = Decimal(0)
     text_size = Decimal(12)
+    current_font: str | None = None
     supported = {"BT", "ET", "Tf", "Td", "TD", "Tm", "Tj", "TJ", "'", '"', "T*", "m", "l", "c", "v", "y", "h", "W", "W*", "n", "S", "s", "f", "F", "f*", "B", "B*", "b", "b*", "q", "Q", "cm", "re", "rg", "RG", "g", "G", "k", "K", "w", "J", "j", "M", "d", "ri", "gs", "sh"}
     def finish_path() -> None:
         nonlocal current, clip_pending
@@ -295,20 +358,60 @@ def _interpret_content(data: bytes) -> tuple[list[str], list[dict[str, Any]], li
             paths.append({"segments": current, "clipping": clip_pending})
             current = []
             clip_pending = False
+    graphics_operators = {"q", "Q", "cm", "rg", "RG", "g", "G", "k", "K", "w", "J", "j", "M", "d", "ri", "gs", "sh"}
     for operator, operands in operations:
         if operator not in supported:
             unsupported.append(operator)
             continue
+        if operator in graphics_operators:
+            if operator == "q":
+                stack.append(list(matrix))
+                state_stack.append(dict(state))
+            elif operator == "Q":
+                if stack:
+                    matrix = stack.pop()
+                if state_stack:
+                    state = state_stack.pop()
+            elif operator == "cm":
+                values = _numeric_values(operands[-6:])
+                if values:
+                    a, b, c, d, e, f = values
+                    old = matrix
+                    matrix = [a * old[0] + c * old[1], b * old[0] + d * old[1], a * old[2] + c * old[3], b * old[2] + d * old[3], a * old[4] + c * old[5] + e, b * old[4] + d * old[5] + f]
+            elif operator in {"rg", "RG"} and _numeric_values(operands[-3:]):
+                state["fillColor" if operator == "rg" else "strokeColor"] = [decimal(value) for value in _numeric_values(operands[-3:]) or []]
+            elif operator in {"g", "G"} and _numeric_values(operands[-1:]):
+                state["fillColor" if operator == "g" else "strokeColor"] = [decimal(value) for value in _numeric_values(operands[-1:]) or []]
+            elif operator in {"k", "K"} and _numeric_values(operands[-4:]):
+                state["fillColor" if operator == "k" else "strokeColor"] = [decimal(value) for value in _numeric_values(operands[-4:]) or []]
+            elif operator == "w" and _numeric_values(operands[-1:]):
+                state["lineWidth"] = decimal((_numeric_values(operands[-1:]) or [Decimal(1)])[-1])
+            elif operator == "J" and operands and isinstance(operands[-1], Decimal):
+                state["lineCap"] = int(operands[-1])
+            elif operator == "j" and operands and isinstance(operands[-1], Decimal):
+                state["lineJoin"] = int(operands[-1])
+            elif operator == "M" and _numeric_values(operands[-1:]):
+                state["miterLimit"] = decimal((_numeric_values(operands[-1:]) or [Decimal(10)])[-1])
+            elif operator == "d" and len(operands) >= 2:
+                state["dashPattern"] = {"array": _json_operands([operands[-2]])[0], "phase": _json_operands([operands[-1]])[0]}
+            elif operator == "ri" and operands and isinstance(operands[-1], str):
+                state["renderingIntent"] = operands[-1]
+            elif operator == "gs" and operands and isinstance(operands[-1], str):
+                state["extGState"] = operands[-1]
+            elif operator == "sh" and operands and isinstance(operands[-1], str):
+                state["shading"] = operands[-1]
+            graphics_states.append({"operator": operator, "operands": _json_operands(operands), "state": _graphics_state_snapshot(state, matrix)})
         if operator in {"Tj", "'", '"'} and operands and isinstance(operands[-1], str):
             texts.append(operands[-1])
-            text_positions.append({"x": text_x, "y": text_y, "size": text_size})
+            text_positions.append({"x": text_x, "y": text_y, "size": text_size, "font": current_font, "characterCodes": _text_character_codes(operands[-1])})
         elif operator == "TJ" and operands and isinstance(operands[-1], list):
             value = "".join(item for item in operands[-1] if isinstance(item, str))
             if value:
                 texts.append(value)
-                text_positions.append({"x": text_x, "y": text_y, "size": text_size})
+                text_positions.append({"x": text_x, "y": text_y, "size": text_size, "font": current_font, "characterCodes": _text_character_codes(value)})
         elif operator == "Tf" and len(operands) >= 2 and isinstance(operands[-1], Decimal):
             text_size = operands[-1]
+            current_font = operands[-2].lstrip("/") if isinstance(operands[-2], str) else None
         elif operator in {"Td", "TD"}:
             values = _numeric_values(operands[-2:])
             if values:
@@ -319,17 +422,6 @@ def _interpret_content(data: bytes) -> tuple[list[str], list[dict[str, Any]], li
             if values:
                 matrix = values
                 text_x, text_y = values[4], values[5]
-        elif operator == "cm":
-            values = _numeric_values(operands[-6:])
-            if values:
-                a, b, c, d, e, f = values
-                old = matrix
-                matrix = [a * old[0] + c * old[1], b * old[0] + d * old[1], a * old[2] + c * old[3], b * old[2] + d * old[3], a * old[4] + c * old[5] + e, b * old[4] + d * old[5] + f]
-        elif operator == "q":
-            stack.append(list(matrix))
-        elif operator == "Q":
-            if stack:
-                matrix = stack.pop()
         elif operator in {"m", "l", "c", "v", "y", "re", "h"}:
             values = _numeric_values(operands)
             if operator == "m" and values and len(values) >= 2:
@@ -352,7 +444,7 @@ def _interpret_content(data: bytes) -> tuple[list[str], list[dict[str, Any]], li
         elif operator in {"n", "S", "s", "f", "F", "f*", "B", "B*", "b", "b*"}:
             finish_path()
     finish_path()
-    return texts, paths, unsupported, text_positions
+    return texts, paths, unsupported, text_positions, graphics_states
 
 
 def inspect(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any]:
@@ -408,7 +500,16 @@ def _observation(builder: DocumentBuilder, kind: str, target_id: str, *, geometr
     return observation_id
 
 
-def _add_text(builder: DocumentBuilder, page_id: str, value: str, page_number: int, fragment: int, space_id: str, position: dict[str, Any] | None = None) -> str:
+def _add_text(
+    builder: DocumentBuilder,
+    page_id: str,
+    value: str,
+    page_number: int,
+    fragment: int,
+    space_id: str,
+    position: dict[str, Any] | None = None,
+    font_by_resource: dict[str, dict[str, Any]] | None = None,
+) -> str:
     text_id = safe_id("text", f"pdf-source-{page_number}-{fragment}")
     builder.add_text(text_id, value, representation="source", provenance="decoded", status="preserved")
     glyph_id = safe_id("node", f"pdf-glyph-{page_number}-{fragment}")
@@ -429,8 +530,16 @@ def _add_text(builder: DocumentBuilder, page_id: str, value: str, page_number: i
     builder.add_source_map(glyph_id, {"page": page_number, "object": fragment, "operator": fragment})
     _observation(builder, "renderer", glyph_id, geometry_id=geometry_id)
     _observation(builder, "ocr", glyph_id, geometry_id=geometry_id)
+    font_by_resource = font_by_resource or {}
+    font = font_by_resource.get(str(position.get("font", "")))
+    character_codes = [str(code).upper() for code in position.get("characterCodes", []) if isinstance(code, str)]
+    mapping = {item.get("sourceCode", "").upper(): item.get("unicode", "") for item in (font or {}).get("mapping", []) if isinstance(item, dict)}
+    mapped_values = [mapping.get(code, "") for code in character_codes]
+    mapping_status = "preserved" if character_codes and mapping and all(mapped_values) else "unavailable"
+    unicode_value = "".join(mapped_values) if mapping_status == "preserved" else value[:1]
+    character_code = character_codes[0] if character_codes else value[:1].encode("latin-1", errors="replace").hex().upper()
     extension_id = safe_id("extension", f"pdf-glyph-provenance-{page_number}-{fragment}")
-    builder.add_item("extensions", {"extensionId": extension_id, "targetId": glyph_id, "namespace": "urn:fdir:format:pdf", "type": "glyph-provenance", "schemaVersion": "1.0.0", "schemaId": "urn:fdir:schema:pdf-glyph-provenance", "payload": {"characterCode": value[:1].encode("latin-1", errors="replace").hex(), "glyphName": "", "unicode": value[:1], "mappingStatus": "unavailable"}, "criticality": "non-critical"}, "extensionId")
+    builder.add_item("extensions", {"extensionId": extension_id, "targetId": glyph_id, "namespace": "urn:fdir:format:pdf", "type": "glyph-provenance", "schemaVersion": "1.0.0", "schemaId": "urn:fdir:schema:pdf-glyph-provenance", "payload": {"characterCode": character_code, "glyphName": "", "unicode": unicode_value, "mappingStatus": mapping_status}, "criticality": "non-critical"}, "extensionId")
     builder.add_feature("text-glyph", "approximated", target_id=glyph_id, diagnostic_ids=[approximation_diagnostic])
     return glyph_id
 
@@ -515,6 +624,7 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
         else:
             builder.add_feature("pdf-object-graph", "preserved", target_id=document_part)
         font_mappings = _pdf_font_mappings(objects)
+        font_by_resource = _pdf_font_resource_map(objects, font_mappings)
         for font in font_mappings:
             object_number, generation = font["object"]
             font_object_name = f"{object_number} {generation}"
@@ -557,13 +667,31 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
             builder.add_source_map(page_id, {"page": pages_seen, "object": pages_seen})
             page_object = page_objects[pages_seen - 1][1] if pages_seen <= len(page_objects) else content.encode("latin-1", errors="replace")
             page_text = streams[pages_seen - 1] if pages_seen <= len(streams) else page_object
-            fragments, parsed_paths, unsupported_operators, text_positions = _interpret_content(page_text)
+            fragments, parsed_paths, unsupported_operators, text_positions, graphics_states = _interpret_content(page_text)
             if not fragments:
                 fragments = _stream_text(page_text.decode("latin-1", errors="replace"))
             if not fragments and page_text != raw:
                 fragments = _stream_text(content)
             for fragment, value in enumerate(fragments, start=1):
-                _add_text(builder, page_id, value, pages_seen, fragment, space_id, text_positions[fragment - 1] if fragment <= len(text_positions) else None)
+                _add_text(builder, page_id, value, pages_seen, fragment, space_id, text_positions[fragment - 1] if fragment <= len(text_positions) else None, font_by_resource)
+            for state_index, state_record in enumerate(graphics_states, start=1):
+                extension_id = safe_id("extension", f"pdf-graphics-state-{pages_seen}-{state_index}")
+                builder.add_item(
+                    "extensions",
+                    {
+                        "extensionId": extension_id,
+                        "targetId": page_id,
+                        "namespace": "urn:fdir:format:pdf",
+                        "type": "graphics-state",
+                        "schemaVersion": "1.0.0",
+                        "schemaId": "urn:fdir:schema:pdf-graphics-state",
+                        "payload": {"page": pages_seen, "operator": state_record["operator"], "operands": state_record["operands"], "state": state_record["state"]},
+                        "criticality": "non-critical",
+                    },
+                    "extensionId",
+                )
+            if graphics_states:
+                builder.add_feature("graphics-state", "preserved", target_id=page_id)
             if unsupported_operators:
                 diagnostic = builder.add_diagnostic("DFIR-PDF-OPERATOR-UNSUPPORTED", f"PDF operators are not interpreted: {', '.join(sorted(set(unsupported_operators)))}", phase="normalize", target_id=page_id)
                 builder.add_feature("unsupported-operator", "unsupported", target_id=page_id, diagnostic_ids=[diagnostic])

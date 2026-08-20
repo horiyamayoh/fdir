@@ -23,7 +23,7 @@
       "id": "format:pdf:1.7:1",
       "format": "pdf",
       "version": "1.7",
-      "supportedFeatures": ["pages", "text", "glyph-codes", "paths", "clipping", "paint-order", "resources", "annotations", "source-maps"],
+      "supportedFeatures": ["pages", "text", "glyph-codes", "paths", "clipping", "paint-order", "graphics-state", "font-mapping", "resources", "annotations", "source-maps"],
       "exactnessLanes": ["indirect-object", "content-operator", "graphics-state", "font-mapping", "glyph-geometry"],
       "disposition": "preserve-or-diagnose",
       "unknownConstructPolicy": "partial-with-diagnostic"
@@ -35,7 +35,7 @@
       "supportedFeatures": ["blocks", "inline", "links", "images", "tables", "lists", "footnotes", "front-matter", "authoring", "source-maps"],
       "dialect": {
         "name": "commonmark",
-        "extensions": ["gfm-tables", "task-list", "front-matter", "raw-html"],
+        "extensions": ["gfm-tables", "front-matter", "raw-html"],
         "parserLanes": ["block-state-machine", "inline-token-stream", "source-span", "resource-resolution"]
       },
       "disposition": "preserve-or-diagnose",

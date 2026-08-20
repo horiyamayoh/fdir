@@ -599,7 +599,8 @@
         "stored": {"$ref": "#/$defs/typedValue"},
         "cached": {"$ref": "#/$defs/typedValue"},
         "computed": {"$ref": "#/$defs/typedValue"},
-        "displayed": {"type": "object", "additionalProperties": false, "required": ["text", "status"], "properties": {"text": {"type": "string"}, "status": {"$ref": "#/$defs/status"}}}
+        "displayed": {"type": "object", "additionalProperties": false, "required": ["text", "status"], "properties": {"text": {"type": "string"}, "status": {"$ref": "#/$defs/status"}}},
+        "laneProvenance": {"type": "object", "additionalProperties": false, "required": ["stored", "cached", "computed", "displayed"], "properties": {"stored": {"type": "string"}, "cached": {"type": "string"}, "computed": {"type": "string"}, "displayed": {"type": "string"}}}
       }
     },
     "typedValue": {

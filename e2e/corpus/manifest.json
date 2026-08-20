@@ -67,7 +67,9 @@
     {"id":"docx-unsupported-independent","format":"docx","kind":"ooxml-parts","path":"docx-unsupported","caseClass":"unsupported","expectedStatus":"partial"},
     {"id":"xlsx-unsupported-independent","format":"xlsx","kind":"ooxml-parts","path":"xlsx-unsupported","caseClass":"unsupported","expectedStatus":"partial"},
     {"id":"pdf-unsupported-independent","format":"pdf","kind":"file","path":"pdf-unsupported.pdf","caseClass":"unsupported","expectedStatus":"partial"},
-    {"id":"markdown-unsupported-independent","format":"markdown","kind":"file","path":"markdown-unsupported.md","caseClass":"unsupported","expectedStatus":"partial"}
+    {"id":"markdown-unsupported-independent","format":"markdown","kind":"file","path":"markdown-unsupported.md","caseClass":"unsupported","expectedStatus":"partial"},
+    {"id":"markdown-task-list-independent","format":"markdown","kind":"file","path":"markdown-task-list.md","caseClass":"unsupported","expectedStatus":"partial"},
+    {"id":"markdown-unclosed-independent","format":"markdown","kind":"file","path":"markdown-unclosed.md","caseClass":"unsupported","expectedStatus":"partial"}
   ],
   "negativeChecks": [
     {

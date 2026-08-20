@@ -11,11 +11,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Callable
+
+try:
+    from qualification_evidence import validate_source_feature_closure
+except ImportError:  # pragma: no cover
+    from tools.qualification_evidence import validate_source_feature_closure
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -118,6 +124,23 @@ def relative(path: Path) -> str:
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise GateError(message)
+
+
+def check_source_closure_report(report: dict[str, Any], label: str) -> None:
+    """Recompute source closure from each report's emitted IR document."""
+
+    cases = list(report.get("cases", []))
+    cases.extend(item for item in report.get("negativeChecks", []) if isinstance(item, dict))
+    require(cases, f"{label} has no source closure cases")
+    for case in cases:
+        require(isinstance(case, dict), f"{label} contains a malformed source closure case")
+        document_path = case.get("documentPath") or case.get("output")
+        require(isinstance(document_path, str) and Path(document_path).is_file(), f"{label} case has no emitted IR document path")
+        document = load_json(Path(document_path))
+        closure = validate_source_feature_closure(document, case)
+        require(closure.get("status") == "passed" and closure.get("mismatches") == [], f"{label} source closure failed: {json.dumps(closure.get('mismatches', []), ensure_ascii=False)}")
+        reported = case.get("sourceClosure")
+        require(isinstance(reported, dict) and reported.get("status") == "passed" and reported.get("mismatches") == [], f"{label} did not report a passed source closure")
 
 
 def load_json(path: Path) -> Any:
@@ -547,6 +570,12 @@ def run_command(name: str, display_command: str, argv: list[str]) -> dict[str, A
         "cwd": ".",
     }
     try:
+        child_environment = os.environ.copy()
+        # Runtime reports contain absolute paths under the Japanese workspace.
+        # The Windows console default is often CP932, while this gate decodes
+        # captured JSON as UTF-8; force the child Python process to use the
+        # same encoding so paths cannot be silently replaced with U+FFFD.
+        child_environment["PYTHONIOENCODING"] = "utf-8"
         completed = subprocess.run(
             [sys.executable, *argv],
             cwd=ROOT,
@@ -554,6 +583,7 @@ def run_command(name: str, display_command: str, argv: list[str]) -> dict[str, A
             text=True,
             encoding="utf-8",
             errors="replace",
+            env=child_environment,
             check=False,
         )
     except OSError as exc:
@@ -592,8 +622,10 @@ def check_runtime_evidence(commands: list[dict[str, Any]]) -> dict[str, int]:
     strict = report("strict_completion")
     require(mutation.get("status") == "passed" and mutation.get("survivors") == [] and mutation.get("killed") == mutation.get("total"), "mutation report is not fully green")
     require(corpus.get("status") == "passed" and len(corpus.get("cases", [])) >= 4, "independent corpus report is incomplete")
+    check_source_closure_report(corpus, "independent corpus")
     require(query.get("status") == "passed" and query.get("parity", {}).get("status") == "passed" and query.get("unqueryableFacts") == [], "query report is not fully green")
     require(e2e.get("status") == "passed" and set(e2e.get("formats", [])) == {"docx", "xlsx", "pdf", "markdown"}, "real-input E2E report is not fully green")
+    check_source_closure_report(e2e, "real-input E2E")
     require(strict.get("status") == "passed" and strict.get("blockers") == [], "strict completion report is not fully green")
     return {
         "mutation_cases": int(mutation.get("total", 0)),

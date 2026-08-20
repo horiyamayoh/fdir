@@ -450,6 +450,7 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
             surface_id = safe_id("surface", "docx-page-1")
             builder.add_item("parts", {"partId": part_id, "kind": "document", "name": "word/document.xml", "contentType": content_types.get("word/document.xml", "application/xml"), "parentPartId": package_part_id, "rootNodeIds": [builder.root_id], "surfaceIds": [surface_id], "relationshipIds": [], "status": "preserved"}, "partId")
             part_ids: dict[str, str] = {"[package]": package_part_id, "word/document.xml": part_id}
+            parsed_part_names = {"word/document.xml", "word/styles.xml", "word/comments.xml", "word/footnotes.xml", "word/endnotes.xml"}
             for package_name in sorted(names):
                 normalized_name = package_name.replace("\\", "/")
                 if normalized_name in {"[Content_Types].xml", "word/document.xml"} or normalized_name.endswith(".rels"):
@@ -458,7 +459,13 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
                 part_ids[normalized_name] = package_part_id_for_name
                 suffix = normalized_name.rsplit(".", 1)[-1].lower() if "." in normalized_name else ""
                 kind = "image" if normalized_name.startswith("word/media/") else "xml" if suffix == "xml" else "embeddedObject"
-                builder.add_item("parts", {"partId": package_part_id_for_name, "kind": kind, "name": normalized_name, "contentType": content_types.get(normalized_name, "application/octet-stream"), "parentPartId": package_part_id, "rootNodeIds": [], "relationshipIds": [], "status": "preserved"}, "partId")
+                if re.fullmatch(r"word/(header|footer)\d+\.xml", normalized_name):
+                    parsed_part_names.add(normalized_name)
+                part_status = "preserved" if normalized_name in parsed_part_names or normalized_name.startswith("word/media/") else "unsupported"
+                builder.add_item("parts", {"partId": package_part_id_for_name, "kind": kind, "name": normalized_name, "contentType": content_types.get(normalized_name, "application/octet-stream"), "parentPartId": package_part_id, "rootNodeIds": [], "relationshipIds": [], "status": part_status}, "partId")
+                if part_status == "unsupported":
+                    diagnostic = builder.add_diagnostic("DFIR-DOCX-PART-UNPARSED", f"DOCX package part is inventory-visible but not parsed by the bounded adapter: {normalized_name}", target_id=package_part_id_for_name, phase="normalize")
+                    builder.add_feature("package-part", "unsupported", target_id=package_part_id_for_name, diagnostic_ids=[diagnostic])
             relationship_loss = False
             for relationship_file in sorted(name for name in names if name == "_rels/.rels" or "/_rels/" in name):
                 source_name = _relationship_source(relationship_file)

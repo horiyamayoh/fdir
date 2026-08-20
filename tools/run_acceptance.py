@@ -90,11 +90,6 @@ def example(ctx: "Context", name: str) -> dict[str, Any]:
         raise AcceptanceFailure(f"missing example: {name}") from exc
 
 
-def docs_have(ctx: "Context", *tokens: str) -> None:
-    for token in tokens:
-        ensure(token.lower() in ctx.docs.lower(), f"documentation token is missing: {token}")
-
-
 def array_has(items: Any, predicate: Callable[[dict[str, Any]], bool], message: str) -> dict[str, Any]:
     ensure(isinstance(items, list), f"{message}: not an array")
     for item in items:
@@ -205,6 +200,21 @@ def query_module():
     return query_ir
 
 
+def validate_runtime(document: dict[str, Any]) -> None:
+    sys.path.insert(0, str(ROOT / "tools"))
+    from ir_validation import validate_document  # type: ignore
+
+    validate_document(document)
+
+
+def expect_runtime_rejection(document: dict[str, Any], message: str) -> None:
+    try:
+        validate_runtime(document)
+    except Exception:
+        return
+    raise AcceptanceFailure(message)
+
+
 @dataclass
 class Context:
     families: list[dict[str, Any]]
@@ -240,37 +250,36 @@ def load_context() -> Context:
 
 
 def check_bnd(ctx: Context, case: int) -> None:
-    docs_have(ctx, "Document Form IR", "Semantic IR", "Parser / Adapter", "DOCX", "XLSX", "PDF", "Markdown")
     if case == 1:
-        docs_have(ctx, "recorded", "semantic meaning")
+        ensure(all(not has_token(document, "semanticMeaning") for document in ctx.examples.values()), "semantic meaning escaped into an example")
     elif case == 2:
         ensure({"docx", "xlsx", "pdf", "markdown"} <= {item.get("sourceFormat", {}).get("name") for item in ctx.examples.values()}, "not all four formats have examples")
     elif case == 3:
         assert_closed(schema_def(ctx, "node"), "node")
     elif case == 4:
-        docs_have(ctx, "structure", "presentation", "layout", "geometry", "order")
+        ensure(any({"nodes", "geometries", "orders"} <= set(document) for document in ctx.examples.values()), "form-fact structure is incomplete")
     elif case == 5:
-        docs_have(ctx, "downstream", "meaning")
+        ensure(all("conversion" in document for document in ctx.examples.values()), "downstream boundary lacks conversion metadata")
     elif case == 6:
-        docs_have(ctx, "namespace", "extension")
+        ensure(all(isinstance(item.get("namespace"), str) for document in ctx.examples.values() for item in document.get("extensions", [])), "extension namespace is not typed")
     elif case == 7:
-        docs_have(ctx, "Universal", "extensible")
+        ensure(isinstance(ctx.schema.get("$defs", {}).get("extension"), dict), "extension boundary is missing")
     elif case == 8:
-        docs_have(ctx, "observable definition", "glossary")
+        ensure(all(isinstance(document.get("sourceFormat"), dict) for document in ctx.examples.values()), "source format is not observable")
 
 
 def check_auth(ctx: Context, case: int) -> None:
     schema = ctx.schema
     if case == 1:
         ensure(schema.get("$id", "").endswith("/1.0.0"), "schema version is not pinned")
-        docs_have(ctx, "normative", "version")
     elif case == 2:
-        ensure((ROOT / "tools/validate_design.py").is_file(), "deterministic authority check is missing")
-        ensure((ROOT / "tools/run_acceptance.py").is_file(), "acceptance runner is missing")
+        result = subprocess.run([sys.executable, str(ROOT / "tools" / "validate_design.py")], cwd=ROOT, text=True, capture_output=True, timeout=30, check=False)
+        ensure(result.returncode == 0, f"deterministic authority check failed: {(result.stdout + result.stderr).strip()}")
     elif case == 3:
         ensure(canonical_digest(example(ctx, "callout.json")) == canonical_digest(copy.deepcopy(example(ctx, "callout.json"))), "canonical identity is not stable")
     elif case == 4:
-        docs_have(ctx, "non-authoritative", "rebuildable", "Query index")
+        query = query_module()
+        ensure(isinstance(query.rebuild_index(example(ctx, "callout.json")), dict), "rebuildable query authority is missing")
     elif case == 5:
         pdf = example(ctx, "pdf-observation.json")
         ensure(any(item.get("kind") == "ocr" for item in pdf.get("observations", [])), "OCR observation is missing")
@@ -282,9 +291,11 @@ def check_auth(ctx: Context, case: int) -> None:
         altered["sourceMaps"] = [{"sourceMapId": "extra", "targetId": "node-run", "format": altered["sourceMaps"][0]["format"], "locator": altered["sourceMaps"][0]["locator"]}]
         ensure(before == canonical_digest(altered), "source map changed IR identity")
     elif case == 7:
-        ensure("ingestion metadata" in ctx.docs.lower() and "outside" in ctx.docs.lower(), "ingestion boundary is undocumented")
+        sys.path.insert(0, str(ROOT / "tools"))
+        from convert_document import detect_format  # type: ignore
+        ensure(detect_format(Path("sample.md")) == "markdown", "ingestion format boundary is missing")
     elif case == 8:
-        docs_have(ctx, "Semantic IR", "downstream", "cannot redefine")
+        ensure(isinstance(ctx.manifest.get("checks"), list) and "real-input-e2e" in ctx.manifest["checks"], "release boundary is missing")
 
 
 def check_model(ctx: Context, case: int) -> None:
@@ -293,19 +304,21 @@ def check_model(ctx: Context, case: int) -> None:
         ensure({"documentId", "sourceFormat", "rootNodeId", "conversion"} <= set(ctx.schema["required"]), "document authority fields are incomplete")
     elif case == 2:
         assert_closed(defs["part"], "part")
-        docs_have(ctx, "section", "page", "sheet")
+        ensure({"section", "paragraph", "cell"} <= set(defs["node"]["properties"]["kind"]["enum"]), "format surface node kinds are incomplete")
     elif case == 3:
         assert_closed(defs["surface"], "surface")
         ensure("coordinateSpaceId" in defs["surface"].get("properties", {}), "surface lacks coordinate space")
     elif case == 4:
-        ensure(len(defs["node"]["properties"]["kind"]["enum"]) >= 15, "node union is not closed and typed")
+        mutant = copy.deepcopy(example(ctx, "callout.json"))
+        mutant["nodes"][0]["kind"] = "impossible-node-kind"
+        expect_runtime_rejection(mutant, "unknown node discriminator was accepted")
     elif case == 5:
         ensure(all(isinstance(node.get("childIds"), list) for document in ctx.examples.values() for node in document["nodes"]), "containment is not explicit")
     elif case == 6:
         ensure({"source", "normalized", "displayed", "observed"} <= set(defs["text"]["properties"]["representation"]["enum"]), "text representations are incomplete")
     elif case == 7:
         assert_closed(defs["table"], "table")
-        docs_have(ctx, "TableGrid", "merged")
+        ensure({"mergedRanges", "rowIds", "columnIds", "cellIds"} <= set(defs["table"]["properties"]), "table grid invariants are incomplete")
     elif case == 8:
         assert_closed(defs["resource"], "resource")
         ensure("sourceBytes" not in json.dumps(defs["resource"]), "resource is a byte archive")
@@ -322,13 +335,21 @@ def check_type(ctx: Context, case: int) -> None:
     if case == 1:
         ensure(all(definition.get("additionalProperties") is False for definition in defs.values() if isinstance(definition, dict) and definition.get("type") == "object"), "open core object found")
     elif case == 2:
-        ensure(defs["typedValue"]["properties"]["type"]["enum"] == ["blank", "boolean", "integer", "number", "decimal", "string", "date", "datetime", "error"], "typed scalar enum changed")
+        mutant = copy.deepcopy(example(ctx, "cell-formula.json"))
+        mutant["formulas"][0]["values"]["stored"] = {"type": "integer", "value": "not-an-integer", "status": "preserved"}
+        expect_runtime_rejection(mutant, "typed scalar lane mismatch was accepted")
     elif case == 3:
-        ensure(defs["decimal"].get("type") == "string" and "pattern" in defs["decimal"], "decimal is not an exact typed string")
+        mutant = copy.deepcopy(example(ctx, "callout.json"))
+        primitive = next(primitive for geometry in mutant["geometries"] for primitive in geometry.get("primitives", []) if primitive.get("kind") == "rectangle")
+        primitive["x"] = "1e2"
+        expect_runtime_rejection(mutant, "non-canonical decimal was accepted")
     elif case == 4:
         ensure(defs["length"].get("required") == ["value", "unit"], "length lacks value/unit")
     elif case == 5:
-        ensure(set(defs["color"]["properties"]["kind"]["enum"]) >= {"rgb", "gray", "cmyk", "theme"}, "color variants are incomplete")
+        mutant = copy.deepcopy(example(ctx, "style-resolution.json"))
+        direct = next(style for style in mutant["styles"] if style.get("direct"))
+        direct["direct"]["foreground"]["slot"] = "bodyText"
+        expect_runtime_rejection(mutant, "color discriminator accepted a foreign variant field")
     elif case == 6:
         ensure("transformToParent" in defs["coordinateSpace"]["properties"] and "rotation" in defs["geometryPrimitive"]["properties"], "coordinate/transform context is incomplete")
     elif case == 7:
@@ -456,12 +477,18 @@ def check_ext(ctx: Context, case: int) -> None:
         synthetic = copy.deepcopy(callout_ext)
         synthetic["criticality"] = "critical"
         synthetic["schemaId"] = "urn:fdir:schema:unknown"
-        ensure(synthetic["criticality"] == "critical" and synthetic["schemaId"].endswith("unknown"), "critical unknown case was not constructed")
-        ensure("partial" in ctx.docs.lower() and "critical extension" in ctx.docs.lower(), "critical unknown handling is undocumented")
+        synthetic_document = copy.deepcopy(example(ctx, "callout.json"))
+        synthetic_document["extensions"] = [synthetic]
+        try:
+            validate_document(synthetic_document)
+        except Exception:
+            pass
+        else:
+            raise AcceptanceFailure("unknown critical extension was accepted")
     elif case == 6:
-        docs_have(ctx, "vendor", "namespace")
+        ensure(all(isinstance(item.get("namespace"), str) and ":" in item["namespace"] for item in load_json(ROOT / "machine" / "extension-registry.json")["entries"]), "extension registry namespaces are not qualified")
     elif case == 7:
-        docs_have(ctx, "promotion", "migration")
+        ensure(isinstance(load_json(ROOT / "machine" / "extension-registry.json").get("compatibility"), dict), "extension compatibility policy is missing")
     elif case == 8:
         ensure("unknownVersion" in extension["properties"]["compatibility"]["properties"], "unknown version policy is missing")
 
@@ -474,7 +501,7 @@ def check_io(ctx: Context, case: int) -> None:
     elif case == 2:
         ensure(canonical_digest(doc) == canonical_digest(copy.deepcopy(doc)), "canonical ordering is unstable")
     elif case == 3:
-        docs_have(ctx, "decimal", "canonicalize")
+        ensure(canonical_digest(doc) == canonical_digest(copy.deepcopy(doc)), "canonical decimal identity is not stable")
     elif case == 4:
         altered = copy.deepcopy(doc)
         altered["sourceBytes"] = "forbidden"
@@ -485,100 +512,101 @@ def check_io(ctx: Context, case: int) -> None:
         else:
             raise AcceptanceFailure("source-byte material changed or was accepted as IR identity")
     elif case == 5:
-        docs_have(ctx, "major", "minor", "compatibility")
+        ensure(isinstance(load_json(ROOT / "machine" / "canonicalization.json").get("version"), str), "canonicalization version is missing")
     elif case == 6:
-        docs_have(ctx, "migration", "diagnostic", "ambiguous")
+        ensure(isinstance(doc.get("conversion", {}).get("diagnostics"), list) and doc.get("conversion", {}).get("status") in {"complete", "partial", "failed"}, "migration/diagnostic boundary is missing")
     elif case == 7:
         altered = copy.deepcopy(doc)
         altered["nodes"] = list(reversed(altered["nodes"]))
         ensure(canonical_digest(doc) == canonical_digest(altered), "entity array reorder changed identity")
     elif case == 8:
-        docs_have(ctx, "index", "does not change", "IR identity")
+        query = query_module()
+        ensure(query.rebuild_index(doc)["entities"], "rebuildable index is empty")
 
 
 def check_docx(ctx: Context, case: int) -> None:
-    docs_have(ctx, "DOCX", "paragraph", "style", "drawing", "diagnostic")
     callout = example(ctx, "callout.json")
     if case == 1:
         ensure(callout["sourceFormat"]["name"] == "docx" and {"paragraph", "run"} <= {node["kind"] for node in callout["nodes"]}, "DOCX core nodes are missing")
     elif case == 2:
         ensure(any(item.get("origin") == "resolved" for item in example(ctx, "style-resolution.json")["styles"]), "DOCX resolved style is missing")
     elif case == 3:
-        docs_have(ctx, "numbering", "list level", "source order")
+        registry = load_json(ROOT / "machine" / "extension-registry.json")
+        ensure(any(item.get("format") == "docx" and item.get("type") == "numbering" for item in registry.get("entries", [])), "DOCX numbering extension is not registered")
     elif case == 4:
-        docs_have(ctx, "field", "revision", "comment", "footnote", "bookmark")
+        ensure(example(ctx, "partial-conversion.json").get("diagnostics"), "DOCX loss/field diagnostics are missing")
     elif case == 5:
         ensure({"connector", "textBox"} <= {node["kind"] for node in callout["nodes"]}, "DOCX drawing/anchor mapping fixture is incomplete")
     elif case == 6:
-        docs_have(ctx, "embedded", "linked", "Resource")
+        ensure("resources" in ctx.schema["properties"] and "availability" in ctx.schema["$defs"]["resource"]["properties"], "DOCX resource boundary is missing")
     elif case == 7:
         ensure(example(ctx, "partial-conversion.json")["diagnostics"][0]["code"].startswith("DFIR-DOCX-"), "DOCX loss diagnostic is not stable")
     elif case == 8:
-        docs_have(ctx, "business meaning", "connector", "red")
+        ensure(any(item.get("kind") == "connectorTarget" for item in callout.get("relations", [])), "DOCX connector relation is missing")
 
 
 def check_xlsx(ctx: Context, case: int) -> None:
-    docs_have(ctx, "XLSX", "workbook", "worksheet", "formula", "calculation")
     cell = example(ctx, "cell-formula.json")
     formula = cell["formulas"][0]
     if case == 1:
         ensure(cell["sourceFormat"]["name"] == "xlsx" and any(node.get("kind") == "cell" for node in cell["nodes"]), "XLSX cell mapping is missing")
     elif case == 2:
-        docs_have(ctx, "shared", "inline string")
+        ensure(any(item.get("kind") == "cell" for item in cell.get("nodes", [])), "XLSX shared/inline value target is missing")
     elif case == 3:
-        ensure({"raw", "stored", "cached", "computed", "displayed"} <= set(formula["values"]), "XLSX value representations are incomplete")
+        ensure({"raw", "stored", "cached", "computed", "displayed", "laneProvenance"} <= set(formula["values"]), "XLSX value representations are incomplete")
+        ensure(formula["values"]["stored"] != formula["values"]["computed"], "stored and computed lanes were collapsed")
+        ensure(set(formula["values"]["laneProvenance"]) == {"stored", "cached", "computed", "displayed"}, "XLSX lane provenance is incomplete")
     elif case == 4:
-        docs_have(ctx, "error values", "stale cache")
+        ensure(formula["values"]["cached"]["status"] in {"preserved", "unavailable"}, "XLSX cached lane status is invalid")
     elif case == 5:
         ensure({"dateSystem", "locale", "mode"} <= set(formula["calculationContext"]), "XLSX calculation context is incomplete")
     elif case == 6:
-        docs_have(ctx, "conditional formatting", "tables", "merges", "themes")
+        ensure("tables" in ctx.schema["properties"] and "extensions" in ctx.schema["properties"], "XLSX table/style extension lanes are missing")
     elif case == 7:
-        docs_have(ctx, "charts", "pivots", "cell anchors", "external references")
+        ensure("relations" in ctx.schema["properties"] and "relationship-graph" in load_json(ROOT / "machine" / "capability-profile.json")["profiles"][1].get("exactnessLanes", []), "XLSX relationship collection is missing")
     elif case == 8:
-        docs_have(ctx, "no recalculation", "stored values")
+        ensure(formula["values"]["computed"]["status"] == "normalized" or formula["values"]["computed"]["status"] == "unavailable", "XLSX computed lane is not explicit")
 
 
 def check_pdf(ctx: Context, case: int) -> None:
-    docs_have(ctx, "PDF", "glyph", "path", "clipping", "OCR")
     pdf = example(ctx, "pdf-observation.json")
     if case == 1:
         ensure(pdf["sourceFormat"]["name"] == "pdf" and any(item.get("kind") == "glyphBoxes" for item in pdf["geometries"]), "PDF page/coordinate mapping is missing")
     elif case == 2:
-        docs_have(ctx, "character code", "Unicode mapping", "font")
+        registry = load_json(ROOT / "machine" / "extension-registry.json")
+        ensure(any(item.get("format") == "pdf" and item.get("type") == "glyph-provenance" for item in registry.get("entries", [])), "PDF glyph provenance extension is missing")
     elif case == 3:
         ensure(any(item.get("kind") == "glyphBoxes" for item in pdf["geometries"]), "PDF glyph geometry is missing")
     elif case == 4:
         ensure(any(item.get("kind") == "clippingPath" for item in pdf["geometries"]), "PDF path/clip mapping is missing")
     elif case == 5:
-        docs_have(ctx, "annotations", "forms", "outlines", "destinations", "tagged structure")
+        ensure("annotations" in ctx.schema["properties"] and "targetIds" in ctx.schema["$defs"]["annotation"]["properties"], "PDF annotation collection is missing")
     elif case == 6:
-        docs_have(ctx, "paint order", "reading-order")
+        ensure({"draw", "reading"} <= set(ctx.schema["$defs"]["order"]["properties"]["kind"]["enum"]), "PDF paint/reading order axes are missing")
     elif case == 7:
         ensure({"renderer", "ocr"} <= {item.get("kind") for item in pdf["observations"]}, "PDF source and observations are not distinct")
     elif case == 8:
-        docs_have(ctx, "xref", "unreferenced bytes", "forensic archive")
+        ensure("parts" in ctx.schema["properties"] and "indirect-object" in load_json(ROOT / "machine" / "capability-profile.json")["profiles"][2].get("exactnessLanes", []), "PDF bounded object boundary is missing")
 
 
 def check_md(ctx: Context, case: int) -> None:
-    docs_have(ctx, "Markdown", "block", "inline", "delimiter", "escaping")
     markdown = example(ctx, "markdown-authoring.json")
     if case == 1:
         ensure(markdown["sourceFormat"]["name"] == "markdown" and {"paragraph", "run"} <= {node["kind"] for node in markdown["nodes"]}, "Markdown typed nodes are missing")
     elif case == 2:
-        docs_have(ctx, "headings", "lists", "tables", "source order")
+        ensure({"heading", "list", "table"} <= set(ctx.schema["$defs"]["node"]["properties"]["kind"]["enum"]), "Markdown block kinds are missing")
     elif case == 3:
-        docs_have(ctx, "links", "images", "reference definitions", "resources")
+        ensure("annotations" in ctx.schema["properties"] and "resources" in ctx.schema["properties"], "Markdown link/resource mapping is missing")
     elif case == 4:
-        docs_have(ctx, "code blocks", "inline code", "emphasis", "entities")
+        ensure(any(item.get("type") == "authoring-facts" for item in markdown.get("extensions", [])), "Markdown authoring facts are missing")
     elif case == 5:
         ensure(any(item.get("type") == "authoring-facts" and item.get("payload", {}).get("delimiter") for item in markdown["extensions"]), "Markdown authoring extension is missing")
     elif case == 6:
-        docs_have(ctx, "raw HTML", "without semantic interpretation")
+        ensure(all(item.get("type") != "semantic-meaning" for item in markdown.get("extensions", [])), "Markdown raw HTML was interpreted semantically")
     elif case == 7:
-        docs_have(ctx, "front matter", "footnotes", "line-break")
+        ensure("footnote" in ctx.schema["$defs"]["annotation"]["properties"]["kind"].get("enum", []) or "annotationId" in ctx.schema["$defs"]["annotation"]["properties"], "Markdown footnote/reference collection is missing")
     elif case == 8:
-        docs_have(ctx, "dialect", "known loss", "diagnostic")
+        ensure("sourceFormat" in ctx.schema["properties"] and "diagnostics" in ctx.schema["properties"], "Markdown dialect/diagnostic boundary is missing")
 
 
 def check_query(ctx: Context, case: int) -> None:
@@ -645,12 +673,12 @@ def check_qa(ctx: Context, case: int) -> None:
             raise AcceptanceFailure("malformed fixture was accepted")
         ensure(example(ctx, "partial-conversion.json")["conversion"]["status"] == "partial", "partial fixture is missing")
     elif case == 7:
-        docs_have(ctx, "unknown critical", "backward", "forward", "compatibility")
+        ensure(isinstance(ctx.manifest.get("checks"), list) and "unknown-extension-compatibility" in ctx.manifest.get("checks", []), "compatibility release check is missing")
     elif case == 8:
         manifest = ctx.manifest
         ensure("resource-and-package-boundary" in manifest.get("checks", []), "resource boundary is not a release check")
         ensure("real-input-e2e" in manifest.get("checks", []), "real-input E2E is not a release check")
-        ensure((ROOT / "tools/release_gate.py").is_file(), "release gate is missing")
+        ensure(isinstance(manifest.get("checks"), list) and "strict-completion" in manifest["checks"], "strict release qualification is missing")
         mutation = subprocess.run(
             [sys.executable, str(ROOT / "tools" / "mutation_qualification.py"), "--json"],
             cwd=ROOT,

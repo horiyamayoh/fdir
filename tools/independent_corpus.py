@@ -14,10 +14,10 @@ from typing import Any
 
 try:
     from ir_validation import validate_document
-    from qualification_evidence import case_evidence, source_digest
+    from qualification_evidence import case_evidence, source_digest, validate_source_feature_closure
 except ImportError:  # pragma: no cover
     from tools.ir_validation import validate_document
-    from tools.qualification_evidence import case_evidence, source_digest
+    from tools.qualification_evidence import case_evidence, source_digest, validate_source_feature_closure
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -95,12 +95,17 @@ def _convert(case: dict[str, Any], input_path: Path, workspace: Path) -> dict[st
     report_evidence["sourceDigest"] = source_digest(CORPUS / str(case["path"]))
     report_evidence["caseClass"] = case.get("caseClass", "positive")
     report_evidence["sourcePath"] = str(case["path"])
+    report_evidence["documentPath"] = str(output)
     if not report_evidence.get("sourceFeatureIds"):
         raise CorpusFailure(f"{case['id']} has no source feature inventory")
     if report_evidence["queryParity"].get("status") != "passed":
         raise CorpusFailure(f"{case['id']} direct/index parity failed")
     if report_evidence["queryParity"].get("unqueryableFacts") != []:
         raise CorpusFailure(f"{case['id']} contains unqueryable authoritative facts")
+    closure = validate_source_feature_closure(document, report_evidence)
+    report_evidence["sourceClosure"] = closure
+    if closure.get("status") != "passed":
+        raise CorpusFailure(f"{case['id']} source occurrence closure failed: {json.dumps(closure.get('mismatches', []), ensure_ascii=False)}")
     return {
         "id": case["id"],
         "format": case["format"],
@@ -109,6 +114,7 @@ def _convert(case: dict[str, Any], input_path: Path, workspace: Path) -> dict[st
         "canonicalDigest": digest,
         "nodes": len(document.get("nodes", [])),
         "diagnostics": len(document.get("diagnostics", [])),
+        "documentPath": str(output),
         "warnings": warnings,
         **report_evidence,
     }
@@ -127,9 +133,14 @@ def _check_resource_limit(case: dict[str, Any], input_path: Path, workspace: Pat
     report_evidence = case_evidence(input_path, case["format"], document)
     report_evidence["sourceDigest"] = source_digest(CORPUS / str(case["path"]))
     report_evidence["caseClass"] = "resource-limit"
+    report_evidence["documentPath"] = str(output)
     if not report_evidence.get("sourceFeatureIds"):
         raise CorpusFailure("resource-limit evidence has no source feature inventory")
-    return {"id": "resource-limit", "status": document["conversion"]["status"], "diagnostics": len(document.get("diagnostics", [])), **report_evidence}
+    closure = validate_source_feature_closure(document, report_evidence)
+    report_evidence["sourceClosure"] = closure
+    if closure.get("status") != "passed":
+        raise CorpusFailure(f"resource-limit source occurrence closure failed: {json.dumps(closure.get('mismatches', []), ensure_ascii=False)}")
+    return {"id": "resource-limit", "status": document["conversion"]["status"], "diagnostics": len(document.get("diagnostics", [])), "documentPath": str(output), **report_evidence}
 
 
 def run() -> dict[str, Any]:

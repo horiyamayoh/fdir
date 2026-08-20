@@ -414,7 +414,10 @@ def _typed_value_check(value: dict[str, Any], path: str) -> None:
             raise IRValidationError(f"{path} integer value must not be a floating point number", "DFIR-TYPED-VALUE-MISMATCH")
         if value_type in {"number", "decimal"} and isinstance(raw, str) and not _canonical_decimal(raw):
             raise IRValidationError(f"{path} decimal is not canonical", "DFIR-DECIMAL-NONCANONICAL")
-        if value_type == "integer" and isinstance(raw, str) and re.fullmatch(r"^-?(0|[1-9][0-9]*)$", raw) is None:
+        # Integer strings use the same canonical zero rule as decimal strings:
+        # negative zero is a distinct spelling and must not be accepted as the
+        # canonical representation of zero.
+        if value_type == "integer" and isinstance(raw, str) and re.fullmatch(r"(?:0|[1-9][0-9]*|-[1-9][0-9]*)", raw) is None:
             raise IRValidationError(f"{path} integer is not exact", "DFIR-TYPED-VALUE-MISMATCH")
     if value_type in {"string", "date", "datetime", "error"} and raw is not None and not isinstance(raw, str):
         raise IRValidationError(f"{path} textual value is not a string", "DFIR-TYPED-VALUE-MISMATCH")

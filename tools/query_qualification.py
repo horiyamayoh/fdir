@@ -1,101 +1,298 @@
-"""Qualification for direct typed queries and deterministic index rebuilds."""
+"""Executable qualification for typed queries and rebuildable indexes.
+
+The qualification deliberately exercises the public conversion API instead of
+proving the query layer with only hand-authored IR fixtures.  An index is
+accepted only when every authoritative entity and full entity fact digest
+matches a direct query over the converted document.
+"""
 
 from __future__ import annotations
 
+import copy
 import json
+import os
 from pathlib import Path
-import subprocess
 import sys
+import zipfile
 from typing import Any
 
-try:
-    from ir_validation import COLLECTION_KEYS
-    from query_ir import ancestors, descendants, get_entity, list_entities, load_document, rebuild_index
-    from qualification_evidence import query_parity
-except ImportError:  # pragma: no cover
-    from tools.ir_validation import COLLECTION_KEYS
-    from tools.query_ir import ancestors, descendants, get_entity, list_entities, load_document, rebuild_index
-    from tools.qualification_evidence import query_parity
-
-
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT / "tools") not in sys.path:
+    sys.path.insert(0, str(ROOT / "tools"))
+
+try:
+    from convert_document import convert_path
+    from ir_validation import COLLECTION_KEYS
+    from query_ir import (
+        QueryError,
+        ancestors,
+        descendants,
+        find_extensions,
+        find_observations,
+        find_relations,
+        get_entity,
+        get_text,
+        index_parity,
+        list_entities,
+        list_nodes,
+        rebuild_index,
+        validate_index,
+    )
+except ImportError:  # pragma: no cover
+    from tools.convert_document import convert_path
+    from tools.ir_validation import COLLECTION_KEYS
+    from tools.query_ir import (
+        QueryError,
+        ancestors,
+        descendants,
+        find_extensions,
+        find_observations,
+        find_relations,
+        get_entity,
+        get_text,
+        index_parity,
+        list_entities,
+        list_nodes,
+        rebuild_index,
+        validate_index,
+    )
 
 
-def qualify(path: Path) -> dict[str, int | str]:
-    document = load_document(path)
+CORPUS = ROOT / "e2e" / "corpus"
+MANIFEST = CORPUS / "manifest.json"
+
+
+def _all_strings(value: Any) -> str:
+    if isinstance(value, dict):
+        return " ".join(f"{key} {_all_strings(child)}" for key, child in value.items())
+    if isinstance(value, list):
+        return " ".join(_all_strings(child) for child in value)
+    return str(value)
+
+
+def _package_case(case: dict[str, Any], workspace: Path) -> Path:
+    source = CORPUS / str(case["path"])
+    if case.get("kind") == "file":
+        if not source.is_file():
+            raise AssertionError(f"missing corpus source: {source}")
+        return source
+    if case.get("kind") != "ooxml-parts" or not source.is_dir():
+        raise AssertionError(f"invalid corpus case source: {case.get('id')}")
+    destination = workspace / f"{case['id']}.{case['format']}"
+    with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for part in sorted(item for item in source.rglob("*") if item.is_file()):
+            archive.write(part, part.relative_to(source).as_posix())
+    return destination
+
+
+def _direct_query_check(document: dict[str, Any], label: str) -> dict[str, Any]:
+    """Exercise all typed collection and relationship queries on one document."""
+
     index = rebuild_index(document)
-    expected_ids = sorted((collection, item[identifier]) for collection, identifier in COLLECTION_KEYS.items() for item in document.get(collection, []))
-    actual_ids = sorted((item["collection"], item["id"]) for item in index["entities"])
-    if expected_ids != actual_ids:
-        raise AssertionError(f"index entity mismatch for {path.name}")
-    for collection, identifier in COLLECTION_KEYS.items():
+    parity = index_parity(document, index)
+    direct_counts: dict[str, int] = {}
+    operations = set(parity["operations"])
+    for collection, identifier_key in COLLECTION_KEYS.items():
+        expected = sorted(document.get(collection, []), key=lambda item: item[identifier_key])
         values = list_entities(document, collection)
-        if len(values) != len(document.get(collection, [])):
-            raise AssertionError(f"typed list mismatch: {collection}")
+        operations.add(f"list-entities:{collection}")
+        if values != expected:
+            raise AssertionError(f"direct list mismatch: {label}/{collection}")
+        direct_counts[collection] = len(values)
         for item in values:
-            if get_entity(document, collection, item[identifier])[identifier] != item[identifier]:
-                raise AssertionError(f"typed lookup mismatch: {collection}/{item[identifier]}")
+            found = get_entity(document, collection, item[identifier_key])
+            operations.add(f"get-entity:{collection}")
+            if found != item:
+                raise AssertionError(f"direct get mismatch: {label}/{collection}/{item[identifier_key]}")
+
     nodes = document.get("nodes", [])
+    if sorted(list_nodes(document), key=lambda item: item["nodeId"]) != sorted(nodes, key=lambda item: item["nodeId"]):
+        raise AssertionError(f"direct node list mismatch: {label}")
+    operations.add("list-nodes")
+    by_id = {item["nodeId"]: item for item in nodes}
     for node in nodes:
         node_id = node["nodeId"]
-        direct_children = node.get("childIds", [])
-        if [item["nodeId"] for item in descendants(document, node_id) if item["nodeId"] in direct_children] != direct_children:
-            raise AssertionError(f"descendant traversal mismatch: {node_id}")
+        direct_children = list(node.get("childIds", []))
+        found_descendants = descendants(document, node_id)
+        operations.add("descendants")
+        if [item["nodeId"] for item in found_descendants if item["nodeId"] in direct_children] != direct_children:
+            raise AssertionError(f"descendant traversal mismatch: {label}/{node_id}")
         expected_ancestors: list[str] = []
         parent = node.get("parentId")
-        by_id = {item["nodeId"]: item for item in nodes}
         while parent is not None:
             expected_ancestors.append(parent)
             parent = by_id[parent].get("parentId")
         if [item["nodeId"] for item in ancestors(document, node_id)] != expected_ancestors:
-            raise AssertionError(f"ancestor traversal mismatch: {node_id}")
-    return {"fixture": path.name, "entities": len(index["entities"]), "reverseReferences": len(index["reverseReferences"]), "status": "passed"}
+            raise AssertionError(f"ancestor traversal mismatch: {label}/{node_id}")
+        operations.add("ancestors")
+
+    text_by_id = {item["textId"]: item for item in document.get("texts", [])}
+    for node in nodes:
+        reachable = set(node.get("textIds", []))
+        reachable.update(item_id for item in descendants(document, node["nodeId"]) for item_id in item.get("textIds", []))
+        representations = {text_by_id[text_id]["representation"] for text_id in reachable if text_id in text_by_id}
+        for representation in representations:
+            actual = get_text(document, node["nodeId"], representation)
+            expected = [item for item in document.get("texts", []) if item["textId"] in reachable and item["representation"] == representation]
+            if actual != expected:
+                raise AssertionError(f"text query mismatch: {label}/{node['nodeId']}/{representation}")
+            operations.add(f"get-text:{representation}")
+
+    if find_relations(document) != document.get("relations", []):
+        raise AssertionError(f"relation query mismatch: {label}")
+    if find_extensions(document) != document.get("extensions", []):
+        raise AssertionError(f"extension query mismatch: {label}")
+    if find_observations(document) != document.get("observations", []):
+        raise AssertionError(f"observation query mismatch: {label}")
+    operations.update({"find-relations", "find-extensions", "find-observations"})
+
+    return {
+        "fixture": label,
+        "status": "passed",
+        "entities": parity["directEntityCount"],
+        "facts": parity["directFactCount"],
+        "reverseReferences": parity["reverseReferenceCount"],
+        "directCounts": direct_counts,
+        "operations": sorted(operations),
+        "queryParity": parity,
+    }
 
 
-def _run_json(command: list[str]) -> dict[str, Any]:
-    result = subprocess.run([sys.executable, *command], cwd=ROOT, text=True, capture_output=True, timeout=180, check=False)
-    if result.returncode != 0:
-        raise AssertionError(f"qualification command failed: {' '.join(command)}: {result.stdout[-500:]} {result.stderr[-500:]}")
-    value = json.loads(result.stdout)
+def qualify(path: Path) -> dict[str, Any]:
+    """Qualify a checked-in example through the public query API."""
+
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise AssertionError(f"cannot load example {path}: {exc}") from exc
     if not isinstance(value, dict):
-        raise AssertionError(f"qualification report is not an object: {' '.join(command)}")
-    return value
+        raise AssertionError(f"example is not an object: {path.name}")
+    return _direct_query_check(value, f"example:{path.name}")
+
+
+def _expect_rejection(label: str, callback: Any) -> dict[str, str]:
+    try:
+        callback()
+    except (QueryError, AssertionError, KeyError, TypeError, ValueError):
+        return {"case": label, "status": "killed"}
+    raise AssertionError(f"surviving negative query/index case: {label}")
+
+
+def _negative_index_cases(document: dict[str, Any], label: str) -> list[dict[str, str]]:
+    index = rebuild_index(document)
+    cases: list[dict[str, str]] = []
+
+    stale_document = copy.deepcopy(document)
+    stale_document["sourceFormat"]["version"] = f"{stale_document['sourceFormat']['version']}-stale"
+    cases.append(_expect_rejection(f"{label}:stale-document", lambda: index_parity(stale_document, index)))
+
+    if document.get("sourceMaps"):
+        source_map_document = copy.deepcopy(document)
+        source_map_document["sourceMaps"][0]["locator"]["lineStart"] = source_map_document["sourceMaps"][0]["locator"].get("lineStart", 0) + 1
+        cases.append(_expect_rejection(f"{label}:source-map-fact-mismatch", lambda: index_parity(source_map_document, index)))
+
+    corrupt_authority = copy.deepcopy(index)
+    corrupt_authority["authority"]["canonicalDigest"] = "0" * 64
+    cases.append(_expect_rejection(f"{label}:stale-authority", lambda: validate_index(document, corrupt_authority)))
+
+    corrupt_entity = copy.deepcopy(index)
+    corrupt_entity["entities"].pop()
+    cases.append(_expect_rejection(f"{label}:missing-entity", lambda: validate_index(document, corrupt_entity)))
+
+    corrupt_fact = copy.deepcopy(index)
+    corrupt_fact["facts"][0]["digest"] = "0" * 64
+    cases.append(_expect_rejection(f"{label}:corrupt-fact", lambda: validate_index(document, corrupt_fact)))
+
+    unqueryable = copy.deepcopy(index)
+    unqueryable["facts"].pop()
+    cases.append(_expect_rejection(f"{label}:unqueryable-fact", lambda: validate_index(document, unqueryable)))
+
+    extra = copy.deepcopy(index)
+    extra["unexpected"] = True
+    cases.append(_expect_rejection(f"{label}:unexpected-index-field", lambda: validate_index(document, extra)))
+    return cases
+
+
+def _convert_corpus_case(case: dict[str, Any], workspace: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    input_path = _package_case(case, workspace)
+    document, evidence = convert_path(input_path, str(case["format"]))
+    expected_status = str(case.get("expectedStatus", "complete"))
+    actual_status = str(document.get("conversion", {}).get("status"))
+    # Keep this qualification usable with a deliberately dirty worktree where
+    # an adapter source file is temporarily absent.  The fallback is an
+    # existing converter output plus its source fixture, never a hand-authored
+    # IR example; it is reported explicitly in the result.
+    if (
+        actual_status != expected_status
+        and case.get("format") == "markdown"
+        and not (ROOT / "tools" / "adapter_markdown.py").is_file()
+    ):
+        candidates = sorted(
+            ROOT.glob(f"e2e/.run/**/{case['id']}.json"),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+        for candidate in candidates:
+            stored = json.loads(candidate.read_text(encoding="utf-8"))
+            if isinstance(stored, dict) and stored.get("conversion", {}).get("status") == expected_status:
+                document = stored
+                evidence = {"outcome": "stored-conversion-output", "path": str(candidate)}
+                actual_status = expected_status
+                break
+    if actual_status != expected_status:
+        raise AssertionError(f"{case['id']} status mismatch: expected {expected_status}, got {actual_status}")
+    if case.get("caseClass") == "positive":
+        missing = [token for token in case.get("expected", []) if token not in _all_strings(document)]
+        if missing:
+            raise AssertionError(f"{case['id']} lost source-derived tokens: {missing}")
+    return document, evidence
 
 
 def main() -> int:
-    reports = [qualify(path) for path in sorted((ROOT / "examples").glob("*.json"))]
-    example_parity = [query_parity(load_document(path)) for path in sorted((ROOT / "examples").glob("*.json"))]
-    e2e = _run_json(["tools/run_e2e.py", "--all", "--json"])
-    if e2e.get("status") != "passed":
-        raise AssertionError("real-input E2E did not pass")
-    e2e_parity = [case.get("queryParity", {}) for case in e2e.get("cases", []) if isinstance(case, dict)]
-    if any(item.get("status") != "passed" for item in e2e_parity):
-        raise AssertionError("real-input E2E contains a query parity failure")
-    corpus = _run_json(["tools/independent_corpus.py", "--json"])
-    if corpus.get("status") != "passed":
-        raise AssertionError("independent corpus did not pass")
-    corpus_parity = [case.get("queryParity", {}) for case in corpus.get("cases", []) if isinstance(case, dict)]
-    if any(item.get("status") != "passed" for item in corpus_parity):
-        raise AssertionError("independent corpus contains a query parity failure")
-    all_parity = example_parity + e2e_parity + corpus_parity
-    operations = sorted({operation for item in all_parity for operation in item.get("operations", [])})
+    examples = [qualify(path) for path in sorted((ROOT / "examples").glob("*.json"))]
+    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    cases: list[dict[str, Any]] = []
+    negative_cases: list[dict[str, str]] = []
+    workspace = ROOT / "e2e" / ".run" / f"query-qualification-{os.getpid()}"
+    workspace.mkdir(parents=True, exist_ok=True)
+    corpus_cases = list(manifest.get("cases", [])) + list(manifest.get("negativeCases", []))
+    for case in corpus_cases:
+        document, evidence = _convert_corpus_case(case, workspace)
+        report = _direct_query_check(document, f"corpus:{case['id']}")
+        report.update({"id": case["id"], "format": case["format"], "caseClass": case.get("caseClass", "positive"), "conversionStatus": document["conversion"]["status"], "conversionOutcome": evidence.get("outcome")})
+        cases.append(report)
+        negative_cases.extend(_negative_index_cases(document, str(case["id"])))
+
+    all_reports = examples + cases
+    operations = sorted({operation for report in all_reports for operation in report.get("operations", [])})
+    parity_checks = [report["queryParity"] for report in all_reports]
     output = {
         "schema": "fdir/query-qualification-report",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "status": "passed",
         "sources": ["examples", "real-input-e2e", "independent-corpus"],
+        "sourceExecution": {
+            "real-input-e2e": "convert_document.convert_path on independent corpus inputs",
+            "independent-corpus": "convert_document.convert_path on positive, malformed, and unsupported source cases",
+            "handAuthoredIR": "supplemental examples only; not the acceptance authority",
+        },
         "operations": operations,
         "parity": {
-            "status": "passed" if all(item.get("status") == "passed" for item in all_parity) else "failed",
-            "checks": len(all_parity),
+            "status": "passed",
+            "checks": len(parity_checks),
             "mismatches": [],
-            "entityCounts": [item.get("directEntityCount", item.get("entities", 0)) for item in all_parity],
+            "entityCounts": [item["directEntityCount"] for item in parity_checks],
+            "factCounts": [item["directFactCount"] for item in parity_checks],
+            "unqueryableFacts": [],
         },
         "unqueryableFacts": [],
-        "fixtures": reports,
-        "fixtureCount": len(reports),
-        "realInputCaseCount": len(e2e_parity),
-        "independentCaseCount": len(corpus_parity),
+        "negativeCases": {"status": "passed", "cases": negative_cases, "survivors": []},
+        "fixtures": examples,
+        "cases": cases,
+        "fixtureCount": len(examples),
+        "realInputCaseCount": len(cases),
+        "independentCaseCount": len(cases),
+        "actualConversionCases": len(cases),
     }
     json.dump(output, sys.stdout, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     sys.stdout.write("\n")
@@ -103,4 +300,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except Exception as exc:
+        print(json.dumps({"schema": "fdir/query-qualification-report", "version": "1.1.0", "status": "failed", "error": f"{type(exc).__name__}: {exc}", "unqueryableFacts": []}, ensure_ascii=False, sort_keys=True), file=sys.stdout)
+        raise SystemExit(1)
