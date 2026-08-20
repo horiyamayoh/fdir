@@ -44,6 +44,7 @@ STRICT_COMPLETION_CONTRACT_PATH = ROOT / "machine" / "strict-completion-contract
 TRACEABILITY_PATH = ROOT / "machine" / "traceability.json"
 SCHEMA_PATH = ROOT / "schemas" / "document-form-ir.schema.json"
 EXAMPLES_PATH = ROOT / "examples"
+CLEAN_ROOM_REPLAY_PATH = ROOT / "e2e" / ".run" / "clean-room-replay.json"
 
 EXPECTED_REQUIREMENTS = 134
 EXPECTED_FAMILIES = 16
@@ -539,6 +540,7 @@ def check_real_input_e2e_assets() -> dict[str, int]:
         "tools/convert_document.py",
         "tools/generate_e2e_fixtures.py",
         "tools/run_e2e.py",
+        "tools/clean_room_replay.py",
         "e2e/README.md",
         "e2e/fixtures/README.md",
     }
@@ -551,6 +553,35 @@ def check_real_input_e2e_assets() -> dict[str, int]:
     for phrase in ("real-input", "evidence", "validate", "canonical", "query", "malformed", "unsupported", "resource-limit", "consumed"):
         require(phrase.casefold() in runner.casefold(), f"E2E runner lacks required check: {phrase}")
     return {"required_assets": len(required), "formats": 4, "e2e_issue": EXPECTED_E2E_ISSUE}
+
+
+def check_clean_room_replay() -> dict[str, int | str]:
+    """Require two successful, same-SHA clean-room E2E runs with no diff."""
+
+    report = load_json(CLEAN_ROOM_REPLAY_PATH)
+    require(report.get("schema") == "fdir/clean-room-replay-report", "clean-room replay report schema is missing")
+    require(report.get("version") == "1.0.0", "clean-room replay report version is invalid")
+    expected_sha = subprocess.run(
+        ["git", "-c", "core.fsmonitor=false", "rev-parse", "HEAD"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    ).stdout.strip()
+    require(report.get("sourceSha") == expected_sha, "clean-room replay source SHA does not match HEAD")
+    runs = report.get("runs")
+    require(isinstance(runs, list) and len(runs) == 2, "clean-room replay must contain exactly two runs")
+    for run in runs:
+        require(isinstance(run, dict) and run.get("status") == "passed" and run.get("returnCode") == 0 and run.get("timedOut") is False, "clean-room replay contains a non-passing run")
+        require(isinstance(run.get("reportDigest"), str) and re.fullmatch(r"[0-9a-f]{64}", run["reportDigest"]), "clean-room run report digest is invalid")
+    comparison = report.get("comparison")
+    require(isinstance(comparison, dict) and comparison.get("status") == "passed" and comparison.get("differenceCount") == 0 and comparison.get("differences") == [], "clean-room replay has an unexpected deterministic diff")
+    diff_digest = comparison.get("diffDigest")
+    require(isinstance(diff_digest, str) and re.fullmatch(r"[0-9a-f]{64}", diff_digest), "clean-room diff digest is invalid")
+    require(report.get("status") == "passed", "clean-room replay report is not passed")
+    return {"runs": len(runs), "difference_count": int(comparison["differenceCount"]), "diff_digest": diff_digest}
 
 
 def check_documents() -> dict[str, int]:
@@ -757,6 +788,7 @@ def main(argv: list[str] | None = None) -> int:
         ("schema", check_schema),
         ("examples", check_examples),
         ("real_input_e2e_assets", check_real_input_e2e_assets),
+        ("clean_room_replay", check_clean_room_replay),
         ("documents_and_boundaries", check_documents),
     )
     for name, function in check_functions:

@@ -1,5 +1,7 @@
 name: Document Form IR design validation
 
+run-name: Qualification ${{ github.ref_name }} @ ${{ github.sha }}
+
 on:
   push:
     branches: [main]
@@ -7,6 +9,11 @@ on:
 
 permissions:
   contents: read
+  issues: read
+
+concurrency:
+  group: fdir-qualification-${{ github.workflow }}-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: false
 
 jobs:
   design:
@@ -24,6 +31,8 @@ jobs:
         run: python tools/validate_qualification_bundle.py --schema-only
       - name: Run Evidence integrity matrix
         run: python tools/test_evidence_integrity.py --all
+      - name: Run clean-room replay
+        run: python tools/clean_room_replay.py --source-sha "${{ github.sha }}"
       - name: Build commit-bound qualification bundle
         shell: bash
         run: |
@@ -42,9 +51,23 @@ jobs:
         run: python tools/run_e2e.py --all
       - name: Upload qualification bundle
         if: always()
+        id: upload
         uses: actions/upload-artifact@v4
         with:
           name: fdir-qualification-bundle-${{ github.sha }}
           path: ${{ runner.temp }}/qualification
           if-no-files-found: error
           retention-days: 14
+      - name: Publish qualification links
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Qualification evidence"
+            echo "- Source commit: https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
+            echo "- Workflow run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "- Artifact: ${{ steps.upload.outputs.artifact-url }}"
+            echo "- Artifact ID: ${{ steps.upload.outputs.artifact-id }}"
+            echo "- Artifact SHA-256: ${{ steps.upload.outputs.artifact-digest }}"
+            echo "- Retention: 14 days (expires 14 days after upload)"
+          } >> "$GITHUB_STEP_SUMMARY"
