@@ -1,56 +1,28 @@
 ## Owning issue
 
-Closes/relates to: <!-- required issue reference -->
-Roadmap milestone: <!-- required for product work -->
+Closes/relates to: <!-- DFIR-I-xxx -->
 
-## What changed and why
+## Scope
 
-<!-- Describe the bounded change and its user/developer impact. -->
+- Requirements:
+- Acceptance families:
+- Changed paths:
+- Explicit exclusions:
 
-## Authority and claim impact
+## Boundary review
 
-- [ ] No normative or production-claim impact
-- [ ] Changes canonical machine/normative source
-- [ ] Changes generated normative contracts
-- [ ] Changes capability/claim/qualification evidence
-- [ ] Changes implementation boundary, dependency manifest/catalog, evidence lanes, normalization, or process isolation
+- [ ] No semantic interpretation, business rule, truth, causality, or semantic equivalence was added.
+- [ ] No source-byte archive, content-addressed source store, byte census, or accounting closure was added.
+- [ ] Core fields remain typed; no free property bag or predicate/value field was added.
+- [ ] Source, normalized, stored, cached, computed, displayed, rendered, and observed facts remain distinct.
+- [ ] Style, layout, geometry, relation, and order changes include invariants or examples.
+- [ ] Unknown, unsupported, approximate, ambiguous, unavailable, and failed outcomes remain explicit.
+- [ ] Query indexes and renderer outputs remain non-authoritative.
 
-Explain the selected impact, including model/protocol/migration compatibility:
+## Verification
 
-## Owned paths and coordination
+Commands:
 
-<!-- List changed paths and any shared seams coordinated with other issues. -->
+Results:
 
-## Verification evidence
-
-Commands and results:
-
-```text
-# exact commands and concise result summaries
-```
-
-- [ ] Local `python3 tools/quality.py --mode full --cache-policy off .` completed, or an unavailable check is explicitly recorded
-- [ ] Required GitHub Actions check `quality / full` passed for this head revision
-- [ ] Generated-contract parity checked when applicable
-- [ ] `python3 tools/validate_implementation_policy.py --check --self-test --json .` passed when policy, dependencies, workers, or handoff are affected
-- [ ] Positive behavior checked
-- [ ] Negative/non-success behavior checked
-- [ ] Documentation/examples checked when applicable
-- [ ] A check that did not run is recorded as unavailable, not passed
-
-## Status and claim discipline
-
-- [ ] Partial, unsupported, unresolved, indeterminate, unreadable, policy-blocked, resource-limited, cancelled, and failed states remain visible
-- [ ] Native substrate/census, semantic helper, renderer, OCR/inference, and storage/codec lanes remain distinct
-- [ ] High-level helper output is not used as the sole native evidence or independent census
-- [ ] No placeholder, skipped test, empty discovery, or demo result is presented as production qualification
-- [ ] Production claims, if affected, name the exact format/capability/profile tuple and qualification evidence
-
-## Deferred and out-of-scope work
-
-<!-- Link follow-up issues. State "none" only after checking roadmap #4. -->
-
-## Security and sensitive data
-
-- [ ] This change contains no credentials, confidential source documents, or public exploit details
-- [ ] Security-sensitive material was handled through SECURITY.md
+Known loss or limitation:

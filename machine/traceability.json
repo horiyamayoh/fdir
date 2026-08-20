@@ -1,0 +1,26 @@
+{
+  "schema": "fdir/document-form-traceability",
+  "version": "1.0.0",
+  "authoritativeInputs": [
+    "machine/requirements.json",
+    "machine/acceptance-tests.json",
+    "machine/issue-plan.json",
+    "machine/github-issue-map.json",
+    "machine/legacy-issue-map.json",
+    "schemas/document-form-ir.schema.json"
+  ],
+  "derivation": {
+    "requirementToIssue": "requirements.ownerIssue",
+    "requirementToAcceptance": "requirements.acceptanceTests",
+    "acceptanceFamilyExpansion": "acceptance-tests.families",
+    "generatedViews": ["issue checklists", "review tables", "CI summaries"]
+  },
+  "rules": [
+    "Every must requirement has an acceptance test family.",
+    "Every requirement owner is an issue-plan entry.",
+    "Every issue declares owned paths and deliverables.",
+    "Generated views are not normative authorities.",
+    "A completed issue cannot contain an unverified owned requirement.",
+    "Semantic interpretation and source-byte archival are never valid completion evidence."
+  ]
+}

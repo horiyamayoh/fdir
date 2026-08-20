@@ -1,118 +1,55 @@
-# FDIR 2.1 — Full-fidelity Document Information Representation
+# FDIR — Document Form IR
 
-FDIR is an intermediate representation and compiler architecture for extracting **recorded information** from documents without making downstream consumers depend on whether the carrier was DOCX, XLSX, PDF, Markdown, or another format.
+FDIR は、DOCX、XLSX、PDF、Markdown などに記録された構造・表現・配置・表示・作成上の事実を、形式差を吸収した型付き・検証可能・機械可読な **Document Form IR** へ変換するための設計と実装のリポジトリです。
 
-> The product-facing IR describes **what was recorded**. The evidence substrate describes **where it appeared, what physically carried it, and why a converter made each statement**. Neither side may substitute for the other.
+一文で言えば、**FDIR は文書が何を意味するかを推論せず、文書がどのような形式で記録・配置・表示されているかを共通表現にする製品**です。
 
-## Baseline status
+## 重要な境界
 
-| Item | Status |
-|---|---|
-| Normative baseline | `FDIR 2.1.0` |
-| Design status | Final and frozen for the 2.1 line |
-| Logical authority | `machine/logical-model.yaml` + `tools/generate_contracts.py` |
-| Repository quality | `python3 tools/quality.py --mode full --cache-policy off .` |
-| Implementation boundary | Rust-first product; CPython source/verification oracle; frozen by ADR 0004 and Issue #32 |
-| Dependency admission | Exact manifest + evidence lanes + isolation policy; no product runtime dependency currently admitted |
-| Release claim scope | Scope revision `1`; four tuples; `development-unqualified` |
-| Release traceability | `python3 tools/validate_release_traceability.py --check --self-test .` |
-| Production converter implementation | Not provided by this baseline |
-| Qualification claim | None |
-| Baseline import issue | [#2](https://github.com/horiyamayoh/fdir/issues/2) |
-| Product umbrella issue | [#1](https://github.com/horiyamayoh/fdir/issues/1) |
-| Completion roadmap | [#4](https://github.com/horiyamayoh/fdir/issues/4) |
-| Release scope issue | [#5](https://github.com/horiyamayoh/fdir/issues/5) |
-| Quality framework issue | [#6](https://github.com/horiyamayoh/fdir/issues/6) |
-| Foundation decision issue | [#32](https://github.com/horiyamayoh/fdir/issues/32) |
-| First product implementation issue | [#7](https://github.com/horiyamayoh/fdir/issues/7) |
-| Adapter protocol implementation | `1.0.0`; Issue [#12](https://github.com/horiyamayoh/fdir/issues/12); implemented-unqualified |
+| 層 | 所有するもの | 所有しないもの |
+| --- | --- | --- |
+| Parser / Adapter | 入力形式を読み、形式上の事実を typed core と形式拡張へ変換する | 業務上の意味、真偽、因果、要求判定 |
+| Document Form IR | 構造、文字、表、書式、スタイル、配置、幾何、描画順、数式の各表現、変換状態 | 元バイトの保管、意味論、cross-format semantic equivalence |
+| Renderer / Query / Export | IR の表示・検索・出力、観測結果の付加 | source-declared fact の上書き、意味の確定 |
+| Semantic IR | 将来の downstream 層。概念・意図・業務ルールを解釈する | FDIR の形式事実を権威として再定義すること |
 
-A successful schema validation or example extraction is not a production claim. A capability becomes production-qualified only for an exact format/capability/profile tuple backed by qualification evidence.
+## 非目標
 
-## Decisive model
+- 元ファイル全体のバイト列、ZIP 物理配置、PDF の未参照バイトを IR の中核に保存しない。
+- 原典の完全復元、exact round trip、フォレンジック証拠保全を製品目標にしない。
+- predicate: string、value: any、自由な property bag を共通モデルにしない。
+- 赤字が警告、矢印が因果、文章が要求、といった意味を推論しない。
+- 異形式文書の業務的同値性、正しさ、矛盾、コード生成を判定しない。
 
-```text
-Recorded-information axis                 Evidence axis
-─────────────────────────                 ─────────────
-InformationUnit                           Artifact
-InformationRelation                       Carrier
-RecordAssertion  <--------------------->  Selector / Occurrence
-AcceptedProjection                        Surface / Geometry / Observation
-EquivalenceCertificate                    InventoryDomain / AccountingItem
-```
+原典 hash、キャッシュキー、入力管理情報が運用上必要な場合は、IR 外側の任意の ingestion metadata として扱います。IR の digest は IR の決定的表現から計算できますが、原典バイト digest を IR identity に含めません。
 
-`InformationUnit` is deliberately an identity/construction anchor. Unit class, facet values, relations, visibility, lineage, and limitations are statements in `RecordAssertion`. This prevents OCR, heuristics, or conflicting candidates from appearing authoritative merely because a consumer reads a convenient object.
+## 正規文書
 
-## Authority order
+- [製品定義と用語](docs/01-product-definition.md)
+- [アーキテクチャと層境界](docs/02-architecture.md)
+- [型付き論理モデル](docs/03-logical-model.md)
+- [四形式のマッピング](docs/04-format-mapping.md)
+- [シリアライズ・拡張・状態](docs/05-serialization-and-extensions.md)
+- [問い合わせ・実装境界](docs/06-interfaces-and-implementation.md)
+- [検証計画と Issue 分割](docs/07-verification-and-issues.md)
+- [厳格レビューとリポジトリ移行判断](docs/08-review-and-reset.md)
+- [機械可読要件](machine/requirements.json)
+- [受入テスト](machine/acceptance-tests.json)
+- [Issue 設計](machine/issue-plan.json)
+- [JSON Schema](schemas/document-form-ir.schema.json)
 
-1. `machine/logical-model.yaml` and pinned `tools/generate_contracts.py` are the core logical authority.
-2. Generated contracts are normative only when byte-identical to regeneration.
-3. Requirements, acceptance tests, profiles, capability registries, ADRs, and the versioned `release/` scope registries are additional normative authorities.
-4. `machine/implementation-policy.yaml` governs implementation language, evidence lanes, isolation, dependency admission, and the product-development handoff without changing the language-neutral FDIR 2.1 semantics.
-5. Markdown specifications explain intent and operating rules.
-6. PDF, DOCX, PNG, SVG, reports, indexes, and binary qualification bundles are generated projections or evidence packages, never canonical authority.
+## 現在の状態
 
-## Repository map
+この変更は製品実装のリセットです。旧 assertion-first／evidence／accounting／source-byte storage 実装は退役させ、上記文書・スキーマ・要件を新しい開発の権威にします。現時点で四形式の変換器が完成したことは主張しません。実装は新 Issue 群を順に完了した時点で追加します。
 
-| Path | Purpose |
-|---|---|
-| `spec/` | Normative explanatory specification and generated reference |
-| `machine/` | Logical model, profiles, requirements, tests, ADRs, migration, and backlog boundary |
-| `release/` | Claim manifest, end-to-end traceability, deferred scope, blocker policy, scope approvals, and the product-development handoff |
-| `schemas/` | Deterministically generated core contracts |
-| `tools/` | Contract, traceability, canonicalization, and repository-quality validators |
-| `tests/` | Standard-library unit and integration-style repository gate tests |
-| `quality/` | Pinned toolchain and required-check, cache, and receipt policy |
-| `examples/` | Assertion-first logical examples |
-| `fixtures/` | Positive, negative, and canonical vectors |
-| `matrices/` | Generated requirement/test, claim, traceability, and design-status projections |
-| `queries/` | Format-neutral query examples over the generated SQLite projection |
-| `references/` | Packaging, terminology, and authority notes |
-| `diagrams/` | Mermaid diagram sources |
+設計成果物の整合性は次で確認できます。
 
-## Project policies
+    python tools/validate_design.py
 
-- [Contributing and issue lifecycle](CONTRIBUTING.md)
-- [Development and build policy](DEVELOPMENT.md)
-- [Repository quality and required-check policy](quality/README.md)
-- [Product-development handoff](release/development-handoff.md)
-- [Dependency candidate assessment baseline](references/dependency-candidate-assessments.md)
-- [Adapter protocol and isolation boundary](references/adapter-protocol.md)
-- [Security and private vulnerability reporting](SECURITY.md)
-- [Apache License 2.0](LICENSE)
-- [Issue intake forms](.github/ISSUE_TEMPLATE/)
-- [Pull request checklist](.github/pull_request_template.md)
+GitHub issue key/number mapping is recorded in [machine/github-issue-map.json](machine/github-issue-map.json). The disposition of superseded legacy issues is recorded in [machine/legacy-issue-map.json](machine/legacy-issue-map.json).
 
-The project owner currently permits small validated commits directly to `main`; external contributions should normally use a focused issue and pull request. Issue and PR templates require ownership, acceptance criteria, evidence, claim impact, and intentionally deferred work.
+要件は 120 件を下回らない粒度へ展開し、各要件に受入テストと担当 Issue を割り当てます。Issue を閉じる条件は、実装・テスト・文書・未対応状態の説明がそろい、未所有要件がないことです。
 
-## Validate
+## ライセンスと安全性
 
-The required local and CI integration command is:
-
-```bash
-python3 tools/quality.py --mode full --cache-policy off .
-```
-
-It uses only CPython's standard library and checks the pinned toolchain, text format, Python lint, documentation links, the frozen implementation/dependency policy, generated-contract byte parity, JSON Schema/JSON-LD/CDDL/SQLite contract structure, positive and negative fixtures, normative requirement/test traceability, baseline and release-scope traceability, unit tests, CI policy, repository policy, and unsupported production claims. The default machine-readable receipt is `reports/quality/full.json`.
-
-For a shorter edit loop that cannot certify integration or release:
-
-```bash
-python3 tools/quality.py --mode fast --cache-policy off .
-```
-
-To demonstrate that every major gate rejects an intentional defect:
-
-```bash
-python3 tools/quality.py --self-test-gates .
-```
-
-Explicit `read-write` and `read-only` cache policies are available for equivalence checks; neither policy skips authoritative gates. `release` mode adds fail-closed qualification and intentionally fails while the claim manifest remains `development-unqualified`. See [the repository quality policy](quality/README.md) for the mode matrix, receipt schemas, cache rules, exact required check name, and release boundary.
-
-The lower-level validators remain available for focused diagnosis:
-
-```bash
-python3 tools/validate_baseline.py .
-python3 tools/validate_implementation_policy.py --check --self-test --json .
-python3 tools/validate_release_traceability.py --check --self-test --json .
-```
+ライセンス、脆弱性報告、コントリビューションの規則はそれぞれ [LICENSE](LICENSE)、[SECURITY.md](SECURITY.md)、[CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。入力文書は不可信データとして扱い、parser、renderer、OCR は必要に応じて隔離された adapter 境界へ置きます。

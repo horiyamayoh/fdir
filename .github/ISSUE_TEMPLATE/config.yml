@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Report a security vulnerability privately
+  - name: Security report
     url: https://github.com/horiyamayoh/fdir/security/advisories/new
-    about: Do not disclose vulnerabilities or sensitive reproductions in a public issue.
-  - name: Review the production roadmap
-    url: https://github.com/horiyamayoh/fdir/issues/4
-    about: Check existing milestones, dependencies, and ownership before opening new work.
+    about: Do not disclose vulnerabilities or customer documents in a public issue.
+  - name: Document Form IR design
+    url: https://github.com/horiyamayoh/fdir/blob/main/docs/01-product-definition.md
+    about: Read the product boundary before filing implementation work.

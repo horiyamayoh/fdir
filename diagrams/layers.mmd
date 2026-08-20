@@ -1,0 +1,6 @@
+flowchart LR
+  A[Parser / Adapter] --> B[Document Form IR]
+  B --> C[Renderer / Query / Export]
+  B --> D[Downstream Semantic IR]
+  C --> B
+  E[Ingestion metadata] -. outside IR .-> A

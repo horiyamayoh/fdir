@@ -1,0 +1,13 @@
+flowchart TD
+  input[DOCX XLSX PDF Markdown] --> inspect[Inspect format]
+  inspect --> parse[Parse source-declared form facts]
+  parse --> map[Map typed common core]
+  parse --> ext[Map typed namespace extension]
+  map --> assemble[Assemble Document Form]
+  ext --> assemble
+  observe[Renderer or OCR] --> observation[Observation entities]
+  observation --> assemble
+  assemble --> report[ConversionReport and Diagnostic]
+  report --> canonical[Canonical serialization]
+  canonical --> query[Query and export]
+  canonical --> index[Rebuildable non-authoritative index]

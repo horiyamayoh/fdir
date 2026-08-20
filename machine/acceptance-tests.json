@@ -1,0 +1,27 @@
+{
+  "schema": "fdir/document-form-acceptance-tests",
+  "version": "1.0.0",
+  "execution": {
+    "command": "python tools/run_acceptance.py --family <family> --case <number>",
+    "stableComparison": "canonical-json-or-diagnostic-code",
+    "notAProductionClaim": true
+  },
+  "families": [
+    {"id":"AT-BND","requirementPrefix":"DFIR-BND-","count":8,"kind":"boundary","command":"check product definition and semantic firewall","expected":"only form facts are in scope"},
+    {"id":"AT-AUTH","requirementPrefix":"DFIR-AUTH-","count":8,"kind":"authority","command":"check authority and generated-artifact rules","expected":"schema, canonical IR, and downstream boundaries are distinct"},
+    {"id":"AT-MODEL","requirementPrefix":"DFIR-MODEL-","count":10,"kind":"schema-invariant","command":"validate core entity model","expected":"typed entities and references validate"},
+    {"id":"AT-TYPE","requirementPrefix":"DFIR-TYPE-","count":8,"kind":"schema-negative","command":"validate typed primitive cases","expected":"free any/property bags are rejected"},
+    {"id":"AT-STYLE","requirementPrefix":"DFIR-STYLE-","count":8,"kind":"style-invariant","command":"validate authored/inherited/theme/direct/resolved styles","expected":"style lineage is preserved and cycles fail"},
+    {"id":"AT-LAYOUT","requirementPrefix":"DFIR-LAYOUT-","count":12,"kind":"geometry-invariant","command":"validate geometry, anchor, connector, and order cases","expected":"coordinate and order facts remain distinct"},
+    {"id":"AT-VALUE","requirementPrefix":"DFIR-VALUE-","count":8,"kind":"value-separation","command":"validate stored/cached/computed/displayed/observed cases","expected":"distinct values are not aliases"},
+    {"id":"AT-STATUS","requirementPrefix":"DFIR-STATUS-","count":8,"kind":"partial-conversion","command":"validate status and diagnostics","expected":"loss is explicit at document, feature, node, or field scope"},
+    {"id":"AT-EXT","requirementPrefix":"DFIR-EXT-","count":8,"kind":"extension-compatibility","command":"validate known, unknown, critical, and versioned extensions","expected":"critical unknowns cannot become complete"},
+    {"id":"AT-IO","requirementPrefix":"DFIR-IO-","count":8,"kind":"canonicalization","command":"serialize and migrate canonical IR","expected":"canonical bytes are deterministic and source-byte independent"},
+    {"id":"AT-DOCX","requirementPrefix":"DFIR-DOCX-","count":8,"kind":"format-golden","command":"run DOCX form mapping fixtures","expected":"Word form facts map without semantic assertions"},
+    {"id":"AT-XLSX","requirementPrefix":"DFIR-XLSX-","count":8,"kind":"format-golden","command":"run XLSX form mapping fixtures","expected":"formula, values, display, style, and anchor remain separate"},
+    {"id":"AT-PDF","requirementPrefix":"DFIR-PDF-","count":8,"kind":"format-golden","command":"run PDF form and observation fixtures","expected":"glyph, path, clip, source, renderer, and OCR remain separate"},
+    {"id":"AT-MD","requirementPrefix":"DFIR-MD-","count":8,"kind":"format-golden","command":"run Markdown form mapping fixtures","expected":"source authoring facts and normalized structure remain separate"},
+    {"id":"AT-QUERY","requirementPrefix":"DFIR-QUERY-","count":8,"kind":"query","command":"run typed query and index fixtures","expected":"requested form facts are queryable without meaning predicates"},
+    {"id":"AT-QA","requirementPrefix":"DFIR-QA-","count":8,"kind":"quality","command":"run schema, malformed, partial, compatibility, and resource suites","expected":"all required test classes execute with stable results"}
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "schema": {"name": "fdir/document-form", "version": "1.0.0"},
+  "documentId": "doc-callout",
+  "sourceFormat": {"namespace": "format", "name": "docx", "version": "ecma-376"},
+  "rootNodeId": "node-paragraph",
+  "parts": [{"partId": "part-document", "kind": "document-body", "rootNodeIds": ["node-paragraph", "node-callout", "node-connector"]}],
+  "surfaces": [{"surfaceId": "surface-page-1", "partId": "part-document", "kind": "page", "coordinateSpaceId": "space-page-1"}],
+  "nodes": [
+    {"nodeId": "node-paragraph", "kind": "paragraph", "partId": "part-document", "childIds": ["node-run"], "status": "preserved"},
+    {"nodeId": "node-run", "kind": "run", "partId": "part-document", "parentId": "node-paragraph", "childIds": [], "textIds": ["text-body"], "status": "preserved"},
+    {"nodeId": "node-callout", "kind": "textBox", "partId": "part-document", "childIds": [], "textIds": ["text-callout"], "geometryId": "geometry-callout", "layoutIds": ["layout-callout"], "status": "preserved"},
+    {"nodeId": "node-connector", "kind": "connector", "partId": "part-document", "childIds": [], "geometryId": "geometry-connector", "layoutIds": ["layout-connector"], "status": "normalized"}
+  ],
+  "texts": [
+    {"textId": "text-body", "representation": "source", "provenance": "authored", "value": "本文の対象箇所", "status": "preserved"},
+    {"textId": "text-callout", "representation": "source", "provenance": "authored", "value": "確認してください", "status": "preserved"}
+  ],
+  "coordinateSpaces": [{"coordinateSpaceId": "space-page-1", "unit": "pt", "origin": {"x": "0", "y": "0"}}],
+  "geometries": [
+    {"geometryId": "geometry-callout", "spaceId": "space-page-1", "kind": "rectangle", "primitives": [{"kind": "rectangle", "x": "120", "y": "80", "width": {"value": "180", "unit": "pt"}, "height": {"value": "70", "unit": "pt"}}], "status": "preserved"},
+    {"geometryId": "geometry-connector", "spaceId": "space-page-1", "kind": "bezier", "primitives": [{"kind": "bezier", "segments": [{"kind": "move", "to": {"x": "210", "y": "150"}}, {"kind": "bezier", "points": [{"x": "210", "y": "150"}, {"x": "150", "y": "180"}, {"x": "90", "y": "220"}]}], "arrowhead": "triangle"}], "status": "normalized"}
+  ],
+  "layouts": [
+    {"layoutId": "layout-callout", "targetId": "node-callout", "surfaceId": "surface-page-1", "placement": "floating", "anchor": {"kind": "page", "surfaceId": "surface-page-1"}, "declaredGeometryId": "geometry-callout", "zIndex": 20, "status": "preserved"},
+    {"layoutId": "layout-connector", "targetId": "node-connector", "surfaceId": "surface-page-1", "placement": "floating", "anchor": {"kind": "endpoint-pair", "nodeId": "node-paragraph"}, "declaredGeometryId": "geometry-connector", "zIndex": 19, "status": "normalized"}
+  ],
+  "relations": [{"relationId": "relation-connector-target", "kind": "connectorTarget", "fromId": "node-connector", "toId": "node-paragraph", "endpoint": "to", "status": "preserved"}],
+  "orders": [{"orderId": "order-paint", "kind": "draw", "ownerId": "surface-page-1", "items": [{"id": "node-paragraph", "ordinal": 0}, {"id": "node-connector", "ordinal": 1}, {"id": "node-callout", "ordinal": 2}], "status": "preserved"}],
+  "extensions": [{"extensionId": "extension-docx-callout", "targetId": "node-callout", "namespace": "urn:fdir:format:docx", "type": "drawingml-callout", "schemaVersion": "1.0.0", "schemaId": "urn:fdir:schema:docx-callout", "criticality": "non-critical", "payload": {"presetGeometry": "wedgeRoundRectCallout"}}],
+  "conversion": {"status": "complete", "features": [{"feature": "callout-geometry", "status": "preserved"}, {"feature": "connector-target-candidate", "status": "normalized"}], "diagnostics": []}
+}

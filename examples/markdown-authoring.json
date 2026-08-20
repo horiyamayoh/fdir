@@ -1,0 +1,11 @@
+{
+  "schema": {"name": "fdir/document-form", "version": "1.0.0"},
+  "documentId": "doc-markdown",
+  "sourceFormat": {"namespace": "format", "name": "markdown", "version": "commonmark"},
+  "rootNodeId": "node-document",
+  "nodes": [{"nodeId": "node-document", "kind": "document", "childIds": ["node-paragraph"], "status": "preserved"}, {"nodeId": "node-paragraph", "kind": "paragraph", "parentId": "node-document", "childIds": ["node-run"], "status": "preserved"}, {"nodeId": "node-run", "kind": "run", "parentId": "node-paragraph", "childIds": [], "textIds": ["text-source"], "status": "preserved"}],
+  "texts": [{"textId": "text-source", "representation": "source", "provenance": "authored", "value": "**重要**", "status": "preserved"}, {"textId": "text-normalized", "representation": "normalized", "provenance": "decoded", "value": "重要", "sourceTextId": "text-source", "status": "normalized"}],
+  "extensions": [{"extensionId": "extension-markdown-authoring", "targetId": "node-run", "namespace": "urn:fdir:format:markdown", "type": "authoring-facts", "schemaVersion": "1.0.0", "schemaId": "urn:fdir:schema:markdown-authoring", "criticality": "non-critical", "payload": {"delimiter": "**", "referenceStyle": "inline", "rawHtml": false, "escaping": []}}],
+  "sourceMaps": [{"sourceMapId": "map-markdown-run", "targetId": "node-run", "format": {"namespace": "format", "name": "markdown", "version": "commonmark"}, "locator": {"kind": "markdown", "lineStart": 1, "columnStart": 1, "lineEnd": 1, "columnEnd": 8, "tokenStart": 0, "tokenEnd": 8}}],
+  "conversion": {"status": "complete", "features": [{"feature": "block-structure", "status": "preserved"}, {"feature": "authoring-delimiter", "targetId": "node-run", "status": "preserved"}], "diagnostics": []}
+}

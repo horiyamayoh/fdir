@@ -1,0 +1,698 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/horiyamayoh/fdir/schema/document-form-ir/1.0.0",
+  "title": "Document Form IR",
+  "description": "Typed common document-form facts with namespaced format extensions. It is not a semantic IR and does not contain source-byte archives.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "documentId",
+    "sourceFormat",
+    "rootNodeId",
+    "nodes",
+    "conversion"
+  ],
+  "properties": {
+    "schema": {"$ref": "#/$defs/schemaRef"},
+    "documentId": {"$ref": "#/$defs/id"},
+    "sourceFormat": {"$ref": "#/$defs/formatRef"},
+    "rootNodeId": {"$ref": "#/$defs/id"},
+    "parts": {"type": "array", "items": {"$ref": "#/$defs/part"}},
+    "surfaces": {"type": "array", "items": {"$ref": "#/$defs/surface"}},
+    "nodes": {"type": "array", "items": {"$ref": "#/$defs/node"}},
+    "texts": {"type": "array", "items": {"$ref": "#/$defs/text"}},
+    "tables": {"type": "array", "items": {"$ref": "#/$defs/table"}},
+    "styles": {"type": "array", "items": {"$ref": "#/$defs/style"}},
+    "layouts": {"type": "array", "items": {"$ref": "#/$defs/layout"}},
+    "coordinateSpaces": {"type": "array", "items": {"$ref": "#/$defs/coordinateSpace"}},
+    "geometries": {"type": "array", "items": {"$ref": "#/$defs/geometry"}},
+    "resources": {"type": "array", "items": {"$ref": "#/$defs/resource"}},
+    "formulas": {"type": "array", "items": {"$ref": "#/$defs/formula"}},
+    "fields": {"type": "array", "items": {"$ref": "#/$defs/field"}},
+    "annotations": {"type": "array", "items": {"$ref": "#/$defs/annotation"}},
+    "relations": {"type": "array", "items": {"$ref": "#/$defs/relation"}},
+    "orders": {"type": "array", "items": {"$ref": "#/$defs/order"}},
+    "observations": {"type": "array", "items": {"$ref": "#/$defs/observation"}},
+    "extensions": {"type": "array", "items": {"$ref": "#/$defs/extension"}},
+    "sourceMaps": {"type": "array", "items": {"$ref": "#/$defs/sourceMap"}},
+    "diagnostics": {"type": "array", "items": {"$ref": "#/$defs/diagnostic"}},
+    "conversion": {"$ref": "#/$defs/conversionReport"}
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_.:/-]{0,127}$"
+    },
+    "decimal": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+    },
+    "schemaRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"type": "string", "const": "fdir/document-form"},
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"}
+      }
+    },
+    "formatRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "name", "version"],
+      "properties": {
+        "namespace": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "enum": ["docx", "xlsx", "pdf", "markdown", "pptx", "html", "odt", "ods", "svg", "text"]},
+        "version": {"type": "string", "minLength": 1}
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["preserved", "normalized", "approximated", "ambiguous", "unsupported", "omitted-by-policy", "unavailable", "failed"]
+    },
+    "visibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["declared"],
+      "properties": {
+        "declared": {"type": "string", "enum": ["visible", "hidden", "unknown"]},
+        "computed": {"type": "string", "enum": ["visible", "hidden", "unknown"]},
+        "reason": {"type": "string"}
+      }
+    },
+    "length": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "unit"],
+      "properties": {
+        "value": {"$ref": "#/$defs/decimal"},
+        "unit": {"type": "string", "enum": ["pt", "px", "emu", "twip", "mm", "cm", "in", "percent", "cell"]}
+      }
+    },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": {"$ref": "#/$defs/decimal"},
+        "y": {"$ref": "#/$defs/decimal"}
+      }
+    },
+    "transform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["a", "b", "c", "d", "e", "f"],
+      "properties": {
+        "a": {"$ref": "#/$defs/decimal"},
+        "b": {"$ref": "#/$defs/decimal"},
+        "c": {"$ref": "#/$defs/decimal"},
+        "d": {"$ref": "#/$defs/decimal"},
+        "e": {"$ref": "#/$defs/decimal"},
+        "f": {"$ref": "#/$defs/decimal"}
+      }
+    },
+    "ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/id"}
+      }
+    },
+    "part": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["partId", "kind", "rootNodeIds"],
+      "properties": {
+        "partId": {"$ref": "#/$defs/id"},
+        "kind": {"type": "string", "minLength": 1},
+        "parentPartId": {"$ref": "#/$defs/id"},
+        "name": {"type": "string"},
+        "rootNodeIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "surfaceIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "visibility": {"$ref": "#/$defs/visibility"},
+        "status": {"$ref": "#/$defs/status"}
+      }
+    },
+    "surface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["surfaceId", "partId", "kind"],
+      "properties": {
+        "surfaceId": {"$ref": "#/$defs/id"},
+        "partId": {"$ref": "#/$defs/id"},
+        "kind": {"type": "string", "minLength": 1},
+        "ordinal": {"type": "integer", "minimum": 0},
+        "coordinateSpaceId": {"$ref": "#/$defs/id"},
+        "gridId": {"$ref": "#/$defs/id"},
+        "layoutIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "visibility": {"$ref": "#/$defs/visibility"},
+        "status": {"$ref": "#/$defs/status"}
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nodeId", "kind", "childIds", "status"],
+      "properties": {
+        "nodeId": {"$ref": "#/$defs/id"},
+        "kind": {"type": "string", "enum": ["document", "section", "paragraph", "run", "heading", "list", "table", "row", "column", "cell", "shape", "textBox", "connector", "image", "chart", "glyph", "path", "field", "annotation", "resource"]},
+        "partId": {"$ref": "#/$defs/id"},
+        "parentId": {"$ref": "#/$defs/id"},
+        "childIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "textIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "styleIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "directStyleId": {"$ref": "#/$defs/id"},
+        "resolvedStyleId": {"$ref": "#/$defs/id"},
+        "layoutIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "geometryId": {"$ref": "#/$defs/id"},
+        "formulaFieldId": {"$ref": "#/$defs/id"},
+        "formulaId": {"$ref": "#/$defs/id"},
+        "fieldId": {"$ref": "#/$defs/id"},
+        "annotationIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "resourceIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "status": {"$ref": "#/$defs/status"},
+        "visibility": {"$ref": "#/$defs/visibility"},
+        "address": {"$ref": "#/$defs/cellAddress"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"kind": {"const": "run"}}},
+          "then": {"required": ["textIds"]}
+        },
+        {
+          "if": {"properties": {"kind": {"const": "cell"}}},
+          "then": {"required": ["address"]}
+        },
+        {
+          "if": {"properties": {"kind": {"enum": ["shape", "textBox", "connector", "image", "chart", "glyph", "path"]}}},
+          "then": {"required": ["geometryId"]}
+        }
+      ]
+    },
+    "text": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["textId", "representation", "provenance", "value", "status"],
+      "properties": {
+        "textId": {"$ref": "#/$defs/id"},
+        "representation": {"type": "string", "enum": ["source", "normalized", "stored", "computed", "displayed", "rendered", "observed"]},
+        "provenance": {"type": "string", "enum": ["authored", "decoded", "calculated", "formatter", "renderer", "ocr"]},
+        "value": {"type": "string"},
+        "sourceTextId": {"$ref": "#/$defs/id"},
+        "status": {"$ref": "#/$defs/status"}
+      }
+    },
+    "cellAddress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["row", "column"],
+      "properties": {
+        "sheetId": {"$ref": "#/$defs/id"},
+        "row": {"type": "integer", "minimum": 1},
+        "column": {"type": "integer", "minimum": 1}
+      }
+    },
+    "table": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tableId", "nodeId", "rowIds", "columnIds", "cellIds"],
+      "properties": {
+        "tableId": {"$ref": "#/$defs/id"},
+        "nodeId": {"$ref": "#/$defs/id"},
+        "rowIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "columnIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "cellIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "mergedRanges": {"type": "array", "items": {"$ref": "#/$defs/cellRange"}},
+        "status": {"$ref": "#/$defs/status"}
+      }
+    },
+    "cellRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to"],
+      "properties": {
+        "from": {"$ref": "#/$defs/cellAddress"},
+        "to": {"$ref": "#/$defs/cellAddress"}
+      }
+    },
+    "style": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["styleId", "role", "origin", "declaration", "status"],
+      "properties": {
+        "styleId": {"$ref": "#/$defs/id"},
+        "role": {"type": "string", "enum": ["paragraph", "character", "table", "cell", "shape", "page", "resolved"]},
+        "origin": {"type": "string", "enum": ["authored", "direct", "theme", "conditional", "resolved"]},
+        "basedOn": {"$ref": "#/$defs/id"},
+        "theme": {"$ref": "#/$defs/themeRef"},
+        "conditional": {"type": "array", "items": {"$ref": "#/$defs/conditionalRule"}},
+        "resolvedFrom": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "authored": {"$ref": "#/$defs/styleProperties"},
+        "direct": {"$ref": "#/$defs/styleProperties"},
+        "resolved": {"$ref": "#/$defs/styleProperties"},
+        "declaration": {"$ref": "#/$defs/styleProperties"},
+        "status": {"$ref": "#/$defs/status"}
+      }
+    },
+    "themeRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["themeId", "slot"],
+      "properties": {
+        "themeId": {"$ref": "#/$defs/id"},
+        "slot": {"type": "string"}
+      }
+    },
+    "conditionalRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ruleId", "condition"],
+      "properties": {
+        "ruleId": {"$ref": "#/$defs/id"},
+        "condition": {"type": "string"},
+        "style": {"$ref": "#/$defs/styleProperties"},
+        "priority": {"type": "integer", "minimum": 0}
+      }
+    },
+    "styleProperties": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fontFamily": {"type": "string"},
+        "fontSize": {"$ref": "#/$defs/length"},
+        "weight": {"type": "integer", "minimum": 1},
+        "italic": {"type": "boolean"},
+        "underline": {"type": "string", "enum": ["none", "single", "double", "dotted", "wave"]},
+        "strike": {"type": "boolean"},
+        "foreground": {"$ref": "#/$defs/color"},
+        "background": {"$ref": "#/$defs/color"},
+        "paragraphAlignment": {"type": "string", "enum": ["left", "center", "right", "justify"]},
+        "indentation": {"$ref": "#/$defs/indentation"},
+        "spacing": {"$ref": "#/$defs/spacing"},
+        "lineHeight": {"$ref": "#/$defs/length"},
+        "borders": {"$ref": "#/$defs/borders"},
+        "fill": {"$ref": "#/$defs/fill"},
+        "stroke": {"$ref": "#/$defs/stroke"},
+        "transparency": {"$ref": "#/$defs/decimal"},
+        "textDirection": {"type": "string", "enum": ["ltr", "rtl", "auto"]},
+        "writingMode": {"type": "string", "enum": ["horizontal", "vertical"]},
+        "numberFormat": {"$ref": "#/$defs/numberFormat"},
+        "visibility": {"$ref": "#/$defs/visibility"}
+      }
+    },
+    "color": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {"type": "string", "enum": ["rgb", "gray", "cmyk", "theme"]},
+        "r": {"type": "integer", "minimum": 0, "maximum": 255},
+        "g": {"type": "integer", "minimum": 0, "maximum": 255},
+        "b": {"type": "integer", "minimum": 0, "maximum": 255},
+        "a": {"type": "number", "minimum": 0, "maximum": 1},
+        "slot": {"type": "string"}
+      }
+    },
+    "indentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "left": {"$ref": "#/$defs/length"},
+        "right": {"$ref": "#/$defs/length"},
+        "firstLine": {"$ref": "#/$defs/length"},
+        "hanging": {"$ref": "#/$defs/length"}
+      }
+    },
+    "spacing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "before": {"$ref": "#/$defs/length"},
+        "after": {"$ref": "#/$defs/length"},
+        "line": {"$ref": "#/$defs/length"}
+      }
+    },
+    "borders": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "top": {"$ref": "#/$defs/stroke"},
+        "right": {"$ref": "#/$defs/stroke"},
+        "bottom": {"$ref": "#/$defs/stroke"},
+        "left": {"$ref": "#/$defs/stroke"}
+      }
+    },
+    "fill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {"type": "string", "enum": ["solid", "pattern", "none"]},
+        "color": {"$ref": "#/$defs/color"}
+      }
+    },
+    "stroke": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "color": {"$ref": "#/$defs/color"},
+        "width": {"$ref": "#/$defs/length"},
+        "dash": {"type": "string"}
+      }
+    },
+    "numberFormat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code"],
+      "properties": {
+        "code": {"type": "string"},
+        "locale": {"type": "string"}
+      }
+    },
+    "coordinateSpace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["coordinateSpaceId", "unit"],
+      "properties": {
+        "coordinateSpaceId": {"$ref": "#/$defs/id"},
+        "parentSpaceId": {"$ref": "#/$defs/id"},
+        "unit": {"type": "string", "enum": ["pt", "px", "emu", "twip", "mm", "cm", "in", "cell"]},
+        "origin": {"$ref": "#/$defs/point"},
+        "scale": {"$ref": "#/$defs/point"},
+        "transformToParent": {"$ref": "#/$defs/transform"}
+      }
+    },
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["geometryId", "spaceId", "kind", "primitives", "status"],
+      "properties": {
+        "geometryId": {"$ref": "#/$defs/id"},
+        "spaceId": {"$ref": "#/$defs/id"},
+        "kind": {"type": "string", "enum": ["point", "line", "polyline", "polygon", "rectangle", "rotatedRectangle", "bezier", "textBaseline", "glyphBoxes", "clippingPath", "cropRegion"]},
+        "primitives": {"type": "array", "items": {"$ref": "#/$defs/geometryPrimitive"}},
+        "transform": {"$ref": "#/$defs/transform"},
+        "status": {"$ref": "#/$defs/status"}
+      }
+    },
+    "geometryPrimitive": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {"type": "string", "enum": ["point", "line", "polyline", "polygon", "rectangle", "rotatedRectangle", "bezier", "clip", "arrowhead"]},
+        "x": {"$ref": "#/$defs/decimal"},
+        "y": {"$ref": "#/$defs/decimal"},
+        "width": {"$ref": "#/$defs/length"},
+        "height": {"$ref": "#/$defs/length"},
+        "rotation": {"type": "object", "additionalProperties": false, "required": ["value", "unit"], "properties": {"value": {"$ref": "#/$defs/decimal"}, "unit": {"const": "deg"}}},
+        "points": {"type": "array", "items": {"$ref": "#/$defs/point"}},
+        "segments": {"type": "array", "items": {"$ref": "#/$defs/pathSegment"}},
+        "arrowhead": {"type": "string"}
+      }
+    },
+    "pathSegment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {"type": "string", "enum": ["move", "line", "bezier", "close"]},
+        "points": {"type": "array", "items": {"$ref": "#/$defs/point"}},
+        "to": {"$ref": "#/$defs/point"}
+      }
+    },
+    "layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["layoutId", "targetId", "anchor", "status"],
+      "properties": {
+        "layoutId": {"$ref": "#/$defs/id"},
+        "targetId": {"$ref": "#/$defs/id"},
+        "surfaceId": {"$ref": "#/$defs/id"},
+        "placement": {"type": "string", "enum": ["inline", "floating", "anchored"]},
+        "anchor": {"$ref": "#/$defs/anchor"},
+        "declaredGeometryId": {"$ref": "#/$defs/id"},
+        "resolvedGeometryId": {"$ref": "#/$defs/id"},
+        "transform": {"$ref": "#/$defs/transform"},
+        "clipGeometryIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "wrap": {"type": "string", "enum": ["none", "square", "tight", "through", "top-bottom"]},
+        "zIndex": {"type": "integer"},
+        "status": {"$ref": "#/$defs/status"}
+      }
+    },
+    "anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {"type": "string", "enum": ["inline", "page", "paragraph", "cell-range", "floating", "endpoint-pair"]},
+        "surfaceId": {"$ref": "#/$defs/id"},
+        "nodeId": {"$ref": "#/$defs/id"},
+        "gridId": {"$ref": "#/$defs/id"},
+        "from": {"$ref": "#/$defs/cellAnchor"},
+        "to": {"$ref": "#/$defs/cellAnchor"},
+        "moveWithCells": {"type": "boolean"},
+        "sizeWithCells": {"type": "boolean"},
+        "offset": {"type": "string"}
+      }
+    },
+    "cellAnchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["row", "column"],
+      "properties": {
+        "row": {"type": "integer", "minimum": 1},
+        "column": {"type": "integer", "minimum": 1},
+        "offsetX": {"$ref": "#/$defs/length"},
+        "offsetY": {"$ref": "#/$defs/length"}
+      }
+    },
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resourceId", "kind", "mediaType", "availability"],
+      "properties": {
+        "resourceId": {"$ref": "#/$defs/id"},
+        "kind": {"type": "string", "enum": ["image", "chart", "font", "embeddedObject", "linkedObject", "attachment"]},
+        "mediaType": {"type": "string"},
+        "availability": {"type": "string", "enum": ["available", "unavailable", "omitted-by-policy"]},
+        "derivedHandle": {"type": "string"},
+        "width": {"$ref": "#/$defs/length"},
+        "height": {"$ref": "#/$defs/length"}
+      }
+    },
+    "formula": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["formulaId", "kind", "expression", "values", "status"],
+      "properties": {
+        "formulaId": {"$ref": "#/$defs/id"},
+        "ownerCellId": {"$ref": "#/$defs/id"},
+        "kind": {"type": "string", "enum": ["spreadsheetFormula", "calculationField"]},
+        "expression": {"type": "object", "additionalProperties": false, "required": ["source", "language", "status"], "properties": {"source": {"type": "string"}, "language": {"type": "string"}, "status": {"$ref": "#/$defs/status"}}},
+        "values": {"$ref": "#/$defs/formulaValues"},
+        "numberFormat": {"$ref": "#/$defs/numberFormat"},
+        "calculationContext": {"$ref": "#/$defs/calculationContext"},
+        "status": {"$ref": "#/$defs/status"}
+      }
+    },
+    "formulaValues": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "raw": {"$ref": "#/$defs/typedValue"},
+        "stored": {"$ref": "#/$defs/typedValue"},
+        "cached": {"$ref": "#/$defs/typedValue"},
+        "computed": {"$ref": "#/$defs/typedValue"},
+        "displayed": {"type": "object", "additionalProperties": false, "required": ["text", "status"], "properties": {"text": {"type": "string"}, "status": {"$ref": "#/$defs/status"}}}
+      }
+    },
+    "typedValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "value", "status"],
+      "properties": {
+        "type": {"type": "string", "enum": ["blank", "boolean", "integer", "number", "decimal", "string", "date", "datetime", "error"]},
+        "value": {"type": ["string", "boolean", "number", "null"]},
+        "status": {"$ref": "#/$defs/status"}
+      }
+    },
+    "calculationContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dateSystem": {"type": "string", "enum": ["1900", "1904"]},
+        "locale": {"type": "string"},
+        "mode": {"type": "string", "enum": ["automatic", "manual", "automatic-except-tables"]},
+        "referenceStyle": {"type": "string", "enum": ["A1", "R1C1"]}
+      }
+    },
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fieldId", "kind", "instruction", "status"],
+      "properties": {
+        "fieldId": {"$ref": "#/$defs/id"},
+        "ownerNodeId": {"$ref": "#/$defs/id"},
+        "kind": {"type": "string"},
+        "instruction": {"type": "string"},
+        "storedResult": {"type": "string"},
+        "computedResult": {"type": "string"},
+        "displayedResult": {"type": "string"},
+        "status": {"$ref": "#/$defs/status"}
+      }
+    },
+    "annotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["annotationId", "kind", "targetIds", "status"],
+      "properties": {
+        "annotationId": {"$ref": "#/$defs/id"},
+        "kind": {"type": "string", "enum": ["comment", "footnote", "endnote", "revision", "hyperlink", "bookmark", "form", "ocrToken"]},
+        "targetIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "body": {"type": "string"},
+        "author": {"type": "string"},
+        "status": {"$ref": "#/$defs/status"}
+      }
+    },
+    "relation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relationId", "kind", "fromId", "toId", "status"],
+      "properties": {
+        "relationId": {"$ref": "#/$defs/id"},
+        "kind": {"type": "string", "enum": ["contains", "references", "connectorTarget", "anchor", "basedOnStyle", "usesResource", "annotates", "links", "groups"]},
+        "fromId": {"$ref": "#/$defs/id"},
+        "toId": {"$ref": "#/$defs/id"},
+        "endpoint": {"type": "string", "enum": ["start", "to", "from", "body"]},
+        "status": {"$ref": "#/$defs/status"}
+      }
+    },
+    "order": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["orderId", "kind", "ownerId", "items", "status"],
+      "properties": {
+        "orderId": {"$ref": "#/$defs/id"},
+        "kind": {"type": "string", "enum": ["structure", "source", "document", "reading", "draw", "z-order", "grid", "tab", "revision"]},
+        "ownerId": {"$ref": "#/$defs/id"},
+        "items": {"type": "array", "items": {"$ref": "#/$defs/orderItem"}},
+        "context": {"type": "string"},
+        "status": {"$ref": "#/$defs/status"}
+      }
+    },
+    "orderItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "ordinal"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "ordinal": {"type": "integer", "minimum": 0}
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observationId", "kind", "targetId", "method", "status"],
+      "properties": {
+        "observationId": {"$ref": "#/$defs/id"},
+        "kind": {"type": "string", "enum": ["renderer", "ocr", "measurement"]},
+        "targetId": {"$ref": "#/$defs/id"},
+        "method": {"type": "string"},
+        "engine": {"type": "string"},
+        "textId": {"$ref": "#/$defs/id"},
+        "geometryId": {"$ref": "#/$defs/id"},
+        "score": {"$ref": "#/$defs/decimal"},
+        "status": {"$ref": "#/$defs/status"}
+      }
+    },
+    "extension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["extensionId", "targetId", "namespace", "type", "schemaVersion", "schemaId", "payload", "criticality"],
+      "properties": {
+        "extensionId": {"$ref": "#/$defs/id"},
+        "targetId": {"$ref": "#/$defs/id"},
+        "namespace": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:"},
+        "type": {"type": "string", "minLength": 1},
+        "schemaVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "schemaId": {"type": "string", "minLength": 1},
+        "payload": {"type": "object"},
+        "criticality": {"type": "string", "enum": ["critical", "non-critical"]},
+        "compatibility": {"type": "object", "additionalProperties": false, "properties": {"unknownVersion": {"type": "string", "enum": ["reject", "preserve-and-mark", "ignore"]}}}
+      }
+    },
+    "sourceMap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceMapId", "targetId", "format", "locator"],
+      "properties": {
+        "sourceMapId": {"$ref": "#/$defs/id"},
+        "targetId": {"$ref": "#/$defs/id"},
+        "format": {"$ref": "#/$defs/formatRef"},
+        "locator": {"$ref": "#/$defs/locator"}
+      }
+    },
+    "locator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {"type": "string", "enum": ["docx", "xlsx", "pdf", "markdown"]},
+        "part": {"type": "string"},
+        "path": {"type": "string"},
+        "worksheet": {"type": "string"},
+        "cell": {"type": "string"},
+        "range": {"type": "string"},
+        "page": {"type": "integer", "minimum": 1},
+        "object": {"type": "integer", "minimum": 0},
+        "operator": {"type": "integer", "minimum": 0},
+        "lineStart": {"type": "integer", "minimum": 1},
+        "columnStart": {"type": "integer", "minimum": 1},
+        "lineEnd": {"type": "integer", "minimum": 1},
+        "columnEnd": {"type": "integer", "minimum": 1},
+        "tokenStart": {"type": "integer", "minimum": 0},
+        "tokenEnd": {"type": "integer", "minimum": 0}
+      }
+    },
+    "conversionReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "features", "diagnostics"],
+      "properties": {
+        "status": {"type": "string", "enum": ["complete", "partial", "failed"]},
+        "features": {"type": "array", "items": {"$ref": "#/$defs/featureResult"}},
+        "diagnostics": {"type": "array", "items": {"$ref": "#/$defs/id"}}
+      }
+    },
+    "featureResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["feature", "status"],
+      "properties": {
+        "feature": {"type": "string"},
+        "targetId": {"$ref": "#/$defs/id"},
+        "status": {"$ref": "#/$defs/status"},
+        "diagnosticIds": {"type": "array", "items": {"$ref": "#/$defs/id"}}
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["diagnosticId", "code", "severity", "message"],
+      "properties": {
+        "diagnosticId": {"$ref": "#/$defs/id"},
+        "code": {"type": "string", "pattern": "^[A-Z0-9_.:-]+$"},
+        "severity": {"type": "string", "enum": ["info", "warning", "error", "fatal"]},
+        "phase": {"type": "string", "enum": ["parse", "normalize", "observe", "validate"]},
+        "message": {"type": "string"},
+        "targetId": {"$ref": "#/$defs/id"},
+        "sourceMapId": {"$ref": "#/$defs/id"},
+        "relatedIds": {"type": "array", "items": {"$ref": "#/$defs/id"}}
+      }
+    }
+  }
+}

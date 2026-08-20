@@ -1,5 +1,0 @@
-[build]
-target-dir = ".validation/rust-target"
-
-[net]
-offline = true

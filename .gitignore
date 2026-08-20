@@ -1,25 +1,11 @@
 __pycache__/
 *.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .venv/
-.env
-.DS_Store
-
-# Generated review projections and rebuildable indexes are not canonical.
 dist/
+build/
 reports/
-indexes/
-target/
-*.pdf
-*.docx
-*.png
-*.svg
-
-# Binary qualification packages are distributed under separate manifests.
-qualification/**/*.bin
-qualification/**/*.zip
-qualification/**/*.tar
-qualification/**/*.tar.gz
-
-# Local validation scratch.
-.tmp/
-.validation/
+tmp/
+.DS_Store

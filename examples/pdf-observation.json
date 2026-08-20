@@ -1,0 +1,13 @@
+{
+  "schema": {"name": "fdir/document-form", "version": "1.0.0"},
+  "documentId": "doc-pdf",
+  "sourceFormat": {"namespace": "format", "name": "pdf", "version": "1.7"},
+  "rootNodeId": "node-page",
+  "nodes": [{"nodeId": "node-page", "kind": "section", "childIds": ["node-glyph", "node-path"], "status": "preserved"}, {"nodeId": "node-glyph", "kind": "glyph", "parentId": "node-page", "childIds": [], "geometryId": "geometry-glyph", "textIds": ["text-source"], "status": "preserved"}, {"nodeId": "node-path", "kind": "path", "parentId": "node-page", "childIds": [], "geometryId": "geometry-clip", "status": "preserved"}],
+  "texts": [{"textId": "text-source", "representation": "source", "provenance": "decoded", "value": "A", "status": "preserved"}, {"textId": "text-ocr", "representation": "observed", "provenance": "ocr", "value": "А", "status": "preserved"}],
+  "coordinateSpaces": [{"coordinateSpaceId": "space-page", "unit": "pt", "origin": {"x": "0", "y": "0"}}],
+  "geometries": [{"geometryId": "geometry-glyph", "spaceId": "space-page", "kind": "glyphBoxes", "primitives": [{"kind": "rectangle", "x": "100", "y": "500", "width": {"value": "8.2", "unit": "pt"}, "height": {"value": "12", "unit": "pt"}}], "status": "preserved"}, {"geometryId": "geometry-clip", "spaceId": "space-page", "kind": "clippingPath", "primitives": [{"kind": "clip", "segments": [{"kind": "move", "to": {"x": "80", "y": "480"}}, {"kind": "line", "to": {"x": "180", "y": "540"}}, {"kind": "close"}]}], "status": "preserved"}],
+  "observations": [{"observationId": "observation-render", "kind": "renderer", "targetId": "node-glyph", "method": "page-render", "engine": "renderer/pdf/1.0", "geometryId": "geometry-glyph", "status": "preserved"}, {"observationId": "observation-ocr", "kind": "ocr", "targetId": "node-glyph", "method": "text-recognition", "engine": "ocr/example/1.0", "textId": "text-ocr", "geometryId": "geometry-glyph", "score": "0.97", "status": "preserved"}],
+  "diagnostics": [{"diagnosticId": "diagnostic-glyph-ocr", "code": "DFIR-PDF-GLYPH-OCR-MISMATCH", "severity": "warning", "phase": "observe", "message": "OCR differs from source-decoded text.", "targetId": "node-glyph", "relatedIds": ["text-source", "text-ocr"]}],
+  "conversion": {"status": "partial", "features": [{"feature": "glyph", "targetId": "node-glyph", "status": "preserved"}, {"feature": "ocr-comparison", "targetId": "node-glyph", "status": "ambiguous", "diagnosticIds": ["diagnostic-glyph-ocr"]}], "diagnostics": ["diagnostic-glyph-ocr"]}
+}

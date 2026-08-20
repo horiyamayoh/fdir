@@ -1,5 +1,3 @@
-FDIR — Full-fidelity Document Information Representation
-Copyright 2026 FDIR contributors
+FDIR (Document Form IR)
 
-This product includes software and documentation developed by the FDIR
-contributors and is licensed under the Apache License, Version 2.0.
+This repository defines and implements a typed intermediate representation for recorded document-form facts. It does not define a semantic interpretation model or a source-byte archive.
