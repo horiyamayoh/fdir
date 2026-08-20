@@ -320,6 +320,10 @@ def run_all() -> dict[str, Any]:
         # defect campaign for every mutation fixture.
         integrity_contract = deepcopy(contract)
         first_spec = deepcopy(contract["defaultEvidence"][0])
+        # The production #88 command is this integrity matrix itself.  The
+        # disposable one-lane positive bundle must use a non-recursive schema
+        # check as its command or the matrix would spawn itself indefinitely.
+        first_spec["command"] = ["python", "tools/validate_qualification_bundle.py", "--schema-only"]
         integrity_contract["scope"] = {
             "issueNumbers": list(first_spec["issueNumbers"]),
             "requiredEvidenceIds": [first_spec["evidenceId"]],
@@ -364,6 +368,11 @@ def run_all() -> dict[str, Any]:
             "schema": "fdir/evidence-integrity-report",
             "version": "1.0.0",
             "status": "passed" if passed else "failed",
+            "sourceSha": source_sha,
+            "assertions": [
+                {"assertionId": item["id"], "expected": "passed", "actual": item["status"], "status": item["status"]}
+                for item in negative
+            ],
             "positive": [schema_case, positive],
             "negative": negative,
             "positiveCount": 2,
@@ -378,6 +387,7 @@ def run_all() -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run positive and negative Evidence integrity fixtures.")
     parser.add_argument("--all", action="store_true", help="run every declared integrity fixture")
+    parser.add_argument("--out", type=Path, help="also write the machine-readable integrity report")
     args = parser.parse_args(argv)
     if not args.all:
         parser.error("--all is required")
@@ -394,6 +404,9 @@ def main(argv: list[str] | None = None) -> int:
             "negativeCount": 0,
             "error": f"{type(exc).__name__}: {exc}",
         }
+    if args.out is not None:
+        output = args.out if args.out.is_absolute() else ROOT / args.out
+        _write_json(output, result)
     rendered = json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     stream = getattr(sys.stdout, "buffer", None)
     if stream is not None:

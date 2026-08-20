@@ -25,6 +25,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = ROOT / "schemas" / "qualification-evidence.schema.json"
 CONTRACT_PATH = ROOT / "machine" / "qualification-contract.json"
+RECOVERY_REPORT_CONTRACT_PATH = ROOT / "machine" / "recovery-report-contract.json"
 EVIDENCE_SCHEMA_NAME = "fdir/qualification-evidence"
 BUNDLE_SCHEMA_NAME = "fdir/qualification-bundle-manifest"
 VERSION = "1.0.0"
@@ -694,7 +695,75 @@ def _validate_issue_indexes(
         if not all(item in report_by_id for item in ids):
             _add(diagnostics, "UNRESOLVED_EVIDENCE_ID", f"issue index references an unknown Evidence ID: {path.name}")
     if seen != expected_issues:
-        _add(diagnostics, "ISSUE_INDEX_SCOPE", f"issue indexes {sorted(seen)} do not match contract issues {sorted(expected_issues)}")
+            _add(diagnostics, "ISSUE_INDEX_SCOPE", f"issue indexes {sorted(seen)} do not match contract issues {sorted(expected_issues)}")
+
+
+def _validate_recovery_report_catalog(
+    bundle_root: Path,
+    report_by_id: dict[str, tuple[str, dict[str, Any]]],
+    diagnostics: list[dict[str, str]],
+    contract: dict[str, Any],
+) -> None:
+    """Resolve every issue-specific report required by the recovery issues.
+
+    Generic command-exit and payload-digest assertions are not substitutes for
+    the named reports in the issue contracts.  Keep this catalog separate from
+    the generic evidence schema so adding an evidence ID cannot silently make
+    an issue-specific requirement disappear.
+    """
+
+    # Integrity tests intentionally build a one-lane disposable contract.  The
+    # issue-specific catalog applies only to the production #88-#105 scope;
+    # otherwise the positive tamper-resistance fixture would be rejected for
+    # reports it deliberately does not exercise.
+    if set(contract.get("scope", {}).get("issueNumbers", [])) != set(range(88, 106)):
+        return
+    try:
+        catalog = load_json(RECOVERY_REPORT_CONTRACT_PATH)
+    except (OSError, json.JSONDecodeError) as exc:
+        _add(diagnostics, "RECOVERY_REPORT_CONTRACT", f"cannot load recovery report contract: {exc}")
+        return
+    if not isinstance(catalog, dict) or catalog.get("schema") != "fdir/recovery-report-contract":
+        _add(diagnostics, "RECOVERY_REPORT_CONTRACT", "recovery report contract schema is invalid")
+        return
+    required = catalog.get("reports")
+    if not isinstance(required, dict):
+        _add(diagnostics, "RECOVERY_REPORT_CONTRACT", "recovery report contract has no reports object")
+        return
+    for issue_text, names in sorted(required.items(), key=lambda item: str(item[0])):
+        if not isinstance(names, list) or not all(isinstance(name, str) and name for name in names):
+            _add(diagnostics, "RECOVERY_REPORT_CONTRACT", f"required report names are malformed for issue #{issue_text}")
+            continue
+        issue_number = int(issue_text) if str(issue_text).isdigit() else None
+        issue_outputs = {
+            str(output.get("path"))
+            for _, report in report_by_id.values()
+            if issue_number is not None and issue_number in report.get("issueNumbers", [])
+            for output in report.get("outputs", [])
+            if isinstance(output, dict) and isinstance(output.get("path"), str)
+        }
+        for name in names:
+            matches = sorted(path for path in issue_outputs if PurePosixPath(path).name == name)
+            if len(matches) != 1:
+                code = "RECOVERY_REPORT_MISSING" if not matches else "RECOVERY_REPORT_DUPLICATE"
+                _add(diagnostics, code, f"issue #{issue_text} requires exactly one named report {name!r}; found {matches}")
+                continue
+            path = matches[0]
+            target = bundle_root / Path(*PurePosixPath(path).parts)
+            try:
+                value = load_json(target)
+            except (OSError, json.JSONDecodeError) as exc:
+                _add(diagnostics, "RECOVERY_REPORT_JSON", f"issue #{issue_text} report {path} is not valid JSON: {exc}", path)
+                continue
+            if not isinstance(value, dict):
+                _add(diagnostics, "RECOVERY_REPORT_OBJECT", f"issue #{issue_text} report {path} is not an object", path)
+                continue
+            if value.get("status") != "passed":
+                _add(diagnostics, "RECOVERY_REPORT_STATUS", f"issue #{issue_text} report {path} is not passed", path)
+            if not isinstance(value.get("sourceSha"), str):
+                _add(diagnostics, "RECOVERY_REPORT_SOURCE_SHA", f"issue #{issue_text} report {path} has no sourceSha", path)
+            if not isinstance(value.get("assertions"), list) or not value.get("assertions"):
+                _add(diagnostics, "RECOVERY_REPORT_ASSERTIONS", f"issue #{issue_text} report {path} has no assertions", path)
 
 
 def validate_bundle(
@@ -785,6 +854,7 @@ def validate_bundle(
     if declared_issue_numbers != expected_issue_numbers:
         _add(diagnostics, "MANIFEST_ISSUE_SCOPE", f"manifest issueNumbers {sorted(declared_issue_numbers)} do not match contract {sorted(expected_issue_numbers)}")
     _validate_issue_indexes(bundle_root, manifest, contract, report_by_id, diagnostics)
+    _validate_recovery_report_catalog(bundle_root, report_by_id, diagnostics, contract)
     return _result(manifest_path, manifest, diagnostics, report_by_id)
 
 

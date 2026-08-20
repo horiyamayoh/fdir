@@ -1,0 +1,24 @@
+{
+  "schema": "fdir/recovery-report-contract",
+  "version": "1.0.0",
+  "reports": {
+    "88": ["evidence-integrity-report.json"],
+    "89": ["defect-injection-campaign.json"],
+    "90": ["schema-differential.json", "graph-invariants.json", "status-contract.json"],
+    "91": ["source-occurrence-accounting.json", "capability-profile-coverage.json", "status-aggregation.json", "unaccounted-occurrences.json"],
+    "92": ["exact-scalar-vectors.json", "text-transformation-vectors.json", "spreadsheet-date-display-vectors.json", "formula-lane-report.json", "pdf-glyph-provenance-report.json"],
+    "93": ["style-cascade-vectors.json", "property-provenance-report.json", "color-paint-resolution.json", "style-coverage-matrix.json"],
+    "94": ["coordinate-transform-vectors.json", "geometry-lane-report.json", "anchor-resolution-report.json", "clip-and-paint-order-report.json", "reading-order-ambiguity-report.json"],
+    "95": ["part-surface-closure.json", "containment-reciprocity.json", "table-grid-topology.json", "story-coverage.json"],
+    "96": ["relationship-closure.json", "resource-availability.json", "annotation-link-field-report.json", "revision-range-report.json"],
+    "97": ["extension-emission-coverage.json", "extension-schema-conformance.json", "extension-reference-closure.json", "extension-version-compatibility.json", "extension-migration-report.json"],
+    "98": ["canonical-cross-language-vectors.json", "projection-identity-report.json", "stable-entity-id-report.json", "migration-matrix-report.json"],
+    "99": ["docx-profile-matrix.json", "docx-part-relationship-closure.json", "docx-story-corpus.json", "docx-structure-style-layout.json", "docx-unsupported-occurrences.json", "docx-multi-producer-differential.json"],
+    "100": ["xlsx-profile-matrix.json", "xlsx-workbook-relationship-closure.json", "xlsx-value-formula-display-matrix.json", "xlsx-style-resolution.json", "xlsx-grid-table-topology.json", "xlsx-multi-producer-differential.json", "xlsx-unsupported-occurrences.json"],
+    "101": ["pdf-profile-matrix.json", "pdf-object-xref-revision.json", "pdf-page-resource-closure.json", "pdf-content-event-trace.json", "pdf-font-cmap-glyph.json", "pdf-annotation-form-report.json", "pdf-multi-parser-differential.json", "pdf-unsupported-occurrences.json"],
+    "102": ["markdown-profile-matrix.json", "commonmark-conformance.json", "gfm-extension-conformance.json", "markdown-ast-source-span.json", "markdown-authoring-facts.json", "markdown-reference-resource-closure.json", "markdown-multi-parser-differential.json", "markdown-unsupported-occurrences.json"],
+    "103": ["index-oracle-conformance.json", "direct-index-parity.json", "index-version-integrity.json"],
+    "104": ["corpus-provenance-independence.json", "requirement-corpus-coverage.json", "multi-producer-results.json", "differential-adjudication.json", "metamorphic-relations.json", "hostile-resource-boundaries.json", "fixture-oracle-digest-manifest.json"],
+    "105": ["requirement-traceability.json", "behavioral-suite-inventory.json", "cli-api-contract-results.json", "platform-runtime-matrix.json", "fresh-install-results.json", "determinism-replay-diff.json", "false-completion-regressions.json", "release-claim-conformance.json"]
+  }
+}
