@@ -26,38 +26,203 @@ jobs:
           ref: agent/issue-12-adapter-process-boundary
           fetch-depth: 0
           persist-credentials: true
-      - name: Apply the compile-fix commit
+      - name: Apply the clippy-fix commit
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
 
-          path = Path("crates/fdir-adapter-sdk/src/protocol.rs")
-          text = path.read_text(encoding="utf-8")
-          old = """        let mut manifest = manifest()?;
-                  manifest.process_boundary = ProcessBoundary::InProcess;
-                  assert_eq!(
-                      manifest.validate().map_err(|error| error.code()),
-          """
-          new = """        let mut invalid_manifest = manifest()?;
-                  invalid_manifest.process_boundary = ProcessBoundary::InProcess;
-                  assert_eq!(
-                      invalid_manifest.validate().map_err(|error| error.code()),
-          """
-          if old in text:
-              path.write_text(text.replace(old, new, 1), encoding="utf-8")
-          elif new not in text:
-              raise SystemExit("expected manifest-shadowing block was not found")
+          protocol = Path("crates/fdir-adapter-sdk/src/protocol.rs")
+          text = protocol.read_text(encoding="utf-8")
+          replacements = [
+              (
+                  """        if self.outcome == WorkerOutcome::Complete {
+                      if !self.output_complete || self.retryable || !tracker.stream_complete() {
+                          return Err(ProtocolError::new(
+                              \"FDIR-PROTOCOL-FALSE-COMPLETE\",
+                              \"complete outcome requires a complete acknowledged stream and cannot be retryable\",
+                          ));
+                      }
+                  }
+          """,
+                  """        if self.outcome == WorkerOutcome::Complete
+                      && (!self.output_complete || self.retryable || !tracker.stream_complete())
+                  {
+                      return Err(ProtocolError::new(
+                          \"FDIR-PROTOCOL-FALSE-COMPLETE\",
+                          \"complete outcome requires a complete acknowledged stream and cannot be retryable\",
+                      ));
+                  }
+          """,
+              ),
+              (
+                  """/// Classify launcher and protocol failures without coercing them to success.
+          #[must_use]
+          pub const fn classify_worker_failure(
+              timed_out: bool,
+              cancelled: bool,
+              sandbox_denied: bool,
+              protocol_mismatch: bool,
+              identity_mismatch: bool,
+              malformed_response: bool,
+              truncated_output: bool,
+              exit_success: bool,
+          ) -> WorkerOutcome {
+              if cancelled {
+                  WorkerOutcome::Cancelled
+              } else if timed_out {
+                  WorkerOutcome::TimedOut
+              } else if sandbox_denied {
+                  WorkerOutcome::SandboxDenied
+              } else if protocol_mismatch {
+                  WorkerOutcome::ProtocolMismatch
+              } else if identity_mismatch {
+                  WorkerOutcome::IdentityMismatch
+              } else if malformed_response {
+                  WorkerOutcome::MalformedResponse
+              } else if truncated_output {
+                  WorkerOutcome::TruncatedOutput
+              } else if exit_success {
+                  WorkerOutcome::Failed
+              } else {
+                  WorkerOutcome::WorkerCrash
+              }
+          }
+          """,
+                  """/// Launcher and protocol facts used to classify a non-success worker result.
+          #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+          pub struct WorkerFailureSignals {
+              pub timed_out: bool,
+              pub cancelled: bool,
+              pub sandbox_denied: bool,
+              pub protocol_mismatch: bool,
+              pub identity_mismatch: bool,
+              pub malformed_response: bool,
+              pub truncated_output: bool,
+              pub exit_success: bool,
+          }
+
+          /// Classify launcher and protocol failures without coercing them to success.
+          #[must_use]
+          pub const fn classify_worker_failure(signals: WorkerFailureSignals) -> WorkerOutcome {
+              if signals.cancelled {
+                  WorkerOutcome::Cancelled
+              } else if signals.timed_out {
+                  WorkerOutcome::TimedOut
+              } else if signals.sandbox_denied {
+                  WorkerOutcome::SandboxDenied
+              } else if signals.protocol_mismatch {
+                  WorkerOutcome::ProtocolMismatch
+              } else if signals.identity_mismatch {
+                  WorkerOutcome::IdentityMismatch
+              } else if signals.malformed_response {
+                  WorkerOutcome::MalformedResponse
+              } else if signals.truncated_output {
+                  WorkerOutcome::TruncatedOutput
+              } else if signals.exit_success {
+                  WorkerOutcome::Failed
+              } else {
+                  WorkerOutcome::WorkerCrash
+              }
+          }
+          """,
+              ),
+              (
+                  """    if usage.decompressed_bytes > 0 {
+                  if usage.compressed_input_bytes == 0
+                      || usage.decompressed_bytes
+                          > usage
+                              .compressed_input_bytes
+                              .saturating_mul(u64::from(budget.max_decompression_ratio))
+                  {
+                      return Err(resource_error(BudgetDimension::Decompression));
+                  }
+              }
+          """,
+                  """    if usage.decompressed_bytes > 0
+                  && (usage.compressed_input_bytes == 0
+                      || usage.decompressed_bytes
+                          > usage
+                              .compressed_input_bytes
+                              .saturating_mul(u64::from(budget.max_decompression_ratio)))
+              {
+                  return Err(resource_error(BudgetDimension::Decompression));
+              }
+          """,
+              ),
+              (
+                  """        WorkerOutcome, WorkerProvenance, classify_worker_failure, negotiate,
+          """,
+                  """        WorkerFailureSignals, WorkerOutcome, WorkerProvenance, classify_worker_failure,
+                  negotiate,
+          """,
+              ),
+              (
+                  """            classify_worker_failure(false, false, false, false, false, false, false, false),
+          """,
+                  """            classify_worker_failure(WorkerFailureSignals::default()),
+          """,
+              ),
+              (
+                  """            classify_worker_failure(true, false, false, false, false, false, false, false),
+          """,
+                  """            classify_worker_failure(WorkerFailureSignals {
+                          timed_out: true,
+                          ..WorkerFailureSignals::default()
+                      }),
+          """,
+              ),
+              (
+                  """            classify_worker_failure(false, true, false, false, false, false, false, false),
+          """,
+                  """            classify_worker_failure(WorkerFailureSignals {
+                          cancelled: true,
+                          ..WorkerFailureSignals::default()
+                      }),
+          """,
+              ),
+          ]
+          for old, new in replacements:
+              if text.count(old) != 1:
+                  raise SystemExit(f"expected exactly one protocol replacement, found {text.count(old)}")
+              text = text.replace(old, new, 1)
+          protocol.write_text(text, encoding="utf-8")
+
+          library = Path("crates/fdir-adapter-sdk/src/lib.rs")
+          text = library.read_text(encoding="utf-8")
+          replacements = [
+              (
+                  """    TerminalReceipt, WireEnvelope, WireMessageKind, WorkerManifest, WorkerOutcome,
+              WorkerProvenance, classify_worker_failure, negotiate,
+          """,
+                  """    TerminalReceipt, WireEnvelope, WireMessageKind, WorkerFailureSignals, WorkerManifest,
+              WorkerOutcome, WorkerProvenance, classify_worker_failure, negotiate,
+          """,
+              ),
+              (
+                  """        assert!(CAPABILITY.available);
+                  assert!(!CAPABILITY.production_ready);
+          """,
+                  """        let capability = std::hint::black_box(CAPABILITY);
+                  assert!(capability.available);
+                  assert!(!capability.production_ready);
+          """,
+              ),
+          ]
+          for old, new in replacements:
+              if text.count(old) != 1:
+                  raise SystemExit(f"expected exactly one library replacement, found {text.count(old)}")
+              text = text.replace(old, new, 1)
+          library.write_text(text, encoding="utf-8")
           PY
-          if ! git diff --quiet -- crates/fdir-adapter-sdk/src/protocol.rs; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add crates/fdir-adapter-sdk/src/protocol.rs
-            git diff --cached --check
-            git commit -m "fix: avoid manifest fixture shadowing"
-            git push origin HEAD:agent/issue-12-adapter-process-boundary
-          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          cargo fmt --all
+          git add crates/fdir-adapter-sdk/src/lib.rs crates/fdir-adapter-sdk/src/protocol.rs
+          git diff --cached --check
+          git commit -m "fix: satisfy strict Rust lint policy"
+          git push origin HEAD:agent/issue-12-adapter-process-boundary
       - name: Set up Python
         uses: actions/setup-python@v6.0.0
         with:
