@@ -1,0 +1,344 @@
+{
+  "schema": "fdir/qualification-issue-90-corpus",
+  "version": "1.0.0",
+  "issueNumber": 90,
+  "schemaCases": [
+    {
+      "id": "root-unknown-property",
+      "source": "examples/callout.json",
+      "expectedSchemaValid": false,
+      "operations": [
+        {"op": "set", "path": "$", "field": "qualificationUnexpected", "value": true}
+      ]
+    },
+    {
+      "id": "missing-root-required-conversion",
+      "source": "examples/callout.json",
+      "expectedSchemaValid": false,
+      "operations": [
+        {"op": "delete", "path": "$.conversion"}
+      ]
+    },
+    {
+      "id": "document-id-wrong-type",
+      "source": "examples/callout.json",
+      "expectedSchemaValid": false,
+      "operations": [
+        {"op": "set", "path": "$.documentId", "value": 42}
+      ]
+    },
+    {
+      "id": "node-kind-illegal",
+      "source": "examples/callout.json",
+      "expectedSchemaValid": false,
+      "operations": [
+        {"op": "set", "path": "nodes[nodeId=node-document].kind", "value": "not-a-node-kind"}
+      ]
+    },
+    {
+      "id": "run-required-text-ids",
+      "source": "examples/markdown-authoring.json",
+      "expectedSchemaValid": false,
+      "operations": [
+        {"op": "delete", "path": "nodes[nodeId=node-run].textIds"}
+      ]
+    },
+    {
+      "id": "cell-required-address",
+      "source": "examples/cell-formula.json",
+      "expectedSchemaValid": false,
+      "operations": [
+        {"op": "delete", "path": "nodes[nodeId=cell-b2].address"}
+      ]
+    },
+    {
+      "id": "visual-required-geometry",
+      "source": "examples/callout.json",
+      "expectedSchemaValid": false,
+      "operations": [
+        {"op": "delete", "path": "nodes[nodeId=node-callout].geometryId"}
+      ]
+    },
+    {
+      "id": "color-branch-forbidden-field",
+      "source": "examples/style-resolution.json",
+      "expectedSchemaValid": false,
+      "operations": [
+        {"op": "set", "path": "styles[styleId=style-direct].direct.foreground", "field": "gray", "value": "1"}
+      ]
+    },
+    {
+      "id": "status-enum",
+      "source": "examples/callout.json",
+      "expectedSchemaValid": false,
+      "operations": [
+        {"op": "set", "path": "nodes[nodeId=node-document].status", "value": "complete"}
+      ]
+    },
+    {
+      "id": "format-enum",
+      "source": "examples/callout.json",
+      "expectedSchemaValid": false,
+      "operations": [
+        {"op": "set", "path": "$.sourceFormat.name", "value": "not-a-supported-format"}
+      ]
+    },
+    {
+      "id": "array-item-wrong-type",
+      "source": "examples/callout.json",
+      "expectedSchemaValid": false,
+      "operations": [
+        {"op": "append", "path": "nodes[nodeId=node-document].childIds", "value": {}}
+      ]
+    }
+  ],
+  "graphCases": [
+    {
+      "id": "dangling-node-child",
+      "category": "dangling-reference",
+      "source": "examples/markdown-authoring.json",
+      "expectedDiagnostic": "DFIR-REF-DANGLING",
+      "expectedPath": "node node-paragraph.childIds",
+      "operations": [
+        {"op": "append", "path": "nodes[nodeId=node-paragraph].childIds", "value": "missing-node"}
+      ]
+    },
+    {
+      "id": "duplicate-child-membership",
+      "category": "uniqueness",
+      "source": "examples/markdown-authoring.json",
+      "expectedDiagnostic": "DFIR-GRAPH-DUPLICATE-MEMBER",
+      "expectedPath": "node node-document",
+      "operations": [
+        {"op": "append", "path": "nodes[nodeId=node-document].childIds", "value": "node-paragraph"}
+      ]
+    },
+    {
+      "id": "broken-parent-reciprocity",
+      "category": "reciprocity",
+      "source": "examples/markdown-authoring.json",
+      "expectedDiagnostic": "DFIR-GRAPH-RECIPROCITY",
+      "expectedPath": "node node-paragraph",
+      "operations": [
+        {"op": "set", "path": "nodes[nodeId=node-paragraph].parentId", "value": "node-run"}
+      ]
+    },
+    {
+      "id": "multiple-parent",
+      "category": "multi-parent",
+      "source": "examples/markdown-authoring.json",
+      "expectedDiagnostic": "DFIR-GRAPH-MULTIPLE-PARENT",
+      "expectedPath": "node node-run",
+      "operations": [
+        {"op": "append", "path": "nodes[nodeId=node-document].childIds", "value": "node-run"}
+      ]
+    },
+    {
+      "id": "containment-self-cycle",
+      "category": "containment-cycle",
+      "source": "examples/markdown-authoring.json",
+      "expectedDiagnostic": "DFIR-GRAPH-CYCLE",
+      "expectedPath": "node node-run",
+      "operations": [
+        {"op": "set", "path": "nodes[nodeId=node-run].parentId", "value": "node-run"}
+      ]
+    },
+    {
+      "id": "orphan-node",
+      "category": "reachability",
+      "source": "examples/markdown-authoring.json",
+      "expectedDiagnostic": "DFIR-GRAPH-ORPHAN",
+      "expectedPath": "node-orphan",
+      "operations": [
+        {"op": "append", "path": "$.nodes", "value": {"nodeId": "node-orphan", "kind": "paragraph", "childIds": [], "status": "preserved"}}
+      ]
+    },
+    {
+      "id": "wrong-target-collection",
+      "category": "target-collection",
+      "source": "examples/markdown-authoring.json",
+      "expectedDiagnostic": "DFIR-REF-WRONG-COLLECTION",
+      "expectedPath": "node node-run.textIds",
+      "operations": [
+        {"op": "set", "path": "nodes[nodeId=node-run].textIds[0]", "value": "node-document"}
+      ]
+    },
+    {
+      "id": "wrong-target-kind",
+      "category": "target-kind",
+      "source": "examples/cell-formula.json",
+      "expectedDiagnostic": "DFIR-REF-WRONG-TYPE",
+      "expectedPath": "formula formula-b2.ownerCellId",
+      "operations": [
+        {"op": "set", "path": "formulas[formulaId=formula-b2].ownerCellId", "value": "node-sheet"}
+      ]
+    },
+    {
+      "id": "style-cycle",
+      "category": "style-cycle",
+      "source": "examples/style-resolution.json",
+      "expectedDiagnostic": "DFIR-STYLE-CYCLE",
+      "expectedPath": "style-authored",
+      "operations": [
+        {"op": "set", "path": "styles[styleId=style-base].basedOn", "value": "style-authored"}
+      ]
+    },
+    {
+      "id": "coordinate-space-cycle",
+      "category": "coordinate-cycle",
+      "source": "examples/callout.json",
+      "expectedDiagnostic": "DFIR-SPACE-CYCLE",
+      "expectedPath": "space-page-1",
+      "operations": [
+        {"op": "set", "path": "coordinateSpaces[coordinateSpaceId=space-page-1].parentSpaceId", "value": "space-page-1"}
+      ]
+    },
+    {
+      "id": "order-duplicate-member",
+      "category": "order-uniqueness",
+      "source": "examples/callout.json",
+      "expectedDiagnostic": "DFIR-ORDER-DUPLICATE",
+      "expectedPath": "order order-paint",
+      "operations": [
+        {"op": "duplicate-first", "path": "orders[orderId=order-paint].items"}
+      ]
+    },
+    {
+      "id": "relation-endpoint-kind",
+      "category": "relation-endpoint-kind",
+      "source": "examples/callout.json",
+      "expectedDiagnostic": "DFIR-RELATION-ENDPOINT-KIND",
+      "expectedPath": "relation relation-connector-target.fromId",
+      "operations": [
+        {"op": "set", "path": "relations[relationId=relation-connector-target].fromId", "value": "node-paragraph"}
+      ]
+    }
+  ],
+  "statusCases": [
+    {
+      "id": "complete-claim-with-non-preserved-entity",
+      "category": "complete-claim",
+      "source": "examples/partial-conversion.json",
+      "expectedDiagnostic": "DFIR-COMPLETE-CLAIM",
+      "expectedPath": "conversion.status",
+      "operations": [
+        {"op": "set", "path": "$.conversion.status", "value": "complete"}
+      ]
+    },
+    {
+      "id": "complete-with-warnings-without-evidence",
+      "category": "complete-with-warnings",
+      "source": "examples/markdown-authoring.json",
+      "expectedDiagnostic": "DFIR-WARNING-STATUS",
+      "expectedPath": "conversion.status",
+      "operations": [
+        {"op": "set", "path": "$.conversion.status", "value": "complete-with-warnings"}
+      ]
+    },
+    {
+      "id": "complete-warning-points-to-error",
+      "category": "diagnostic-severity",
+      "source": "examples/markdown-authoring.json",
+      "expectedDiagnostic": "DFIR-WARNING-SEVERITY",
+      "expectedPath": "conversion.warnings",
+      "operations": [
+        {"op": "append", "path": "$.diagnostics", "value": {"diagnosticId": "diagnostic-error", "code": "DFIR-TEST-ERROR", "severity": "error", "phase": "validate", "message": "qualification error", "action": "review", "targetId": "node-document"}},
+        {"op": "set", "path": "$.conversion.status", "value": "complete-with-warnings"},
+        {"op": "append", "path": "$.conversion.warnings", "value": "diagnostic-error"}
+      ]
+    },
+    {
+      "id": "partial-without-loss-evidence",
+      "category": "partial-evidence",
+      "source": "examples/markdown-authoring.json",
+      "expectedDiagnostic": "DFIR-PARTIAL-NO-EVIDENCE",
+      "expectedPath": "conversion.status",
+      "operations": [
+        {"op": "set", "path": "$.conversion.status", "value": "partial"}
+      ]
+    },
+    {
+      "id": "failed-without-diagnostic",
+      "category": "failed-evidence",
+      "source": "examples/markdown-authoring.json",
+      "expectedDiagnostic": "DFIR-FAILED-NO-DIAGNOSTIC",
+      "expectedPath": "conversion.status",
+      "operations": [
+        {"op": "set", "path": "$.conversion.status", "value": "failed"}
+      ]
+    },
+    {
+      "id": "feature-inventory-count-drift",
+      "category": "feature-aggregation",
+      "source": "examples/markdown-authoring.json",
+      "expectedDiagnostic": "DFIR-CAPABILITY-INVENTORY-MISMATCH",
+      "expectedPath": "featureInventory",
+      "operations": [
+        {"op": "set", "path": "$.conversion.featureInventory[0].occurrences", "value": 2}
+      ]
+    },
+    {
+      "id": "unavailable-not-observation",
+      "category": "unavailable-policy",
+      "source": "examples/markdown-authoring.json",
+      "expectedDiagnostic": "DFIR-CAPABILITY-DISPOSITION",
+      "expectedPath": "featureInventory",
+      "operations": [
+        {"op": "set", "path": "$.conversion.featureInventory[0].status", "value": "unavailable"}
+      ]
+    },
+    {
+      "id": "feature-diagnostic-binding-missing",
+      "category": "diagnostic-binding",
+      "source": "examples/markdown-authoring.json",
+      "expectedDiagnostic": "DFIR-DIAGNOSTIC-MISSING",
+      "expectedPath": "conversion.features",
+      "operations": [
+        {"op": "set", "path": "$.conversion.features[0].diagnosticIds", "value": ["missing-diagnostic"]}
+      ]
+    },
+    {
+      "id": "complete-claim-with-error-diagnostic",
+      "category": "complete-claim",
+      "source": "examples/markdown-authoring.json",
+      "expectedDiagnostic": "DFIR-COMPLETE-CLAIM",
+      "expectedPath": "conversion.status",
+      "operations": [
+        {"op": "append", "path": "$.diagnostics", "value": {"diagnosticId": "diagnostic-error", "code": "DFIR-TEST-ERROR", "severity": "error", "phase": "validate", "message": "qualification error", "action": "review", "targetId": "node-document"}},
+        {"op": "append", "path": "$.conversion.diagnostics", "value": "diagnostic-error"}
+      ]
+    }
+  ],
+  "requiredGraphCategories": [
+    "dangling-reference",
+    "target-collection",
+    "target-kind",
+    "owner-kind",
+    "reciprocity",
+    "uniqueness",
+    "cardinality",
+    "reachability",
+    "multi-parent",
+    "containment-cycle",
+    "style-cycle",
+    "coordinate-cycle",
+    "order-uniqueness",
+    "table-topology",
+    "relation-endpoint-kind",
+    "extension-target-schema",
+    "source-map-format",
+    "diagnostic-binding"
+  ],
+  "requiredStatusCategories": [
+    "complete-claim",
+    "complete-with-warnings",
+    "diagnostic-severity",
+    "partial-evidence",
+    "failed-evidence",
+    "feature-aggregation",
+    "unavailable-policy",
+    "diagnostic-binding",
+    "status-enum",
+    "entity-feature-authority"
+  ]
+}
