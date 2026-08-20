@@ -1,5 +1,14 @@
 # 6. 問い合わせ、実装境界、API
 
+## 6.0 実装と qualification の境界
+
+The interfaces in this chapter describe the intended typed contract and the
+bounded reference paths currently present in the repository. They do not turn
+an available adapter, query operation, or example into qualified evidence.
+Release remains blocked under
+[`machine/audit-recovery-plan.json`](../machine/audit-recovery-plan.json); the
+commit-bound recovery evidence for Issues #88–#105 is still required.
+
 ## 6.1 代表的な問い合わせ
 
 問い合わせは entity kind、typed field、relation、status を使います。意味解釈の predicate を追加しません。
@@ -81,10 +90,11 @@ fdir export <document-form.json> --target json|markdown|html
 
 ## 6.7 Executable adapter entry point
 
-The repository reference implementation exposes the bounded adapter contract
-through `tools/convert_document.py`. It accepts real DOCX, XLSX, PDF, and
-Markdown files, emits Document Form IR plus an external execution-evidence
-sidecar, and fails closed on malformed input or configured resource limits:
+The repository contains a bounded reference entry point at
+`tools/convert_document.py`. It has paths for DOCX, XLSX, PDF, and Markdown
+inputs, emits Document Form IR plus an external execution-evidence sidecar,
+and is intended to fail closed on malformed input or configured resource
+limits:
 
 ~~~text
 python tools/convert_document.py inspect <input>
@@ -92,11 +102,11 @@ python tools/convert_document.py convert <input> --out <document-form.json> --ev
 python tools/convert_document.py validate <document-form.json>
 ~~~
 
-`tools/run_e2e.py --all` generates real source files, invokes that public
-entry point in child processes, and verifies source-derived content,
-diagnostics, malformed-input handling, and limits for all four formats. This
-is the executable reference for the adapter and release-gate contract; it
-does not promote renderer/OCR observations or parser output into business
-meaning.
+`tools/run_e2e.py --all` generates bounded real-input cases, invokes that
+public entry point in child processes, and checks source-derived content,
+diagnostics, malformed-input handling, and configured limits across the four
+format paths. This is an implementation/regression path, not proof of complete
+format coverage or release qualification. It does not promote renderer/OCR
+observations or parser output into business meaning.
 
 compare、equivalence、lineage、assert、knowledge graph は FDIR CLI の command にしません。構造差・表示差を比較する補助 command を将来追加する場合も、semantic equivalence とは別 namespace と型で設計します。

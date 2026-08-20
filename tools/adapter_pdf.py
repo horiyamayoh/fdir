@@ -24,13 +24,46 @@ LITERAL_RE = re.compile(r"\(((?:\\.|[^\\)])*)\)\s*(?:Tj|'|\")")
 HEX_RE = re.compile(r"<([0-9A-Fa-f]+)>\s*Tj")
 NUMBER = r"-?(?:\d+(?:\.\d*)?|\.\d+)"
 PATH_RE = re.compile(rf"(?P<x>{NUMBER})\s+(?P<y>{NUMBER})\s+(?P<op>m|l)\s*")
+PDF_NUMBER_RE = re.compile(r"-?(?:\d+(?:\.\d*)?|\.\d+)")
 
 
 OBJECT_HEADER_RE = re.compile(rb"(?m)(\d+)\s+(\d+)\s+obj\b")
 STREAM_MARKER_RE = re.compile(rb">>\s*stream\r?\n")
 
+# These are deliberately local to the PDF adapter.  AdapterLimits predates
+# format-specific stream/token budgets, so the existing input/text/object
+# budgets are used as the caller-controlled ceiling for these conservative
+# PDF work limits.
+_PDF_DEFAULT_MAX_STREAM_BYTES = 8 * 1024 * 1024
+_PDF_DEFAULT_MAX_CMAP_BYTES = 2 * 1024 * 1024
+_PDF_DEFAULT_MAX_CMAP_ENTRIES = 100_000
+_PDF_DEFAULT_MAX_CMAP_CODE_CHARS = 256
+_PDF_DEFAULT_MAX_TOKENS = 250_000
+_PDF_DEFAULT_MAX_LEXEME_CHARS = 1 * 1024 * 1024
+_PDF_DEFAULT_MAX_NESTING = 64
+_PDF_DEFAULT_MAX_ANNOTATIONS_PER_PAGE = 1_024
+_PDF_DEFAULT_MAX_ANNOTATION_TEXT = 4_096
 
-def _pdf_objects(data: bytes) -> dict[tuple[int, int], bytes]:
+
+def _pdf_budget(limits: AdapterLimits | None, attribute: str, default: int) -> int:
+    value = default if limits is None else int(getattr(limits, attribute, default))
+    return max(1, min(default, value))
+
+
+def _pdf_limit_event(events: list[tuple[str, str]] | None, code: str, message: str) -> None:
+    if events is None:
+        return
+    event = (code, message)
+    if event not in events:
+        events.append(event)
+
+
+def _pdf_objects(
+    data: bytes,
+    *,
+    max_objects: int | None = None,
+    events: list[tuple[str, str]] | None = None,
+) -> dict[tuple[int, int], bytes]:
     """Extract indirect objects without treating stream data as structure.
 
     A plain ``.*?endobj`` regex is unsafe: literal stream bytes can contain
@@ -66,7 +99,21 @@ def _pdf_objects(data: bytes) -> dict[tuple[int, int], bytes]:
             endobj = data.find(b"endobj", search_from)
         end = len(data) if endobj < 0 else endobj
         identifier = (int(match.group(1)), int(match.group(2)))
-        objects[identifier] = data[object_start:end]
+        if identifier in objects:
+            _pdf_limit_event(
+                events,
+                "DFIR-PDF-DUPLICATE-OBJECT",
+                f"PDF contains a duplicate indirect object identifier {identifier[0]} {identifier[1]} R; the first bounded occurrence is retained.",
+            )
+        elif max_objects is not None and len(objects) >= max_objects:
+            _pdf_limit_event(
+                events,
+                "DFIR-PDF-OBJECT-LIMIT",
+                f"PDF object limit exceeded while indexing indirect objects ({max_objects}).",
+            )
+            break
+        else:
+            objects[identifier] = data[object_start:end]
         cursor = len(data) if endobj < 0 else endobj + len(b"endobj")
     return objects
 
@@ -93,25 +140,63 @@ def _cmap_unicode(raw: str) -> str:
         return data.decode("latin-1", errors="replace")
 
 
-def _parse_cmap(data: bytes) -> list[dict[str, str]]:
+def _parse_cmap(
+    data: bytes,
+    *,
+    limits: AdapterLimits | None = None,
+    events: list[tuple[str, str]] | None = None,
+) -> list[dict[str, str]]:
     """Parse the portable bfchar/bfrange subset of a ToUnicode CMap."""
 
+    max_bytes = _pdf_budget(limits, "max_input_bytes", _PDF_DEFAULT_MAX_CMAP_BYTES)
+    if len(data) > max_bytes:
+        _pdf_limit_event(
+            events,
+            "DFIR-PDF-CMAP-BYTE-LIMIT",
+            f"ToUnicode CMap exceeds the bounded parser input limit ({len(data)} > {max_bytes} bytes).",
+        )
+        return []
+    max_entries = _pdf_budget(limits, "max_pdf_objects", _PDF_DEFAULT_MAX_CMAP_ENTRIES)
     text = data.decode("latin-1", errors="replace")
     mappings: dict[str, str] = {}
-    for block in re.findall(r"beginbfchar(.*?)endbfchar", text, flags=re.S):
-        for source, target in re.findall(r"(<[0-9A-Fa-f]+>)\s+(<[0-9A-Fa-f]+>)", block):
+    max_blocks = min(max_entries, 1_024)
+    for block_index, block_match in enumerate(re.finditer(r"beginbfchar(.*?)endbfchar", text, flags=re.S)):
+        if block_index >= max_blocks:
+            _pdf_limit_event(events, "DFIR-PDF-CMAP-BLOCK-LIMIT", "ToUnicode CMap block count exceeded the bounded parser limit.")
+            return [{"sourceCode": source, "unicode": mappings[source]} for source in sorted(mappings)]
+        block = block_match.group(1)
+        for entry_match in re.finditer(r"(<[0-9A-Fa-f]+>)\s+(<[0-9A-Fa-f]+>)", block):
+            if len(mappings) >= max_entries:
+                _pdf_limit_event(events, "DFIR-PDF-CMAP-ENTRY-LIMIT", "ToUnicode CMap entry count exceeded the bounded parser limit.")
+                return [{"sourceCode": source_code, "unicode": mappings[source_code]} for source_code in sorted(mappings)]
+            source, target = entry_match.groups()
+            if len(source) > _PDF_DEFAULT_MAX_CMAP_CODE_CHARS or len(target) > _PDF_DEFAULT_MAX_CMAP_CODE_CHARS:
+                _pdf_limit_event(events, "DFIR-PDF-CMAP-CODE-LIMIT", "ToUnicode CMap code width exceeded the bounded parser limit.")
+                continue
             source_code = source[1:-1].upper()
             value = _cmap_unicode(target)
             if value:
                 mappings[source_code] = value
-    for block in re.findall(r"beginbfrange(.*?)endbfrange", text, flags=re.S):
-        for start, end, target in re.findall(r"(<[0-9A-Fa-f]+>)\s+(<[0-9A-Fa-f]+>)\s+(<[^>]+>)", block):
+    for block_index, block_match in enumerate(re.finditer(r"beginbfrange(.*?)endbfrange", text, flags=re.S)):
+        if block_index >= max_blocks:
+            _pdf_limit_event(events, "DFIR-PDF-CMAP-BLOCK-LIMIT", "ToUnicode CMap block count exceeded the bounded parser limit.")
+            break
+        block = block_match.group(1)
+        for range_match in re.finditer(r"(<[0-9A-Fa-f]+>)\s+(<[0-9A-Fa-f]+>)\s+(<[^>]+>)", block):
+            start, end, target = range_match.groups()
+            if max(len(start), len(end), len(target)) > _PDF_DEFAULT_MAX_CMAP_CODE_CHARS:
+                _pdf_limit_event(events, "DFIR-PDF-CMAP-CODE-LIMIT", "ToUnicode CMap code width exceeded the bounded parser limit.")
+                continue
             try:
                 start_code = int(start[1:-1], 16)
                 end_code = int(end[1:-1], 16)
                 target_code = int(target[1:-1], 16)
             except ValueError:
                 continue
+            span = end_code - start_code + 1
+            if span < 0 or span > max_entries - len(mappings):
+                _pdf_limit_event(events, "DFIR-PDF-CMAP-ENTRY-LIMIT", "ToUnicode CMap range exceeds the bounded parser entry limit.")
+                break
             for offset, code in enumerate(range(start_code, end_code + 1)):
                 value = _cmap_unicode(f"<{target_code + offset:0{len(target) - 2}X}>")
                 if value:
@@ -119,7 +204,12 @@ def _parse_cmap(data: bytes) -> list[dict[str, str]]:
     return [{"sourceCode": source, "unicode": mappings[source]} for source in sorted(mappings)]
 
 
-def _pdf_font_mappings(objects: dict[tuple[int, int], bytes]) -> list[dict[str, Any]]:
+def _pdf_font_mappings(
+    objects: dict[tuple[int, int], bytes],
+    *,
+    limits: AdapterLimits | None = None,
+    events: list[tuple[str, str]] | None = None,
+) -> list[dict[str, Any]]:
     fonts: list[dict[str, Any]] = []
     for font_object, object_data in sorted(objects.items()):
         if not re.search(rb"/Type\s*/Font\b", object_data):
@@ -132,7 +222,7 @@ def _pdf_font_mappings(objects: dict[tuple[int, int], bytes]) -> list[dict[str, 
             cmap_object = (int(has_to_unicode.group(1)), int(has_to_unicode.group(2)))
             cmap_data = objects.get(cmap_object)
             if cmap_data is not None:
-                mapping = _parse_cmap(_decode_stream(cmap_data))
+                mapping = _parse_cmap(_decode_stream(cmap_data, limits=limits, events=events), limits=limits, events=events)
                 status = "preserved" if mapping else "unavailable"
         fonts.append({"object": font_object, "toUnicodeObject": cmap_object, "mappingStatus": status, "mapping": mapping})
     return fonts
@@ -152,7 +242,12 @@ def _pdf_font_resource_map(objects: dict[tuple[int, int], bytes], fonts: list[di
     return result
 
 
-def _decode_stream(object_data: bytes) -> bytes:
+def _decode_stream(
+    object_data: bytes,
+    *,
+    limits: AdapterLimits | None = None,
+    events: list[tuple[str, str]] | None = None,
+) -> bytes:
     marker = STREAM_MARKER_RE.search(object_data)
     if marker is None:
         return b""
@@ -160,33 +255,120 @@ def _decode_stream(object_data: bytes) -> bytes:
     if end < 0:
         return b""
     value = object_data[marker.end():end]
+    max_stream_bytes = _pdf_budget(limits, "max_input_bytes", _PDF_DEFAULT_MAX_STREAM_BYTES)
+    if len(value) > max_stream_bytes:
+        _pdf_limit_event(
+            events,
+            "DFIR-PDF-STREAM-BYTE-LIMIT",
+            f"PDF stream exceeds the bounded decoder input limit ({len(value)} > {max_stream_bytes} bytes).",
+        )
+        return b""
+    max_decoded_bytes = _pdf_budget(limits, "max_input_bytes", _PDF_DEFAULT_MAX_STREAM_BYTES)
     if b"/FlateDecode" in object_data:
         try:
-            return zlib.decompress(value)
-        except zlib.error:
-            return value
+            decompressor = zlib.decompressobj()
+            output = bytearray()
+            pending = value
+            while pending:
+                remaining = max_decoded_bytes - len(output)
+                if remaining <= 0:
+                    _pdf_limit_event(events, "DFIR-PDF-STREAM-DECODED-LIMIT", "FlateDecode output exceeded the bounded decoder limit.")
+                    return b""
+                output.extend(decompressor.decompress(pending, remaining + 1))
+                if len(output) > max_decoded_bytes or decompressor.unconsumed_tail:
+                    _pdf_limit_event(events, "DFIR-PDF-STREAM-DECODED-LIMIT", "FlateDecode output exceeded the bounded decoder limit.")
+                    return b""
+                pending = decompressor.unconsumed_tail
+            remaining = max_decoded_bytes - len(output)
+            output.extend(decompressor.flush(remaining + 1))
+            if len(output) > max_decoded_bytes:
+                _pdf_limit_event(events, "DFIR-PDF-STREAM-DECODED-LIMIT", "FlateDecode output exceeded the bounded decoder limit.")
+                return b""
+            if not decompressor.eof:
+                _pdf_limit_event(events, "DFIR-PDF-STREAM-DECODE-FAILED", "FlateDecode stream ended before a complete zlib member was decoded.")
+                return b""
+            return bytes(output)
+        except (zlib.error, ValueError):
+            _pdf_limit_event(events, "DFIR-PDF-STREAM-DECODE-FAILED", "FlateDecode stream could not be decoded safely.")
+            return b""
     if b"/ASCIIHexDecode" in object_data:
         try:
-            return bytes.fromhex(value.replace(b">", b"").decode("ascii"))
+            compact = re.sub(rb"\s+", b"", value.replace(b">", b""))
+            if len(compact) > max_decoded_bytes * 2 + 1:
+                _pdf_limit_event(events, "DFIR-PDF-STREAM-DECODED-LIMIT", "ASCIIHexDecode output exceeded the bounded decoder limit.")
+                return b""
+            decoded = bytes.fromhex(compact.decode("ascii"))
+            if len(decoded) > max_decoded_bytes:
+                _pdf_limit_event(events, "DFIR-PDF-STREAM-DECODED-LIMIT", "ASCIIHexDecode output exceeded the bounded decoder limit.")
+                return b""
+            return decoded
         except (ValueError, UnicodeDecodeError):
-            return value
+            _pdf_limit_event(events, "DFIR-PDF-STREAM-DECODE-FAILED", "ASCIIHexDecode stream could not be decoded safely.")
+            return b""
+    if len(value) > max_decoded_bytes:
+        _pdf_limit_event(events, "DFIR-PDF-STREAM-DECODED-LIMIT", "Unfiltered PDF stream exceeded the bounded decoder limit.")
+        return b""
+    if b"/Filter" in object_data:
+        _pdf_limit_event(events, "DFIR-PDF-STREAM-FILTER-UNSUPPORTED", "PDF stream uses a filter outside the bounded adapter subset.")
+        return b""
     return value
 
 
-def _page_content_streams(objects: dict[tuple[int, int], bytes], fallback: bytes) -> list[bytes]:
+def _page_content_streams(
+    objects: dict[tuple[int, int], bytes],
+    fallback: bytes,
+    *,
+    limits: AdapterLimits | None = None,
+    events: list[tuple[str, str]] | None = None,
+) -> list[bytes]:
     pages = [(key, value) for key, value in sorted(objects.items()) if re.search(rb"/Type\s*/Page\b", value)]
     streams: list[bytes] = []
     for _, page in pages:
-        references = [(int(number), int(generation)) for number, generation in re.findall(rb"(\d+)\s+(\d+)\s+R", page)]
-        page_streams = [_decode_stream(objects[ref]) for ref in references if ref in objects and b"stream" in objects[ref]]
-        streams.append(b"\n".join(page_streams) if page_streams else page)
-    return streams or [fallback]
+        tokens = _pdf_dictionary_tokens(page, limits=limits, events=events)
+        contents = _pdf_find_value(tokens, "Contents")
+        references: list[tuple[int, int]] = []
+        if contents is not None and contents[0] == "ref":
+            references = [contents[1]]
+        elif contents is not None and contents[0] == "array":
+            references = _pdf_reference_values(
+                contents,
+                max_count=_pdf_budget(limits, "max_pdf_objects", _PDF_DEFAULT_MAX_ANNOTATIONS_PER_PAGE),
+                events=events,
+            )
+        elif contents is not None:
+            _pdf_limit_event(events, "DFIR-PDF-CONTENTS-UNAVAILABLE", "PDF page /Contents is outside the bounded indirect-stream subset.")
+        page_streams = [_decode_stream(objects[ref], limits=limits, events=events) for ref in references if ref in objects and b"stream" in objects[ref]]
+        if page_streams:
+            streams.append(b"\n".join(page_streams))
+        else:
+            _pdf_limit_event(events, "DFIR-PDF-CONTENTS-UNAVAILABLE", "PDF page has no bounded /Contents stream; page metadata is not treated as source text.")
+            streams.append(b"")
+    return streams
 
 
-def _pdf_lex(data: str) -> list[tuple[str, Any]]:
+def _pdf_lex(
+    data: str,
+    *,
+    limits: AdapterLimits | None = None,
+    events: list[tuple[str, str]] | None = None,
+) -> list[tuple[str, Any]]:
     tokens: list[tuple[str, Any]] = []
     index = 0
     delimiters = "()<>[]{}/%"
+    max_tokens = _pdf_budget(limits, "max_text_chars", _PDF_DEFAULT_MAX_TOKENS)
+    max_lexeme_chars = _pdf_budget(limits, "max_text_chars", _PDF_DEFAULT_MAX_LEXEME_CHARS)
+    max_data_chars = _pdf_budget(limits, "max_text_chars", _PDF_DEFAULT_MAX_LEXEME_CHARS * 8)
+    if len(data) > max_data_chars:
+        _pdf_limit_event(events, "DFIR-PDF-TOKEN-BYTE-LIMIT", "PDF token input exceeded the bounded lexer input limit.")
+        data = data[:max_data_chars]
+
+    def append_token(kind: str, value: Any) -> bool:
+        if len(tokens) >= max_tokens:
+            _pdf_limit_event(events, "DFIR-PDF-TOKEN-LIMIT", "PDF token count exceeded the bounded lexer limit.")
+            return False
+        tokens.append((kind, value))
+        return True
+
     while index < len(data):
         character = data[index]
         if character.isspace():
@@ -197,11 +379,13 @@ def _pdf_lex(data: str) -> list[tuple[str, Any]]:
             index = len(data) if newline < 0 else newline + 1
             continue
         if data.startswith("<<", index) or data.startswith(">>", index):
-            tokens.append(("delimiter", data[index:index + 2]))
+            if not append_token("delimiter", data[index:index + 2]):
+                return tokens
             index += 2
             continue
         if character in "[]":
-            tokens.append(("delimiter", character))
+            if not append_token("delimiter", character):
+                return tokens
             index += 1
             continue
         if character == "(":
@@ -211,6 +395,9 @@ def _pdf_lex(data: str) -> list[tuple[str, Any]]:
             while index < len(data) and depth:
                 current = data[index]
                 if current == "\\" and index + 1 < len(data):
+                    if len(value) + 2 > max_lexeme_chars:
+                        _pdf_limit_event(events, "DFIR-PDF-TOKEN-LEXEME-LIMIT", "PDF literal string exceeded the bounded lexer token limit.")
+                        return tokens
                     value.append(data[index:index + 2])
                     index += 2
                     continue
@@ -223,49 +410,79 @@ def _pdf_lex(data: str) -> list[tuple[str, Any]]:
                         break
                 value.append(current)
                 index += 1
-            tokens.append(("string", _decode_literal("".join(value))))
+                if len(value) > max_lexeme_chars:
+                    _pdf_limit_event(events, "DFIR-PDF-TOKEN-LEXEME-LIMIT", "PDF literal string exceeded the bounded lexer token limit.")
+                    return tokens
+            if not append_token("string", _decode_literal("".join(value))):
+                return tokens
             continue
         if character == "<" and not data.startswith("<<", index):
             end = data.find(">", index + 1)
+            if end < 0 and len(data) - index > max_lexeme_chars:
+                _pdf_limit_event(events, "DFIR-PDF-TOKEN-LEXEME-LIMIT", "PDF hex string exceeded the bounded lexer token limit.")
+                return tokens
+            if end >= 0 and end - index - 1 > max_lexeme_chars:
+                _pdf_limit_event(events, "DFIR-PDF-TOKEN-LEXEME-LIMIT", "PDF hex string exceeded the bounded lexer token limit.")
+                return tokens
             raw = data[index + 1: len(data) if end < 0 else end]
             raw = re.sub(r"\s+", "", raw)
             try:
                 decoded = bytes.fromhex(raw + ("0" if len(raw) % 2 else "")).decode("utf-16-be" if raw.lower().startswith("feff") else "latin-1", errors="replace")
             except ValueError:
                 decoded = raw
-            tokens.append(("string", decoded))
+            if not append_token("string", decoded):
+                return tokens
             index = len(data) if end < 0 else end + 1
             continue
         if character == "/":
             end = index + 1
             while end < len(data) and not data[end].isspace() and data[end] not in delimiters:
                 end += 1
-            tokens.append(("name", data[index:end]))
+                if end - index > max_lexeme_chars:
+                    _pdf_limit_event(events, "DFIR-PDF-TOKEN-LEXEME-LIMIT", "PDF name exceeded the bounded lexer token limit.")
+                    return tokens
+            if not append_token("name", data[index:end]):
+                return tokens
             index = end
             continue
-        number = re.match(r"-?(?:\d+(?:\.\d*)?|\.\d+)", data[index:])
+        number = PDF_NUMBER_RE.match(data, index)
         if number:
             raw = number.group(0)
             try:
-                tokens.append(("number", Decimal(raw)))
+                if not append_token("number", Decimal(raw)):
+                    return tokens
             except InvalidOperation:
-                tokens.append(("word", raw))
+                if not append_token("word", raw):
+                    return tokens
             index += len(raw)
             continue
         end = index + 1
         while end < len(data) and not data[end].isspace() and data[end] not in delimiters:
             end += 1
-        tokens.append(("word", data[index:end]))
+            if end - index > max_lexeme_chars:
+                _pdf_limit_event(events, "DFIR-PDF-TOKEN-LEXEME-LIMIT", "PDF word exceeded the bounded lexer token limit.")
+                return tokens
+        if not append_token("word", data[index:end]):
+            return tokens
         index = end
     return tokens
 
 
-def _pdf_operations(data: str) -> list[tuple[str, list[Any]]]:
+def _pdf_operations(
+    data: str,
+    *,
+    limits: AdapterLimits | None = None,
+    events: list[tuple[str, str]] | None = None,
+) -> list[tuple[str, list[Any]]]:
     operations: list[tuple[str, list[Any]]] = []
     operands: list[Any] = []
     arrays: list[list[Any]] = []
-    for kind, value in _pdf_lex(data):
+    max_array_depth = 64
+    for kind, value in _pdf_lex(data, limits=limits, events=events):
         if kind == "delimiter" and value == "[":
+            if len(arrays) >= max_array_depth:
+                _pdf_limit_event(events, "DFIR-PDF-TOKEN-NESTING-LIMIT", "PDF array nesting exceeded the bounded operator parser limit.")
+                return operations
             arrays.append([])
         elif kind == "delimiter" and value == "]":
             if arrays:
@@ -323,8 +540,13 @@ def _graphics_state_snapshot(state: dict[str, Any], matrix: list[Decimal]) -> di
     }
 
 
-def _interpret_content(data: bytes) -> tuple[list[str], list[dict[str, Any]], list[str], list[dict[str, Any]], list[dict[str, Any]]]:
-    operations = _pdf_operations(data.decode("latin-1", errors="replace"))
+def _interpret_content(
+    data: bytes,
+    *,
+    limits: AdapterLimits | None = None,
+    events: list[tuple[str, str]] | None = None,
+) -> tuple[list[str], list[dict[str, Any]], list[str], list[dict[str, Any]], list[dict[str, Any]]]:
+    operations = _pdf_operations(data.decode("latin-1", errors="replace"), limits=limits, events=events)
     texts: list[str] = []
     paths: list[dict[str, Any]] = []
     unsupported: list[str] = []
@@ -500,6 +722,438 @@ def _observation(builder: DocumentBuilder, kind: str, target_id: str, *, geometr
     return observation_id
 
 
+def _pdf_dictionary_bytes(object_data: bytes) -> bytes:
+    marker = STREAM_MARKER_RE.search(object_data)
+    return object_data if marker is None else object_data[:marker.start()]
+
+
+def _pdf_matching_delimiter(tokens: list[tuple[str, Any]], start: int) -> int:
+    if start >= len(tokens) or tokens[start][0] != "delimiter" or tokens[start][1] not in {"[", "<<"}:
+        return min(start + 1, len(tokens))
+    closing = {"[": "]", "<<": ">>"}
+    stack = [closing[tokens[start][1]]]
+    for index in range(start + 1, len(tokens)):
+        kind, value = tokens[index]
+        if kind != "delimiter":
+            continue
+        if value in {"[", "<<"}:
+            if len(stack) >= _PDF_DEFAULT_MAX_NESTING:
+                return len(tokens)
+            stack.append(closing[value])
+        elif stack and value == stack[-1]:
+            stack.pop()
+            if not stack:
+                return index + 1
+    return len(tokens)
+
+
+def _pdf_parse_value(tokens: list[tuple[str, Any]], start: int) -> tuple[tuple[str, Any], int]:
+    if start >= len(tokens):
+        return ("missing", None), start
+    kind, value = tokens[start]
+    if kind == "delimiter" and value in {"[", "<<"}:
+        end = _pdf_matching_delimiter(tokens, start)
+        return ("array" if value == "[" else "dict", tokens[start + 1:max(start + 1, end - 1)]), end
+    if kind == "number" and start + 2 < len(tokens):
+        generation_kind, generation = tokens[start + 1]
+        marker_kind, marker = tokens[start + 2]
+        if generation_kind == "number" and marker_kind == "word" and marker == "R" and value == int(value) and generation == int(generation):
+            return ("ref", (int(value), int(generation))), start + 3
+    return (kind, value), start + 1
+
+
+def _pdf_value_end(tokens: list[tuple[str, Any]], start: int) -> int:
+    return _pdf_parse_value(tokens, start)[1]
+
+
+def _pdf_find_value(tokens: list[tuple[str, Any]], key: str) -> tuple[str, Any] | None:
+    index = 1 if tokens and tokens[0] == ("delimiter", "<<") else 0
+    while index < len(tokens):
+        kind, value = tokens[index]
+        if kind == "delimiter" and value == ">>":
+            break
+        if kind == "name":
+            parsed, end = _pdf_parse_value(tokens, index + 1)
+            if value == f"/{key}":
+                return parsed
+            index = end
+        else:
+            index += 1
+    return None
+
+
+def _pdf_value_name(value: tuple[str, Any] | None) -> str | None:
+    if value is None or value[0] != "name" or not isinstance(value[1], str):
+        return None
+    return value[1].lstrip("/") or None
+
+
+def _pdf_tokens_text(tokens: list[tuple[str, Any]], *, limit: int = _PDF_DEFAULT_MAX_ANNOTATION_TEXT) -> str:
+    values: list[str] = []
+    length = 0
+    for kind, value in tokens:
+        if kind == "delimiter":
+            item = str(value)
+        elif kind == "string":
+            item = str(value)
+        elif kind == "name":
+            item = str(value)
+        elif kind == "number":
+            item = str(value)
+        else:
+            item = str(value)
+        additional = len(item) if not values else len(item) + 1
+        if length + additional > limit:
+            break
+        values.append(item)
+        length += additional
+    text = " ".join(values)
+    return text if len(text) <= limit else text[: max(1, limit - 1)] + "…"
+
+
+def _pdf_value_text(value: tuple[str, Any] | None, *, limit: int = _PDF_DEFAULT_MAX_ANNOTATION_TEXT) -> str | None:
+    if value is None or value[0] == "missing":
+        return None
+    kind, raw = value
+    if kind in {"string", "word", "number"}:
+        text = str(raw)
+    elif kind == "name":
+        text = str(raw).lstrip("/")
+    elif kind == "ref":
+        text = f"{raw[0]} {raw[1]} R"
+    elif kind == "array":
+        text = _pdf_tokens_text(raw, limit=limit)
+    elif kind == "dict":
+        text = "dictionary"
+    else:
+        return None
+    return text if len(text) <= limit else text[: max(1, limit - 1)] + "…"
+
+
+def _pdf_dictionary_tokens(
+    object_data: bytes,
+    *,
+    limits: AdapterLimits | None = None,
+    events: list[tuple[str, str]] | None = None,
+) -> list[tuple[str, Any]]:
+    dictionary = _pdf_dictionary_bytes(object_data)
+    return _pdf_lex(dictionary.decode("latin-1", errors="replace"), limits=limits, events=events)
+
+
+def _pdf_resolve_value(
+    value: tuple[str, Any] | None,
+    objects: dict[tuple[int, int], bytes],
+    *,
+    limits: AdapterLimits | None = None,
+    events: list[tuple[str, str]] | None = None,
+) -> tuple[str, Any] | None:
+    if value is None or value[0] != "ref":
+        return value
+    object_data = objects.get(value[1])
+    if object_data is None:
+        return ("missing", value[1])
+    tokens = _pdf_dictionary_tokens(object_data, limits=limits, events=events)
+    if not tokens:
+        return ("missing", value[1])
+    return _pdf_parse_value(tokens, 0)[0]
+
+
+def _pdf_reference_values(
+    value: tuple[str, Any] | None,
+    *,
+    max_count: int,
+    events: list[tuple[str, str]] | None = None,
+) -> list[tuple[int, int]]:
+    if value is None or value[0] != "array":
+        return []
+    references: list[tuple[int, int]] = []
+    tokens = value[1]
+    index = 0
+    while index < len(tokens):
+        parsed, end = _pdf_parse_value(tokens, index)
+        if parsed[0] == "ref":
+            reference = parsed[1]
+            if reference not in references:
+                references.append(reference)
+            if len(references) >= max_count:
+                _pdf_limit_event(events, "DFIR-PDF-ANNOTATION-REFERENCE-LIMIT", "PDF annotation reference count reached the bounded page limit; additional references are not parsed.")
+                return references[:max_count]
+            index = end
+        else:
+            index += 1
+    return references
+
+
+def _pdf_annotation_references(
+    page_object: bytes,
+    objects: dict[tuple[int, int], bytes],
+    *,
+    limits: AdapterLimits | None = None,
+    events: list[tuple[str, str]] | None = None,
+) -> tuple[list[tuple[int, int]], bool]:
+    tokens = _pdf_dictionary_tokens(page_object, limits=limits, events=events)
+    annots = _pdf_find_value(tokens, "Annots")
+    if annots is None:
+        return [], False
+    max_count = _pdf_budget(limits, "max_pdf_objects", _PDF_DEFAULT_MAX_ANNOTATIONS_PER_PAGE)
+    if annots[0] == "ref":
+        array_object = objects.get(annots[1])
+        if array_object is None:
+            _pdf_limit_event(events, "DFIR-PDF-ANNOTATION-REFERENCE-UNAVAILABLE", "PDF /Annots references an unavailable annotation array object.")
+            return [], True
+        array_tokens = _pdf_dictionary_tokens(array_object, limits=limits, events=events)
+        if array_tokens:
+            annots = _pdf_parse_value(array_tokens, 0)[0]
+    references = _pdf_reference_values(annots, max_count=max_count, events=events)
+    if annots[0] != "array":
+        _pdf_limit_event(events, "DFIR-PDF-ANNOTATION-REFERENCE-UNAVAILABLE", "PDF /Annots did not resolve to a bounded array of indirect annotation references.")
+    return references, True
+
+
+def _pdf_destination_text(
+    value: tuple[str, Any] | None,
+    objects: dict[tuple[int, int], bytes],
+    *,
+    limits: AdapterLimits | None = None,
+    events: list[tuple[str, str]] | None = None,
+) -> str | None:
+    resolved = _pdf_resolve_value(value, objects, limits=limits, events=events)
+    if resolved is None or resolved[0] not in {"string", "name", "array"}:
+        return None
+    return _pdf_value_text(resolved)
+
+
+def _pdf_scalar_text(
+    value: tuple[str, Any] | None,
+    objects: dict[tuple[int, int], bytes],
+    *,
+    limits: AdapterLimits | None = None,
+    events: list[tuple[str, str]] | None = None,
+) -> str | None:
+    resolved = _pdf_resolve_value(value, objects, limits=limits, events=events)
+    if resolved is None or resolved[0] not in {"string", "name"}:
+        return None
+    return _pdf_value_text(resolved)
+
+
+def _add_pdf_annotations(
+    builder: DocumentBuilder,
+    page_id: str,
+    page_number: int,
+    page_object: bytes,
+    objects: dict[tuple[int, int], bytes],
+    *,
+    limits: AdapterLimits | None = None,
+    events: list[tuple[str, str]] | None = None,
+) -> None:
+    references, has_annots = _pdf_annotation_references(page_object, objects, limits=limits, events=events)
+    if not has_annots:
+        return
+    if not references:
+        return
+    for object_number, generation in references:
+        reference_id = f"{object_number} {generation} R"
+        annotation_object = objects.get((object_number, generation))
+        if annotation_object is None:
+            diagnostic = builder.add_diagnostic(
+                "DFIR-PDF-ANNOTATION-OBJECT-UNAVAILABLE",
+                f"PDF annotation reference {reference_id} points to an unavailable object.",
+                phase="parse",
+                target_id=page_id,
+            )
+            builder.add_feature("annotation", "unavailable", target_id=page_id, diagnostic_ids=[diagnostic])
+            continue
+        tokens = _pdf_dictionary_tokens(annotation_object, limits=limits, events=events)
+        subtype = _pdf_value_name(_pdf_find_value(tokens, "Subtype"))
+        if subtype is None:
+            diagnostic = builder.add_diagnostic(
+                "DFIR-PDF-ANNOTATION-SUBTYPE-UNAVAILABLE",
+                f"PDF annotation {reference_id} has no bounded /Subtype value.",
+                phase="parse",
+                target_id=page_id,
+            )
+            builder.add_feature("annotation", "unavailable", target_id=page_id, diagnostic_ids=[diagnostic])
+            continue
+
+        if subtype == "Link":
+            kind = "hyperlink"
+        elif subtype in {"Text", "FreeText", "Popup"}:
+            kind = "comment"
+        elif subtype == "Widget":
+            kind = "form"
+        else:
+            diagnostic = builder.add_diagnostic(
+                "DFIR-PDF-ANNOTATION-SUBTYPE-UNSUPPORTED",
+                f"PDF annotation {reference_id} uses unsupported subtype /{subtype}; it is not relabeled as another annotation kind.",
+                phase="normalize",
+                target_id=page_id,
+            )
+            builder.add_feature("annotation", "unsupported", target_id=page_id, diagnostic_ids=[diagnostic])
+            continue
+
+        status = "preserved"
+        body: str | None = None
+        diagnostic_ids: list[str] = []
+
+        if subtype == "Link":
+            action = _pdf_find_value(tokens, "A")
+            destination = _pdf_find_value(tokens, "Dest")
+            if action is not None:
+                action_value = _pdf_resolve_value(action, objects, limits=limits, events=events)
+                if action_value is None or action_value[0] == "missing":
+                    status = "unavailable"
+                    diagnostic_ids.append(builder.add_diagnostic(
+                        "DFIR-PDF-ANNOTATION-ACTION-UNAVAILABLE",
+                        f"PDF link annotation {reference_id} references an unavailable action object.",
+                        phase="parse",
+                        target_id=page_id,
+                    ))
+                elif action_value[0] != "dict":
+                    status = "unsupported"
+                    diagnostic_ids.append(builder.add_diagnostic(
+                        "DFIR-PDF-ANNOTATION-ACTION-UNSUPPORTED",
+                        f"PDF link annotation {reference_id} has an action value outside the bounded dictionary subset.",
+                        phase="normalize",
+                        target_id=page_id,
+                    ))
+                else:
+                    action_name = _pdf_value_name(_pdf_find_value(action_value[1], "S"))
+                    if action_name == "URI":
+                        body_value = _pdf_scalar_text(_pdf_find_value(action_value[1], "URI"), objects, limits=limits, events=events)
+                        if body_value:
+                            body = f"URI: {body_value}"
+                        else:
+                            status = "unavailable"
+                            diagnostic_ids.append(builder.add_diagnostic(
+                                "DFIR-PDF-ANNOTATION-DESTINATION-UNAVAILABLE",
+                                f"PDF URI action {reference_id} has no bounded URI value.",
+                                phase="parse",
+                                target_id=page_id,
+                            ))
+                    elif action_name == "GoTo":
+                        body_value = _pdf_destination_text(_pdf_find_value(action_value[1], "D"), objects, limits=limits, events=events)
+                        if body_value:
+                            body = f"Destination: {body_value}"
+                        else:
+                            status = "unavailable"
+                            diagnostic_ids.append(builder.add_diagnostic(
+                                "DFIR-PDF-ANNOTATION-DESTINATION-UNAVAILABLE",
+                                f"PDF GoTo action {reference_id} has no bounded destination value.",
+                                phase="parse",
+                                target_id=page_id,
+                            ))
+                    elif action_name == "GoToR":
+                        destination_text = _pdf_destination_text(_pdf_find_value(action_value[1], "D"), objects, limits=limits, events=events)
+                        file_text = _pdf_destination_text(_pdf_find_value(action_value[1], "F"), objects, limits=limits, events=events)
+                        if destination_text or file_text:
+                            pieces = []
+                            if file_text:
+                                pieces.append(f"file={file_text}")
+                            if destination_text:
+                                pieces.append(f"destination={destination_text}")
+                            body = "GoToR: " + "; ".join(pieces)
+                            status = "unsupported"
+                            diagnostic_ids.append(builder.add_diagnostic(
+                                "DFIR-PDF-ANNOTATION-ACTION-UNSUPPORTED",
+                                f"PDF GoToR action {reference_id} is parsed but external navigation is outside the bounded adapter slice.",
+                                phase="normalize",
+                                target_id=page_id,
+                            ))
+                        else:
+                            status = "unavailable"
+                            diagnostic_ids.append(builder.add_diagnostic(
+                                "DFIR-PDF-ANNOTATION-DESTINATION-UNAVAILABLE",
+                                f"PDF GoToR action {reference_id} has no bounded file or destination value.",
+                                phase="parse",
+                                target_id=page_id,
+                            ))
+                    elif action_name:
+                        status = "unsupported"
+                        body = f"Action: /{action_name}"
+                        diagnostic_ids.append(builder.add_diagnostic(
+                            "DFIR-PDF-ANNOTATION-ACTION-UNSUPPORTED",
+                            f"PDF link annotation {reference_id} uses unsupported action /{action_name}.",
+                            phase="normalize",
+                            target_id=page_id,
+                        ))
+                    else:
+                        status = "unavailable"
+                        diagnostic_ids.append(builder.add_diagnostic(
+                            "DFIR-PDF-ANNOTATION-ACTION-UNAVAILABLE",
+                            f"PDF link annotation {reference_id} has no bounded action subtype.",
+                            phase="parse",
+                            target_id=page_id,
+                        ))
+            elif destination is not None:
+                destination_text = _pdf_destination_text(destination, objects, limits=limits, events=events)
+                if destination_text:
+                    body = f"Destination: {destination_text}"
+                else:
+                    status = "unavailable"
+                    diagnostic_ids.append(builder.add_diagnostic(
+                        "DFIR-PDF-ANNOTATION-DESTINATION-UNAVAILABLE",
+                        f"PDF link annotation {reference_id} has no bounded destination value.",
+                        phase="parse",
+                        target_id=page_id,
+                    ))
+            else:
+                status = "unavailable"
+                diagnostic_ids.append(builder.add_diagnostic(
+                    "DFIR-PDF-ANNOTATION-ACTION-UNAVAILABLE",
+                    f"PDF link annotation {reference_id} has neither /A nor /Dest.",
+                    phase="parse",
+                    target_id=page_id,
+                ))
+        elif subtype in {"Text", "FreeText", "Popup"}:
+            contents = _pdf_find_value(tokens, "Contents")
+            if subtype == "Popup" and contents is None:
+                parent_value = _pdf_resolve_value(_pdf_find_value(tokens, "Parent"), objects, limits=limits, events=events)
+                if parent_value is not None and parent_value[0] == "dict":
+                    contents = _pdf_find_value(parent_value[1], "Contents")
+            body = _pdf_scalar_text(contents, objects, limits=limits, events=events)
+            if not body:
+                status = "unavailable"
+                diagnostic_ids.append(builder.add_diagnostic(
+                    "DFIR-PDF-ANNOTATION-CONTENTS-UNAVAILABLE",
+                    f"PDF {subtype} annotation {reference_id} has no bounded contents value.",
+                    phase="parse",
+                    target_id=page_id,
+                ))
+        elif subtype == "Widget":
+            field_name = _pdf_scalar_text(_pdf_find_value(tokens, "T"), objects, limits=limits, events=events)
+            body = f"Field: {field_name}" if field_name else None
+            status = "unsupported"
+            diagnostic_ids.append(builder.add_diagnostic(
+                "DFIR-PDF-ANNOTATION-WIDGET-UNSUPPORTED",
+                f"PDF widget annotation {reference_id} is identified but form behavior and appearance are outside the bounded adapter slice.",
+                phase="normalize",
+                target_id=page_id,
+            ))
+
+        item: dict[str, Any] = {
+            "annotationId": safe_id("annotation", f"pdf-annotation-{page_number}-{object_number}-{generation}"),
+            "kind": kind,
+            "targetIds": [page_id],
+            "referenceId": reference_id,
+            "status": status,
+        }
+        if body:
+            item["body"] = body[:_PDF_DEFAULT_MAX_ANNOTATION_TEXT]
+        builder.add_item("annotations", item, "annotationId")
+        builder.add_feature("annotation", status, target_id=page_id, diagnostic_ids=diagnostic_ids)
+
+
+def _emit_pdf_limit_events(
+    builder: DocumentBuilder,
+    events: list[tuple[str, str]],
+    *,
+    target_id: str,
+) -> None:
+    for code, message in events:
+        diagnostic = builder.add_diagnostic(code, message, phase="parse", target_id=target_id)
+        builder.add_feature("bounded-pdf-work", "unsupported", target_id=target_id, diagnostic_ids=[diagnostic])
+
+
 def _add_text(
     builder: DocumentBuilder,
     page_id: str,
@@ -555,14 +1209,15 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
             builder.add_feature("header", "failed", diagnostic_ids=[diagnostic])
             return builder.finish(status="failed")
         content = raw.decode("latin-1", errors="replace")
-        objects = _pdf_objects(raw)
-        if len(objects) > limits.max_pdf_objects:
-            diagnostic = builder.add_diagnostic("DFIR-PDF-OBJECT-LIMIT", "PDF object limit exceeded", severity="error", phase="parse")
-            builder.add_feature("package-validation", "failed", diagnostic_ids=[diagnostic])
-            return builder.finish(status="failed")
+        limit_events: list[tuple[str, str]] = []
+        objects = _pdf_objects(raw, max_objects=limits.max_pdf_objects, events=limit_events)
         page_objects = [(key, value) for key, value in sorted(objects.items()) if re.search(rb"/Type\s*/Page\b", value)]
-        page_count = len(page_objects) or len(re.findall(r"/Type\s*/Page\b", content))
+        # A textual /Type /Page marker outside an extracted indirect object is
+        # not enough evidence of a page; it may occur in a stream or comment.
+        # Only materialized page objects may create page/surface entities.
+        page_count = len(page_objects)
         if page_count == 0:
+            _emit_pdf_limit_events(builder, limit_events, target_id=builder.root_id)
             diagnostic = builder.add_diagnostic("DFIR-PDF-PAGE-MISSING", "PDF contains no page object", severity="error", phase="parse")
             builder.add_feature("pages", "failed", diagnostic_ids=[diagnostic])
             return builder.finish(status="failed")
@@ -623,7 +1278,7 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
             builder.add_feature("pdf-object-graph", "ambiguous", target_id=document_part, diagnostic_ids=[diagnostic])
         else:
             builder.add_feature("pdf-object-graph", "preserved", target_id=document_part)
-        font_mappings = _pdf_font_mappings(objects)
+        font_mappings = _pdf_font_mappings(objects, limits=limits, events=limit_events)
         font_by_resource = _pdf_font_resource_map(objects, font_mappings)
         for font in font_mappings:
             object_number, generation = font["object"]
@@ -655,7 +1310,7 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
                     target_id=builder.root_id,
                 )
                 builder.add_feature("font-mapping", "unavailable", target_id=builder.root_id, diagnostic_ids=[diagnostic])
-        streams = _page_content_streams(objects, raw)
+        streams = _page_content_streams(objects, raw, limits=limits, events=limit_events)
         pages_seen = 0
         for page_index in range(page_count):
             pages_seen += 1
@@ -665,13 +1320,11 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
             builder.add_item("surfaces", {"surfaceId": surface_id, "partId": document_part, "kind": "page", "ordinal": pages_seen - 1, "coordinateSpaceId": space_id, "status": "preserved"}, "surfaceId")
             builder.add_node("section", page_id, parent_id=builder.root_id, part_id=document_part, status="preserved")
             builder.add_source_map(page_id, {"page": pages_seen, "object": pages_seen})
-            page_object = page_objects[pages_seen - 1][1] if pages_seen <= len(page_objects) else content.encode("latin-1", errors="replace")
-            page_text = streams[pages_seen - 1] if pages_seen <= len(streams) else page_object
-            fragments, parsed_paths, unsupported_operators, text_positions, graphics_states = _interpret_content(page_text)
+            page_object = page_objects[pages_seen - 1][1]
+            page_text = streams[pages_seen - 1] if pages_seen <= len(streams) else b""
+            fragments, parsed_paths, unsupported_operators, text_positions, graphics_states = _interpret_content(page_text, limits=limits, events=limit_events)
             if not fragments:
                 fragments = _stream_text(page_text.decode("latin-1", errors="replace"))
-            if not fragments and page_text != raw:
-                fragments = _stream_text(content)
             for fragment, value in enumerate(fragments, start=1):
                 _add_text(builder, page_id, value, pages_seen, fragment, space_id, text_positions[fragment - 1] if fragment <= len(text_positions) else None, font_by_resource)
             for state_index, state_record in enumerate(graphics_states, start=1):
@@ -708,10 +1361,7 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
                 builder.add_node("path", path_id, parent_id=page_id, geometryId=geometry_id, status=geometry_status)
                 builder.add_source_map(path_id, {"page": pages_seen, "operator": path_index})
                 builder.add_feature("clipping" if geometry_kind == "clippingPath" else "path", geometry_status, target_id=path_id)
-            page_has_annots = b"/Annots" in page_object if isinstance(page_object, bytes) else "/Annots" in page_object
-            if page_has_annots:
-                annotation_id = safe_id("annotation", f"pdf-link-{pages_seen}")
-                builder.add_item("annotations", {"annotationId": annotation_id, "kind": "hyperlink", "targetIds": [page_id], "body": "PDF annotation destination retained as form fact", "status": "preserved"}, "annotationId")
+            _add_pdf_annotations(builder, page_id, pages_seen, page_object, objects, limits=limits, events=limit_events)
             renderer_diagnostic = builder.add_diagnostic("DFIR-PDF-RENDERER-UNAVAILABLE", "No renderer worker is configured; renderer result is unavailable and source facts are unchanged.", phase="observe", target_id=page_id)
             ocr_diagnostic = builder.add_diagnostic("DFIR-PDF-OCR-UNAVAILABLE", "No OCR worker is configured; OCR result is unavailable and source text is unchanged.", phase="observe", target_id=page_id)
             builder.add_feature("renderer-observation", "unavailable", target_id=page_id, diagnostic_ids=[renderer_diagnostic])
@@ -723,6 +1373,7 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
             builder.add_item("resources", {"resourceId": resource_id, "kind": "font", "mediaType": "application/x-font", "availability": "unavailable", "derivedHandle": "font-resource"}, "resourceId")
             diagnostic = builder.add_diagnostic("DFIR-PDF-FONT-RESOURCE-UNAVAILABLE", "PDF font references could not be resolved to an indirect font object.", phase="parse", target_id=builder.root_id)
             builder.add_feature("font-mapping", "unavailable", target_id=builder.root_id, diagnostic_ids=[diagnostic])
+        _emit_pdf_limit_events(builder, limit_events, target_id=builder.root_id)
         builder.add_feature("pages", "preserved", target_id=builder.root_id)
         return builder.finish()
     except (OSError, ValueError, AdapterError) as exc:

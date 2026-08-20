@@ -7,6 +7,7 @@ exit status and file presence alone never satisfy a completion claim.
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 from pathlib import Path
@@ -90,6 +91,7 @@ def run() -> dict[str, Any]:
     mutation = _json_report(["tools/mutation_qualification.py", "--json"], blockers)
     if mutation is not None:
         specification = reports["mutation"]
+        _require(mutation.get("status") == "passed", "MUTATION_STATUS", "mutation report is not marked passed", blockers)
         _require(mutation.get("schema") == specification["schema"], "MUTATION_SCHEMA", "mutation report schema is not the strict contract schema", blockers)
         _require(isinstance(mutation.get("coverage"), dict), "MUTATION_COVERAGE_MISSING", "mutation report must identify covered mutation classes", blockers)
         covered = set(mutation.get("coverage", {}).keys()) if isinstance(mutation.get("coverage"), dict) else set()
@@ -104,6 +106,7 @@ def run() -> dict[str, Any]:
     corpus = _json_report(["tools/independent_corpus.py", "--json"], blockers)
     if corpus is not None:
         specification = reports["independentCorpus"]
+        _require(corpus.get("status") == "passed", "CORPUS_STATUS", "independent corpus report is not marked passed", blockers)
         _require(corpus.get("schema") == specification["schema"], "CORPUS_SCHEMA", "independent corpus report schema is not the strict contract schema", blockers)
         formats = {case.get("format") for case in corpus.get("cases", []) if isinstance(case, dict)}
         _require(formats == set(specification["requiredFormats"]), "CORPUS_FORMAT_MATRIX", "independent corpus does not cover exactly the required formats", blockers)
@@ -125,6 +128,7 @@ def run() -> dict[str, Any]:
     query = _json_report(["tools/query_qualification.py"], blockers)
     if query is not None:
         specification = reports["query"]
+        _require(query.get("status") == "passed", "QUERY_STATUS", "query qualification report is not marked passed", blockers)
         _require(query.get("schema") == specification["schema"], "QUERY_SCHEMA", "query report schema is not the strict contract schema", blockers)
         _require(set(specification["requiredSources"]).issubset(set(query.get("sources", []))), "QUERY_SOURCES_INCOMPLETE", "query qualification must include examples, real-input E2E, and independent corpus", blockers)
         _require(query.get("unqueryableFacts") == [], "QUERY_UNQUERYABLE_FACTS", "strict completion forbids unqueryable authoritative facts", blockers)
@@ -136,6 +140,7 @@ def run() -> dict[str, Any]:
     real_input = _json_report(["tools/run_e2e.py", "--all", "--json"], blockers)
     if real_input is not None:
         specification = reports["realInput"]
+        _require(real_input.get("status") == "passed", "E2E_STATUS", "real-input E2E report is not marked passed", blockers)
         _require(real_input.get("schema") == specification["schema"], "E2E_SCHEMA", "real-input report schema is not the strict contract schema", blockers)
         formats = set(real_input.get("formats", []))
         _require(formats == set(specification["requiredFormats"]), "E2E_FORMAT_MATRIX", "real-input E2E does not cover exactly the required formats", blockers)
@@ -164,9 +169,39 @@ def run() -> dict[str, Any]:
     }
 
 
-def main() -> int:
+def run_bundle(manifest: Path, *, allow_dirty: bool = False) -> dict[str, Any]:
+    """Run the commit-bound Evidence validator as a strict completion gate.
+
+    The legacy phase-2 gate remains available through ``run()``.  A bundle
+    path opts into the newer #88 contract and makes the evidence validator
+    the authoritative result for that invocation.
+    """
+
     try:
-        report = run()
+        from validate_qualification_bundle import validate_bundle
+    except ImportError:  # pragma: no cover
+        from tools.validate_qualification_bundle import validate_bundle
+
+    validation = validate_bundle(manifest, repo_root=ROOT, allow_dirty=allow_dirty)
+    blockers = validation.get("diagnostics", [])
+    return {
+        "schema": "fdir/strict-completion-gate-report",
+        "version": "1.1.0",
+        "status": "passed" if validation.get("status") == "passed" else "blocked",
+        "issues": [88],
+        "blockers": blockers,
+        "reportsChecked": ["qualification-bundle"],
+        "bundleValidation": validation,
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--bundle", type=Path, help="validate a commit-bound qualification manifest")
+    parser.add_argument("--allow-dirty", action="store_true", help="permit a dirty bundle for local development")
+    args = parser.parse_args()
+    try:
+        report = run_bundle(args.bundle, allow_dirty=args.allow_dirty) if args.bundle else run()
     except Exception as exc:
         report = {"schema": "fdir/strict-completion-gate-report", "version": "1.0.0", "status": "blocked", "blockers": [{"code": "GATE_ERROR", "detail": f"{type(exc).__name__}: {exc}"}]}
     print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))

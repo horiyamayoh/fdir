@@ -668,7 +668,18 @@ def validate_document(document: dict[str, Any]) -> list[str]:
     except ImportError:  # pragma: no cover - package-style import
         from tools.extension_registry import validate_extension
     for extension in items_by_collection["extensions"].values():
-        validate_extension(extension, document, ids, kind_by_id)
+        extension_result = validate_extension(extension, document, ids, kind_by_id)
+        if extension_result == "opaque":
+            diagnosed = any(
+                item.get("code") == "DFIR-EXTENSION-UNKNOWN-OPAQUE"
+                and item.get("targetId") == extension.get("extensionId")
+                for item in items_by_collection["diagnostics"].values()
+            )
+            if not diagnosed:
+                raise IRValidationError(
+                    f"unknown non-critical extension {extension.get('extensionId')} lacks an opaque diagnostic",
+                    "DFIR-EXTENSION-OPAQUE-NO-DIAGNOSTIC",
+                )
     for source_map_id, source_map in items_by_collection["sourceMaps"].items():
         _id_ref(source_map.get("targetId"), ids, set(COLLECTION_KEYS) - {"diagnostics", "sourceMaps"}, f"sourceMap {source_map_id}.targetId", optional=False)
         if source_map.get("format", {}).get("name") != source.get("name"):
@@ -683,7 +694,7 @@ def validate_document(document: dict[str, Any]) -> list[str]:
             _id_ref(related_id, ids, set(COLLECTION_KEYS), f"diagnostic {diagnostic_id}.relatedIds", optional=False)
 
     conversion = document.get("conversion")
-    if not isinstance(conversion, dict) or conversion.get("status") not in {"complete", "partial", "failed"}:
+    if not isinstance(conversion, dict) or conversion.get("status") not in {"complete", "complete-with-warnings", "partial", "failed"}:
         raise IRValidationError("invalid conversion report", "DFIR-CONVERSION-STATUS")
     _validate_capability_contract(document, source, conversion)
     for diagnostic_id in conversion.get("diagnostics", []):
@@ -692,6 +703,8 @@ def validate_document(document: dict[str, Any]) -> list[str]:
     for warning_id in conversion.get("warnings", []):
         if warning_id not in diagnostic_ids:
             raise IRValidationError(f"conversion references missing warning {warning_id}", "DFIR-DIAGNOSTIC-MISSING")
+        if next(item for item in items_by_collection["diagnostics"].values() if item.get("diagnosticId") == warning_id).get("severity") not in {"info", "warning"}:
+            raise IRValidationError(f"conversion warning references an error diagnostic {warning_id}", "DFIR-WARNING-SEVERITY")
     for feature in conversion.get("features", []):
         status = feature.get("status")
         if status not in STATUS_VALUES:
@@ -710,10 +723,20 @@ def validate_document(document: dict[str, Any]) -> list[str]:
     statuses.extend(feature.get("status") for feature in conversion.get("features", []))
     hard_loss = any(status in PARTIAL_STATUSES for status in statuses)
     has_error = any(item.get("severity") in {"error", "fatal"} for item in items_by_collection["diagnostics"].values())
-    if conversion["status"] == "complete" and (hard_loss or has_error):
+    if conversion["status"] in {"complete", "complete-with-warnings"} and (hard_loss or has_error):
         raise IRValidationError("complete conversion contains a non-preserved or error outcome", "DFIR-COMPLETE-CLAIM")
-    if conversion["status"] == "failed" and not conversion.get("diagnostics"):
-        raise IRValidationError("failed conversion has no diagnostic", "DFIR-FAILED-NO-DIAGNOSTIC")
+    if conversion["status"] == "complete" and conversion.get("warnings"):
+        raise IRValidationError("warning-bearing conversion must use complete-with-warnings", "DFIR-WARNING-STATUS")
+    if conversion["status"] == "complete-with-warnings" and not conversion.get("warnings"):
+        raise IRValidationError("complete-with-warnings conversion has no warning evidence", "DFIR-WARNING-STATUS")
+    if conversion["status"] == "failed":
+        if not conversion.get("diagnostics"):
+            raise IRValidationError("failed conversion has no diagnostic", "DFIR-FAILED-NO-DIAGNOSTIC")
+        if not has_error:
+            raise IRValidationError(
+                "failed conversion has no error or fatal diagnostic",
+                "DFIR-FAILED-NO-ERROR-DIAGNOSTIC",
+            )
     if conversion["status"] == "partial" and not conversion.get("diagnostics") and not hard_loss:
         raise IRValidationError("partial conversion has no loss evidence", "DFIR-PARTIAL-NO-EVIDENCE")
     return [f"{item.get('code')}: {item.get('message')}" for item in items_by_collection["diagnostics"].values() if item.get("severity") in {"info", "warning"}]

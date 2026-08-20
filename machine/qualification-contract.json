@@ -1,0 +1,96 @@
+{
+  "schema": "fdir/qualification-contract",
+  "version": "1.0.0",
+  "repository": "horiyamayoh/fdir",
+  "evidenceSchema": "schemas/qualification-evidence.schema.json",
+  "scope": {
+    "issueNumbers": [88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105],
+    "requiredEvidenceIds": [
+      "issue-88-qualification-contract", "issue-89-defect-injection", "issue-90-model-contract",
+      "issue-91-occurrence-accounting", "issue-92-exact-values", "issue-93-style-provenance",
+      "issue-94-geometry-order", "issue-95-topology", "issue-96-relationship-closure",
+      "issue-97-extension-registry", "issue-98-canonical-identity", "issue-99-docx-profile",
+      "issue-100-xlsx-profile", "issue-101-pdf-profile", "issue-102-markdown-profile",
+      "issue-103-query-index", "issue-104-independent-corpus", "issue-105-release-quality"
+    ],
+    "requiredRequirementIds": [
+      "QUAL-88-EVIDENCE-OBJECT", "QUAL-89-MUST-MUTATIONS", "QUAL-90-AUTHORITY-CLOSURE",
+      "QUAL-91-OCCURRENCE-ACCOUNTING", "QUAL-92-EXACT-LANES", "QUAL-93-STYLE-PROVENANCE",
+      "QUAL-94-GEOMETRY-ORDER", "QUAL-95-TOPOLOGY", "QUAL-96-RELATIONSHIP-CLOSURE",
+      "QUAL-97-EXTENSION-CLOSURE", "QUAL-98-CANONICAL-IDENTITY", "QUAL-99-DOCX-PROFILE",
+      "QUAL-100-XLSX-PROFILE", "QUAL-101-PDF-PROFILE", "QUAL-102-MARKDOWN-PROFILE",
+      "QUAL-103-QUERY-INDEX", "QUAL-104-INDEPENDENT-CORPUS", "QUAL-105-RELEASE-BARRIER"
+    ]
+  },
+  "sourcePolicy": {
+    "shaFormat": "git-40-lowercase-hex",
+    "mustMatchHead": true,
+    "releaseEvidenceMustBeClean": true
+  },
+  "bundlePolicy": {
+    "manifestName": "manifest.json",
+    "manifestDigest": "sha256(canonical-json(manifest-with-manifestDigest-omitted))",
+    "payloadDigestAlgorithm": "sha256",
+    "payloadFiles": "all regular files below bundle root except manifest.json",
+    "dirtyTree": "git status of the repository excluding the generated bundle directory",
+    "inputPaths": "repository-relative POSIX paths",
+    "outputPaths": "bundle-relative POSIX paths",
+    "issueIndexPattern": "issues/<issue-number>.json",
+    "reportPattern": "reports/<evidence-id>.json",
+    "logPattern": "logs/<evidence-id>.(stdout|stderr).txt"
+  },
+  "environmentPolicy": {
+    "requiredFields": ["os", "architecture", "python", "runtime", "dependencyLockDigest"],
+    "dependencyLockFiles": [],
+    "dependencyLockBasis": "fdir-stdlib-only-dependencies-v1"
+  },
+  "ciPolicy": {
+    "allowedProviders": ["github-actions", "local"],
+    "releaseStatus": "completed",
+    "githubActionsRunUrlPattern": "https://github.com/<repository>/actions/runs/<run-id>",
+    "localRunUrlPrefix": "local://"
+  },
+  "defaultEvidence": [
+    {"evidenceId":"issue-88-qualification-contract","issueNumbers":[88],"requirementIds":["QUAL-88-EVIDENCE-OBJECT"],"command":["python","tools/validate_qualification_bundle.py","--schema-only"],"inputs":[{"path":"machine/qualification-contract.json","role":"qualification-contract"},{"path":"schemas/qualification-evidence.schema.json","role":"evidence-schema"},{"path":"machine/strict-completion-contract.json","role":"strict-completion-policy"}],"outputs":[{"sourcePath":"machine/qualification-contract.json","path":"artifacts/88/qualification-contract.json","role":"contract-snapshot"},{"sourcePath":"schemas/qualification-evidence.schema.json","path":"artifacts/88/qualification-evidence.schema.json","role":"schema-snapshot"},{"sourcePath":"machine/strict-completion-contract.json","path":"artifacts/88/strict-completion-contract.json","role":"strict-policy-snapshot"}]},
+    {"evidenceId":"issue-89-defect-injection","issueNumbers":[89],"requirementIds":["QUAL-89-MUST-MUTATIONS"],"command":["python","tools/run_defect_injection_campaign.py","--jobs","8","--allow-dirty-base","--out","e2e/.run/qualification-issue-89.json","--artifact-dir","e2e/.run/qualification-issue-89-artifacts"],"inputs":[{"path":"machine/defect-injection-contract.json","role":"defect-contract"},{"path":"tools/run_defect_injection_campaign.py","role":"campaign-runner"},{"path":"tools/defect_profile_formats.py","role":"format-probes"}],"outputs":[{"sourcePath":"e2e/.run/qualification-issue-89.json","path":"artifacts/89/defect-injection-campaign.json","role":"campaign-report"},{"sourcePath":"machine/defect-injection-contract.json","path":"artifacts/89/defect-injection-contract.json","role":"campaign-contract"},{"sourceDirectory":"e2e/.run/qualification-issue-89-artifacts","path":"artifacts/89/defect-injection-artifacts","role":"campaign-artifacts"}]},
+    {"evidenceId":"issue-90-model-contract","issueNumbers":[90],"requirementIds":["QUAL-90-AUTHORITY-CLOSURE"],"command":["python","tools/validate_model_contract.py","--check"],"inputs":[{"path":"machine/model-contract.json","role":"normative-model"},{"path":"machine/reference-registry.json","role":"reference-registry"},{"path":"schemas/document-form-ir.schema.json","role":"generated-schema"}],"outputs":[{"sourcePath":"machine/model-contract.json","path":"artifacts/90/model-contract.json","role":"model-contract"},{"sourcePath":"machine/reference-registry.json","path":"artifacts/90/reference-registry.json","role":"reference-registry"},{"sourcePath":"schemas/document-form-ir.schema.json","path":"artifacts/90/document-form-ir.schema.json","role":"generated-schema"}]},
+    {"evidenceId":"issue-91-occurrence-accounting","issueNumbers":[91],"requirementIds":["QUAL-91-OCCURRENCE-ACCOUNTING"],"command":["python","tools/run_acceptance.py","--all"],"inputs":[{"path":"tools/adapter_common.py","role":"status-accounting"},{"path":"tools/ir_validation.py","role":"runtime-validation"},{"path":"machine/capability-profile.json","role":"capability-policy"}],"outputs":[{"sourcePath":"tools/adapter_common.py","path":"artifacts/91/adapter_common.py","role":"status-accounting-source"},{"sourcePath":"machine/capability-profile.json","path":"artifacts/91/capability-profile.json","role":"capability-policy"}]},
+    {"evidenceId":"issue-92-exact-values","issueNumbers":[92],"requirementIds":["QUAL-92-EXACT-LANES"],"command":["python","tools/run_e2e.py","--all","--json"],"inputs":[{"path":"tools/adapter_common.py","role":"value-lanes"},{"path":"tools/adapter_xlsx.py","role":"spreadsheet-lanes"},{"path":"tools/adapter_pdf.py","role":"glyph-lanes"}],"outputs":[{"sourcePath":"tools/adapter_xlsx.py","path":"artifacts/92/adapter_xlsx.py","role":"spreadsheet-adapter"},{"sourcePath":"tools/adapter_pdf.py","path":"artifacts/92/adapter_pdf.py","role":"pdf-glyph-adapter"}]},
+    {"evidenceId":"issue-93-style-provenance","issueNumbers":[93],"requirementIds":["QUAL-93-STYLE-PROVENANCE"],"command":["python","tools/run_e2e.py","--all","--json"],"inputs":[{"path":"tools/adapter_docx.py","role":"docx-style-cascade"},{"path":"tools/adapter_xlsx.py","role":"xlsx-style-cascade"},{"path":"examples/style-resolution.json","role":"style-oracle-example"}],"outputs":[{"sourcePath":"tools/adapter_docx.py","path":"artifacts/93/adapter_docx.py","role":"docx-style-adapter"},{"sourcePath":"examples/style-resolution.json","path":"artifacts/93/style-resolution.json","role":"style-example"}]},
+    {"evidenceId":"issue-94-geometry-order","issueNumbers":[94],"requirementIds":["QUAL-94-GEOMETRY-ORDER"],"command":["python","tools/run_e2e.py","--all","--json"],"inputs":[{"path":"tools/adapter_docx.py","role":"drawing-geometry"},{"path":"tools/adapter_pdf.py","role":"pdf-geometry-order"}],"outputs":[{"sourcePath":"tools/adapter_docx.py","path":"artifacts/94/adapter_docx.py","role":"docx-geometry-adapter"},{"sourcePath":"tools/adapter_pdf.py","path":"artifacts/94/adapter_pdf.py","role":"pdf-geometry-adapter"}]},
+    {"evidenceId":"issue-95-topology","issueNumbers":[95],"requirementIds":["QUAL-95-TOPOLOGY"],"command":["python","tools/run_e2e.py","--all","--json"],"inputs":[{"path":"tools/adapter_docx.py","role":"docx-topology"},{"path":"tools/adapter_xlsx.py","role":"xlsx-topology"},{"path":"tools/adapter_markdown.py","role":"markdown-topology"}],"outputs":[{"sourcePath":"tools/adapter_docx.py","path":"artifacts/95/adapter_docx.py","role":"docx-topology-adapter"},{"sourcePath":"tools/adapter_xlsx.py","path":"artifacts/95/adapter_xlsx.py","role":"xlsx-topology-adapter"},{"sourcePath":"tools/adapter_markdown.py","path":"artifacts/95/adapter_markdown.py","role":"markdown-topology-adapter"}]},
+    {"evidenceId":"issue-96-relationship-closure","issueNumbers":[96],"requirementIds":["QUAL-96-RELATIONSHIP-CLOSURE"],"command":["python","tools/run_e2e.py","--all","--json"],"inputs":[{"path":"machine/reference-registry.json","role":"relationship-registry"},{"path":"tools/adapter_docx.py","role":"docx-relationships"},{"path":"tools/adapter_xlsx.py","role":"xlsx-relationships"},{"path":"tools/adapter_pdf.py","role":"pdf-annotations"}],"outputs":[{"sourcePath":"machine/reference-registry.json","path":"artifacts/96/reference-registry.json","role":"relationship-registry"},{"sourcePath":"tools/adapter_docx.py","path":"artifacts/96/adapter_docx.py","role":"docx-relationship-adapter"}]},
+    {"evidenceId":"issue-97-extension-registry","issueNumbers":[97],"requirementIds":["QUAL-97-EXTENSION-CLOSURE"],"command":["python","tools/validate_design.py"],"inputs":[{"path":"machine/extension-registry.json","role":"extension-registry"},{"path":"schemas/extensions/format-extensions.schema.json","role":"extension-schema"},{"path":"tools/extension_registry.py","role":"extension-validator"}],"outputs":[{"sourcePath":"machine/extension-registry.json","path":"artifacts/97/extension-registry.json","role":"extension-registry"},{"sourcePath":"schemas/extensions/format-extensions.schema.json","path":"artifacts/97/format-extensions.schema.json","role":"extension-schema"},{"sourcePath":"tools/extension_registry.py","path":"artifacts/97/extension_registry.py","role":"extension-validator"}]},
+    {"evidenceId":"issue-98-canonical-identity","issueNumbers":[98],"requirementIds":["QUAL-98-CANONICAL-IDENTITY"],"command":["python","tools/defect_profile_canonical.py","--probe","canonical-key-order"],"inputs":[{"path":"machine/canonicalization.json","role":"canonicalization-contract"},{"path":"tools/canonicalize_ir.py","role":"canonicalizer"},{"path":"tools/defect_profile_canonical.py","role":"canonical-probe"}],"outputs":[{"sourcePath":"machine/canonicalization.json","path":"artifacts/98/canonicalization.json","role":"canonicalization-contract"},{"sourcePath":"tools/canonicalize_ir.py","path":"artifacts/98/canonicalize_ir.py","role":"canonicalizer"}]},
+    {"evidenceId":"issue-99-docx-profile","issueNumbers":[99],"requirementIds":["QUAL-99-DOCX-PROFILE"],"command":["python","tools/run_e2e.py","--all","--json"],"inputs":[{"path":"tools/adapter_docx.py","role":"docx-profile-adapter"},{"path":"e2e/corpus/manifest.json","role":"corpus-manifest"}],"outputs":[{"sourcePath":"tools/adapter_docx.py","path":"artifacts/99/adapter_docx.py","role":"docx-profile-adapter"},{"sourcePath":"e2e/corpus/manifest.json","path":"artifacts/99/corpus-manifest.json","role":"corpus-manifest"}]},
+    {"evidenceId":"issue-100-xlsx-profile","issueNumbers":[100],"requirementIds":["QUAL-100-XLSX-PROFILE"],"command":["python","tools/run_e2e.py","--all","--json"],"inputs":[{"path":"tools/adapter_xlsx.py","role":"xlsx-profile-adapter"},{"path":"e2e/corpus/manifest.json","role":"corpus-manifest"}],"outputs":[{"sourcePath":"tools/adapter_xlsx.py","path":"artifacts/100/adapter_xlsx.py","role":"xlsx-profile-adapter"},{"sourcePath":"e2e/corpus/manifest.json","path":"artifacts/100/corpus-manifest.json","role":"corpus-manifest"}]},
+    {"evidenceId":"issue-101-pdf-profile","issueNumbers":[101],"requirementIds":["QUAL-101-PDF-PROFILE"],"command":["python","tools/run_e2e.py","--all","--json"],"inputs":[{"path":"tools/adapter_pdf.py","role":"pdf-profile-adapter"},{"path":"e2e/corpus/manifest.json","role":"corpus-manifest"}],"outputs":[{"sourcePath":"tools/adapter_pdf.py","path":"artifacts/101/adapter_pdf.py","role":"pdf-profile-adapter"},{"sourcePath":"e2e/corpus/manifest.json","path":"artifacts/101/corpus-manifest.json","role":"corpus-manifest"}]},
+    {"evidenceId":"issue-102-markdown-profile","issueNumbers":[102],"requirementIds":["QUAL-102-MARKDOWN-PROFILE"],"command":["python","tools/run_e2e.py","--all","--json"],"inputs":[{"path":"tools/adapter_markdown.py","role":"markdown-profile-adapter"},{"path":"e2e/corpus/manifest.json","role":"corpus-manifest"}],"outputs":[{"sourcePath":"tools/adapter_markdown.py","path":"artifacts/102/adapter_markdown.py","role":"markdown-profile-adapter"},{"sourcePath":"e2e/corpus/manifest.json","path":"artifacts/102/corpus-manifest.json","role":"corpus-manifest"}]},
+    {"evidenceId":"issue-103-query-index","issueNumbers":[103],"requirementIds":["QUAL-103-QUERY-INDEX"],"command":["python","tools/query_qualification.py"],"inputs":[{"path":"machine/query-contract.json","role":"query-contract"},{"path":"tools/query_ir.py","role":"query-index"},{"path":"tools/query_qualification.py","role":"query-qualification"}],"outputs":[{"sourcePath":"machine/query-contract.json","path":"artifacts/103/query-contract.json","role":"query-contract"},{"sourcePath":"tools/query_ir.py","path":"artifacts/103/query_ir.py","role":"query-index"}]},
+    {"evidenceId":"issue-104-independent-corpus","issueNumbers":[104],"requirementIds":["QUAL-104-INDEPENDENT-CORPUS"],"command":["python","tools/independent_corpus.py","--json"],"inputs":[{"path":"e2e/corpus/manifest.json","role":"corpus-manifest"},{"path":"tools/independent_corpus.py","role":"corpus-runner"}],"outputs":[{"sourcePath":"e2e/corpus/manifest.json","path":"artifacts/104/corpus-manifest.json","role":"corpus-manifest"},{"sourcePath":"tools/independent_corpus.py","path":"artifacts/104/independent_corpus.py","role":"corpus-runner"}]},
+    {"evidenceId":"issue-105-release-quality","issueNumbers":[105],"requirementIds":["QUAL-105-RELEASE-BARRIER"],"command":["python","tools/release_gate.py"],"inputs":[{"path":"machine/release-claim-manifest.json","role":"release-claims"},{"path":"machine/audit-recovery-plan.json","role":"release-barrier"},{"path":".github/workflows/design.yml","role":"ci-workflow"}],"outputs":[{"sourcePath":"machine/release-claim-manifest.json","path":"artifacts/105/release-claim-manifest.json","role":"release-claims"},{"sourcePath":"machine/audit-recovery-plan.json","path":"artifacts/105/audit-recovery-plan.json","role":"release-barrier"},{"sourcePath":".github/workflows/design.yml","path":"artifacts/105/design.yml","role":"ci-workflow"}]}
+  ],
+  "negativeFixtures": [
+    {"id":"modified-output","mutation":"append one byte to a declared output without changing its manifest record","expectedDiagnostic":"OUTPUT_DIGEST_MISMATCH"},
+    {"id":"different-source-sha","mutation":"change one report sourceSha nibble and refresh only the enclosing payload metadata","expectedDiagnostic":"SOURCE_SHA_MISMATCH"},
+    {"id":"empty-report","mutation":"replace one report with an empty JSON object and refresh only the enclosing payload metadata","expectedDiagnostic":"EVIDENCE_REPORT_EMPTY"},
+    {"id":"ci-inconsistent","mutation":"change ci.sourceSha while keeping the report sourceSha unchanged","expectedDiagnostic":"CI_SOURCE_SHA_MISMATCH"},
+    {"id":"duplicate-evidence-id","mutation":"copy a report to a second path without changing evidenceId","expectedDiagnostic":"DUPLICATE_EVIDENCE_ID"},
+    {"id":"dirty-tree","mutation":"mark the manifest and report as dirty under the release-clean policy","expectedDiagnostic":"DIRTY_TREE"},
+    {"id":"assertion-mismatch","mutation":"change an assertion expected value without changing actual","expectedDiagnostic":"ASSERTION_MISMATCH"},
+    {"id":"manifest-digest","mutation":"change the manifest declaration without recomputing manifestDigest","expectedDiagnostic":"MANIFEST_DIGEST_MISMATCH"}
+  ],
+  "policies": {
+    "noThirdPartyDependencies": true,
+    "requireEvidenceSchemaFields": true,
+    "requireInputDigestRecomputation": true,
+    "requireOutputDigestRecomputation": true,
+    "requireAtLeastOneAssertion": true,
+    "requireAtLeastOneTestCase": true,
+    "rejectDuplicateEvidenceIds": true,
+    "rejectUnresolvedIssueBindings": true,
+    "rejectCiSourceOrRepositoryMismatch": true,
+    "rejectReleaseDirtyTree": true,
+    "waiversAllowed": false
+  }
+}

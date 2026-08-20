@@ -15,7 +15,10 @@
     "python tools/mutation_qualification.py --json",
     "python tools/query_qualification.py",
     "python tools/independent_corpus.py --json",
-    "python tools/strict_completion_gate.py"
+    "python tools/strict_completion_gate.py",
+    "python tools/validate_model_contract.py --check",
+    "python tools/test_evidence_integrity.py --all",
+    "python tools/validate_qualification_bundle.py --schema-only"
   ],
   "requiredAdapters": [
     "tools/adapter_docx.py",
@@ -49,11 +52,22 @@
     "machine/query-contract.json",
     "machine/release-claim-manifest.json",
     "machine/strict-completion-contract.json",
+    "machine/audit-recovery-plan.json",
+    "machine/qualification-contract.json",
+    "machine/model-contract.json",
+    "machine/defect-injection-contract.json",
+    "schemas/qualification-evidence.schema.json",
     "e2e/corpus/manifest.json",
     "e2e/corpus/README.md",
     "tools/query_qualification.py",
     "tools/independent_corpus.py",
-    "tools/strict_completion_gate.py"
+    "tools/strict_completion_gate.py",
+    "tools/build_qualification_bundle.py",
+    "tools/validate_qualification_bundle.py",
+    "tools/test_evidence_integrity.py",
+    "tools/generate_model_contract.py",
+    "tools/validate_model_contract.py",
+    "tools/run_defect_injection_campaign.py"
   ],
   "forbiddenConcepts": [
     "semanticEquivalence",
@@ -80,6 +94,11 @@
     "mutation-qualification",
     "query-qualification",
     "independent-corpus",
-    "strict-completion"
+    "strict-completion",
+    "audit-recovery",
+    "audit-recovery-release-boundary",
+    "qualification-evidence",
+    "model-contract",
+    "defect-injection"
   ]
 }

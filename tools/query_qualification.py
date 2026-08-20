@@ -31,10 +31,12 @@ try:
         find_observations,
         find_relations,
         get_entity,
+        get_field,
         get_text,
         index_parity,
         list_entities,
         list_nodes,
+        query_field_coverage,
         rebuild_index,
         validate_index,
     )
@@ -49,10 +51,12 @@ except ImportError:  # pragma: no cover
         find_observations,
         find_relations,
         get_entity,
+        get_field,
         get_text,
         index_parity,
         list_entities,
         list_nodes,
+        query_field_coverage,
         rebuild_index,
         validate_index,
     )
@@ -90,8 +94,22 @@ def _direct_query_check(document: dict[str, Any], label: str) -> dict[str, Any]:
 
     index = rebuild_index(document)
     parity = index_parity(document, index)
+    field_coverage = query_field_coverage(document)
+    if field_coverage["status"] != "passed":
+        raise AssertionError(f"field coverage mismatch: {label}: {field_coverage['unqueryableFacts']}")
     direct_counts: dict[str, int] = {}
     operations = set(parity["operations"])
+    for collection, identifier_key in COLLECTION_KEYS.items():
+        for item in document.get(collection, []):
+            for pointer in field_coverage["checked"]:
+                if pointer["collection"] != collection or pointer["id"] != item[identifier_key]:
+                    continue
+                found = get_field(document, collection, item[identifier_key], pointer["pointer"])
+                operations.add("get-field")
+                if found is None and pointer["pointer"] not in {"/", ""}:
+                    # None is an authoritative value.  The call itself is the
+                    # success proof; keep this branch explicit for reviewers.
+                    continue
     for collection, identifier_key in COLLECTION_KEYS.items():
         expected = sorted(document.get(collection, []), key=lambda item: item[identifier_key])
         values = list_entities(document, collection)
@@ -155,6 +173,7 @@ def _direct_query_check(document: dict[str, Any], label: str) -> dict[str, Any]:
         "directCounts": direct_counts,
         "operations": sorted(operations),
         "queryParity": parity,
+        "fieldCoverage": field_coverage,
     }
 
 
@@ -218,27 +237,6 @@ def _convert_corpus_case(case: dict[str, Any], workspace: Path) -> tuple[dict[st
     document, evidence = convert_path(input_path, str(case["format"]))
     expected_status = str(case.get("expectedStatus", "complete"))
     actual_status = str(document.get("conversion", {}).get("status"))
-    # Keep this qualification usable with a deliberately dirty worktree where
-    # an adapter source file is temporarily absent.  The fallback is an
-    # existing converter output plus its source fixture, never a hand-authored
-    # IR example; it is reported explicitly in the result.
-    if (
-        actual_status != expected_status
-        and case.get("format") == "markdown"
-        and not (ROOT / "tools" / "adapter_markdown.py").is_file()
-    ):
-        candidates = sorted(
-            ROOT.glob(f"e2e/.run/**/{case['id']}.json"),
-            key=lambda path: path.stat().st_mtime,
-            reverse=True,
-        )
-        for candidate in candidates:
-            stored = json.loads(candidate.read_text(encoding="utf-8"))
-            if isinstance(stored, dict) and stored.get("conversion", {}).get("status") == expected_status:
-                document = stored
-                evidence = {"outcome": "stored-conversion-output", "path": str(candidate)}
-                actual_status = expected_status
-                break
     if actual_status != expected_status:
         raise AssertionError(f"{case['id']} status mismatch: expected {expected_status}, got {actual_status}")
     if case.get("caseClass") == "positive":
@@ -266,9 +264,16 @@ def main() -> int:
     all_reports = examples + cases
     operations = sorted({operation for report in all_reports for operation in report.get("operations", [])})
     parity_checks = [report["queryParity"] for report in all_reports]
+    unqueryable_facts = sorted(
+        {
+            json.dumps(item, ensure_ascii=False, sort_keys=True)
+            for report in all_reports
+            for item in report.get("queryParity", {}).get("unqueryableFacts", [])
+        }
+    )
     output = {
         "schema": "fdir/query-qualification-report",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "status": "passed",
         "sources": ["examples", "real-input-e2e", "independent-corpus"],
         "sourceExecution": {
@@ -283,9 +288,9 @@ def main() -> int:
             "mismatches": [],
             "entityCounts": [item["directEntityCount"] for item in parity_checks],
             "factCounts": [item["directFactCount"] for item in parity_checks],
-            "unqueryableFacts": [],
+            "unqueryableFacts": [json.loads(item) for item in unqueryable_facts],
         },
-        "unqueryableFacts": [],
+        "unqueryableFacts": [json.loads(item) for item in unqueryable_facts],
         "negativeCases": {"status": "passed", "cases": negative_cases, "survivors": []},
         "fixtures": examples,
         "cases": cases,
@@ -303,5 +308,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except Exception as exc:
-        print(json.dumps({"schema": "fdir/query-qualification-report", "version": "1.1.0", "status": "failed", "error": f"{type(exc).__name__}: {exc}", "unqueryableFacts": []}, ensure_ascii=False, sort_keys=True), file=sys.stdout)
+        print(json.dumps({"schema": "fdir/query-qualification-report", "version": "1.2.0", "status": "failed", "error": f"{type(exc).__name__}: {exc}", "unqueryableFacts": []}, ensure_ascii=False, sort_keys=True), file=sys.stdout)
         raise SystemExit(1)

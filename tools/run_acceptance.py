@@ -135,7 +135,7 @@ def validate_document_shape(document: dict[str, Any], name: str) -> None:
     ensure(isinstance(document.get("rootNodeId"), str), f"{name}: missing rootNodeId")
     ensure(isinstance(document.get("nodes"), list) and document["nodes"], f"{name}: missing nodes")
     ensure(isinstance(document.get("conversion"), dict), f"{name}: missing conversion report")
-    ensure(document["conversion"].get("status") in {"complete", "partial", "failed"}, f"{name}: invalid conversion status")
+    ensure(document["conversion"].get("status") in {"complete", "complete-with-warnings", "partial", "failed"}, f"{name}: invalid conversion status")
     ref_ids(document)
     node_map = ids_for(document, "nodes", f"{name} nodes")
     ensure(document["rootNodeId"] in node_map, f"{name}: root node is not present")
@@ -155,7 +155,10 @@ def validate_document_shape(document: dict[str, Any], name: str) -> None:
         ensure(diagnostic_id in diagnostic_map, f"{name}: missing conversion diagnostic {diagnostic_id}")
     if conversion["status"] in {"partial", "failed"}:
         ensure(report_diagnostics or diagnostics, f"{name}: non-complete conversion hides diagnostics")
+    if conversion["status"] == "complete-with-warnings":
+        ensure(bool(conversion.get("warnings")), f"{name}: warning-bearing status has no warnings")
     if conversion["status"] == "complete":
+        ensure(not conversion.get("warnings"), f"{name}: complete conversion has warning diagnostics")
         ensure(not any(node.get("status") in {"failed", "unsupported", "unavailable"} for node in node_map.values()),
                f"{name}: complete conversion contains an unhandled node status")
     forbidden = {
@@ -454,7 +457,7 @@ def check_status(ctx: Context, case: int) -> None:
         ensure("status" in schema_def(ctx, "field")["required"], "field status is not available")
     elif case == 6:
         diagnostic = partial["diagnostics"][0]
-        ensure({"diagnosticId", "code", "severity", "message"} <= set(diagnostic), "diagnostic fields are incomplete")
+        ensure({"diagnosticId", "code", "severity", "message", "action"} <= set(diagnostic), "diagnostic fields are incomplete")
     elif case == 7:
         ensure(partial["conversion"]["diagnostics"], "unsupported node was silently dropped")
     elif case == 8:
@@ -514,7 +517,7 @@ def check_io(ctx: Context, case: int) -> None:
     elif case == 5:
         ensure(isinstance(load_json(ROOT / "machine" / "canonicalization.json").get("version"), str), "canonicalization version is missing")
     elif case == 6:
-        ensure(isinstance(doc.get("conversion", {}).get("diagnostics"), list) and doc.get("conversion", {}).get("status") in {"complete", "partial", "failed"}, "migration/diagnostic boundary is missing")
+        ensure(isinstance(doc.get("conversion", {}).get("diagnostics"), list) and doc.get("conversion", {}).get("status") in {"complete", "complete-with-warnings", "partial", "failed"}, "migration/diagnostic boundary is missing")
     elif case == 7:
         altered = copy.deepcopy(doc)
         altered["nodes"] = list(reversed(altered["nodes"]))

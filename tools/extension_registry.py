@@ -97,8 +97,11 @@ def validate_extension(extension: dict[str, Any], document: dict[str, Any], ids:
     if entry is None:
         if extension["criticality"] == "critical":
             raise ExtensionValidationError(f"unknown critical extension: {extension['namespace']}:{extension['type']}:{extension['schemaVersion']}")
-        if document.get("conversion", {}).get("status") == "complete":
-            raise ExtensionValidationError(f"unknown non-critical extension cannot be complete: {extension['extensionId']}")
+        if document.get("conversion", {}).get("status") in {"complete", "complete-with-warnings"}:
+            raise ExtensionValidationError(
+                "unknown non-critical extension cannot claim a complete conversion: "
+                f"{extension['extensionId']}"
+            )
         return "opaque"
     if extension["schemaId"] != entry["schemaId"]:
         raise ExtensionValidationError(f"extension {extension['extensionId']} schemaId does not match registry")

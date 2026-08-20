@@ -148,7 +148,7 @@ def _actual_canonical_and_index_mutations() -> list[dict[str, Any]]:
 
     source = ROOT / "e2e" / "corpus" / "pdf-independent.pdf"
     document, evidence = convert_path(source, "pdf")
-    if evidence.get("outcome") != "success" or document.get("conversion", {}).get("status") not in {"partial", "complete"}:
+    if evidence.get("outcome") != "success" or document.get("conversion", {}).get("status") not in {"partial", "complete-with-warnings", "complete"}:
         raise QualificationError(f"real canonical/query mutation source did not convert: {evidence}")
 
     cases: list[dict[str, Any]] = []
@@ -284,6 +284,10 @@ def _actual_canonical_and_index_mutations() -> list[dict[str, Any]]:
 
 
 def run() -> dict[str, Any]:
+    # Mutation qualification writes only disposable run products.  Create the
+    # ignored workspace here so the strict gate also works from a fresh
+    # checkout where e2e/.run does not yet exist.
+    (ROOT / "e2e" / ".run").mkdir(parents=True, exist_ok=True)
     positive = ["callout.json", "cell-formula.json", "markdown-authoring.json", "style-resolution.json"]
     for name in positive:
         validate_document(_load(name))

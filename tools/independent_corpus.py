@@ -130,6 +130,11 @@ def _check_resource_limit(case: dict[str, Any], input_path: Path, workspace: Pat
     validate_document(document)
     if document.get("conversion", {}).get("status") != "failed":
         raise CorpusFailure("resource-limit negative case did not fail closed")
+    evidence_value = json.loads(evidence.read_text(encoding="utf-8"))
+    if evidence_value.get("input", {}).get("consumed") is not True:
+        raise CorpusFailure("resource-limit evidence does not prove that the real input was consumed")
+    if evidence_value.get("input", {}).get("format") != case["format"]:
+        raise CorpusFailure("resource-limit evidence format does not match the corpus case")
     report_evidence = case_evidence(input_path, case["format"], document)
     report_evidence["sourceDigest"] = source_digest(CORPUS / str(case["path"]))
     report_evidence["caseClass"] = "resource-limit"

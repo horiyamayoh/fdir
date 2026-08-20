@@ -13,9 +13,9 @@ import zipfile
 import xml.etree.ElementTree as ET
 
 try:
-    from adapter_common import AdapterError, AdapterLimits, DocumentBuilder, decimal, input_limit_check, safe_id
+    from adapter_common import AdapterError, AdapterLimits, DocumentBuilder, decimal, input_limit_check, read_bounded_xml, safe_id, validate_zip_archive
 except ImportError:  # pragma: no cover
-    from tools.adapter_common import AdapterError, AdapterLimits, DocumentBuilder, decimal, input_limit_check, safe_id
+    from tools.adapter_common import AdapterError, AdapterLimits, DocumentBuilder, decimal, input_limit_check, read_bounded_xml, safe_id, validate_zip_archive
 
 
 NS_MAIN = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -60,24 +60,24 @@ def _cell_range(value: str, sheet_id: str) -> dict[str, Any] | None:
     return {"from": {"sheetId": sheet_id, "row": _row_number(endpoints[0]), "column": _col_number(endpoints[0])}, "to": {"sheetId": sheet_id, "row": _row_number(endpoints[1]), "column": _col_number(endpoints[1])}}
 
 
-def _read_xml(archive: zipfile.ZipFile, name: str) -> ET.Element:
-    return ET.fromstring(archive.read(name))
+def _read_xml(archive: zipfile.ZipFile, name: str, limits: AdapterLimits | None = None) -> ET.Element:
+    return read_bounded_xml(archive, name, limits or AdapterLimits())
 
 
-def _shared_strings(archive: zipfile.ZipFile) -> list[str]:
+def _shared_strings(archive: zipfile.ZipFile, limits: AdapterLimits | None = None) -> list[str]:
     if "xl/sharedStrings.xml" not in archive.namelist():
         return []
-    root = _read_xml(archive, "xl/sharedStrings.xml")
+    root = _read_xml(archive, "xl/sharedStrings.xml", limits)
     values: list[str] = []
     for item in _children(root, "si"):
         values.append("".join(text.text or "" for text in item.iter() if _local(text.tag) == "t"))
     return values
 
 
-def _shared_string_details(archive: zipfile.ZipFile) -> dict[int, dict[str, Any]]:
+def _shared_string_details(archive: zipfile.ZipFile, limits: AdapterLimits | None = None) -> dict[int, dict[str, Any]]:
     if "xl/sharedStrings.xml" not in archive.namelist():
         return {}
-    root = _read_xml(archive, "xl/sharedStrings.xml")
+    root = _read_xml(archive, "xl/sharedStrings.xml", limits)
     details: dict[int, dict[str, Any]] = {}
     for index, item in enumerate(_children(root, "si")):
         runs: list[dict[str, Any]] = []
@@ -120,10 +120,10 @@ def _rich_runs(element: ET.Element) -> list[dict[str, Any]]:
     return runs
 
 
-def _relationships(archive: zipfile.ZipFile, name: str) -> dict[str, str]:
+def _relationships(archive: zipfile.ZipFile, name: str, limits: AdapterLimits | None = None) -> dict[str, str]:
     if name not in archive.namelist():
         return {}
-    root = _read_xml(archive, name)
+    root = _read_xml(archive, name, limits)
     return {_attr(item, "Id"): _attr(item, "Target") for item in root if _local(item.tag) == "Relationship"}
 
 
@@ -143,10 +143,12 @@ def _calc_context(workbook: ET.Element) -> dict[str, str]:
 def inspect(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any]:
     limits = input_limit_check(Path(path), limits)
     with zipfile.ZipFile(path) as archive:
-        names = archive.namelist()
+        names = validate_zip_archive(archive, limits)
+        if len(names) > limits.max_xml_parts:
+            raise AdapterError(f"XLSX package part limit exceeded: {len(names)} > {limits.max_xml_parts}")
         if "xl/workbook.xml" not in names:
             raise AdapterError("XLSX package lacks xl/workbook.xml")
-        workbook = _read_xml(archive, "xl/workbook.xml")
+        workbook = _read_xml(archive, "xl/workbook.xml", limits)
         sheets = [item for item in _children(workbook, "sheet")]
         return {
             "format": "xlsx",
@@ -240,12 +242,12 @@ def _xlsx_color(element: ET.Element | None) -> dict[str, Any] | None:
     return None
 
 
-def _style_table(archive: zipfile.ZipFile, builder: DocumentBuilder) -> tuple[dict[int, str], dict[int, str]]:
+def _style_table(archive: zipfile.ZipFile, builder: DocumentBuilder, limits: AdapterLimits | None = None) -> tuple[dict[int, str], dict[int, str]]:
     style_ids: dict[int, str] = {}
     formats: dict[int, str] = {0: "General"}
     if "xl/styles.xml" not in archive.namelist():
         return style_ids, formats
-    root = _read_xml(archive, "xl/styles.xml")
+    root = _read_xml(archive, "xl/styles.xml", limits)
     custom = {_attr(item, "numFmtId"): _attr(item, "formatCode") for item in _children(root, "numFmt")}
     fonts = _children(next(iter(_children(root, "fonts")), root), "font")
     fills = _children(next(iter(_children(root, "fills")), root), "fill")
@@ -300,7 +302,7 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
     builder = DocumentBuilder(path, "xlsx", "Office Open XML", limits=limits)
     try:
         with zipfile.ZipFile(path) as archive:
-            names = archive.namelist()
+            names = validate_zip_archive(archive, limits)
             if len(names) > limits.max_xml_parts:
                 diagnostic = builder.add_diagnostic("DFIR-XLSX-PACKAGE-LIMIT", f"package has {len(names)} parts; limit is {limits.max_xml_parts}", severity="error", phase="parse")
                 builder.add_feature("package-validation", "failed", diagnostic_ids=[diagnostic])
@@ -309,11 +311,11 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
                 diagnostic = builder.add_diagnostic("DFIR-XLSX-WORKBOOK-MISSING", "XLSX package lacks xl/workbook.xml", severity="error", phase="parse")
                 builder.add_feature("workbook", "failed", diagnostic_ids=[diagnostic])
                 return builder.finish(status="failed")
-            workbook = _read_xml(archive, "xl/workbook.xml")
-            workbook_rels = _relationships(archive, "xl/_rels/workbook.xml.rels")
-            shared = _shared_strings(archive)
-            shared_details = _shared_string_details(archive)
-            style_ids, number_formats = _style_table(archive, builder)
+            workbook = _read_xml(archive, "xl/workbook.xml", limits)
+            workbook_rels = _relationships(archive, "xl/_rels/workbook.xml.rels", limits)
+            shared = _shared_strings(archive, limits)
+            shared_details = _shared_string_details(archive, limits)
+            style_ids, number_formats = _style_table(archive, builder, limits)
             context = _calc_context(workbook)
             package_part = safe_id("part", "xlsx-package")
             builder.add_item("parts", {"partId": package_part, "kind": "package", "name": "OOXML package", "contentType": "application/vnd.openxmlformats-package", "rootNodeIds": [builder.root_id], "status": "preserved"}, "partId")
@@ -354,7 +356,7 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
                     builder.add_item("relations", {"relationId": workbook_relation_id, "kind": "references", "fromId": workbook_part, "toId": part_id, "status": "preserved"}, "relationId")
                     builder.find("parts", "partId", workbook_part).setdefault("relationshipIds", []).append(workbook_relation_id)
                 builder.add_source_map(section_id, {"path": target, "worksheet": sheet_name})
-                sheet_root = _read_xml(archive, target)
+                sheet_root = _read_xml(archive, target, limits)
                 for view in _children(sheet_root, "sheetView"):
                     pane = next(iter(_children(view, "pane")), None)
                     pane_payload = {key: _attr(pane, key) for key in ("xSplit", "ySplit", "topLeftCell", "activePane", "state") if pane is not None and _attr(pane, key)}
@@ -372,10 +374,16 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
                         builder.add_feature("defined-name", "preserved", target_id=section_id)
                 rows = [row for row in _children(sheet_root, "row")]
                 max_column = max((_col_number(_attr(cell, "r")) for row in rows for cell in _children(row, "c")), default=1)
+                if max_column > limits.max_nodes:
+                    raise AdapterError(f"XLSX column limit exceeded: {max_column} > {limits.max_nodes}")
                 column_visibility: dict[int, dict[str, Any]] = {}
                 for column_definition in _children(sheet_root, "col"):
                     minimum = int(_attr(column_definition, "min", "1") or 1)
                     maximum = int(_attr(column_definition, "max", str(minimum)) or minimum)
+                    if minimum < 1 or maximum < minimum or maximum - minimum + 1 > limits.max_nodes:
+                        raise AdapterError(
+                            f"XLSX column visibility range exceeds the bounded node limit: {minimum}:{maximum}"
+                        )
                     state = {"declared": "hidden" if _attr(column_definition, "hidden") in {"1", "true"} else "visible"}
                     for column_number in range(minimum, maximum + 1):
                         column_visibility[column_number] = state
@@ -467,11 +475,11 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
                 merged_ranges = [item for item in merged_ranges if item is not None]
                 builder.add_item("tables", {"tableId": safe_id("table", f"xlsx-grid-{sheet_ordinal}"), "nodeId": table_node_id, "rowIds": row_ids, "columnIds": column_ids, "cellIds": cell_ids, "mergedRanges": merged_ranges, "status": "preserved"}, "tableId")
                 sheet_rel_name = f"xl/worksheets/_rels/{target.rsplit('/', 1)[-1]}.rels"
-                table_names_for_sheet = [posixpath.normpath(posixpath.join("xl/worksheets", table_target)) for table_target in _relationships(archive, sheet_rel_name).values() if table_target.startswith("../tables/")]
+                table_names_for_sheet = [posixpath.normpath(posixpath.join("xl/worksheets", table_target)) for table_target in _relationships(archive, sheet_rel_name, limits).values() if table_target.startswith("../tables/")]
                 if not table_names_for_sheet and len([name for name in names if name.startswith("xl/tables/") and name.endswith(".xml")]) == 1:
                     table_names_for_sheet = [name for name in names if name.startswith("xl/tables/") and name.endswith(".xml")]
                 for table_name in sorted(name for name in table_names_for_sheet if name in names):
-                    table_root = _read_xml(archive, table_name)
+                    table_root = _read_xml(archive, table_name, limits)
                     table_id = safe_id("table", f"xlsx-{sheet_ordinal}-{_attr(table_root, 'name', table_name)}")
                     builder.add_item("tables", {"tableId": table_id, "nodeId": table_node_id, "rowIds": row_ids, "columnIds": column_ids, "cellIds": cell_ids, "status": "preserved"}, "tableId")
                     table_part_id = part_ids.get(table_name)

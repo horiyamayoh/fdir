@@ -1,5 +1,13 @@
 # 7. 検証計画と Issue 分割
 
+> **Release status: BLOCKED.** The current state is controlled by
+> [`machine/audit-recovery-plan.json`](../machine/audit-recovery-plan.json),
+> which requires the commit-bound recovery program in Issues #88–#105.
+
+The verification material below distinguishes implementation checks from
+qualification evidence. A present adapter, a passing design check, a closed
+Issue, or a command exit alone cannot restore release status.
+
 ## 7.1 検証の考え方
 
 品質の中心は qualification の事務処理量ではなく、typed model の不変条件と四形式の具体的な変換結果です。受入テストは機械可読要件へ追跡し、成果物がない Issue を完了扱いにしません。
@@ -53,9 +61,19 @@ flowchart LR
 
 詳細な requirement-to-test-to-issue の対応は machine/requirements.json、machine/acceptance-tests.json、machine/issue-plan.json にあります。
 
+The historical implementation Issue criteria above do not override the current
+recovery policy. Release qualification additionally requires the live state of
+every recovery Issue #88–#105, the dependency DAG recorded in the recovery
+plan, and a resolvable commit-bound qualification bundle with reproducible
+reports, source accounting, and negative cases. Closed state, file existence,
+field or enum presence, and command-exit-only results are not standalone
+evidence.
+
 ## 7.5 Executable acceptance and release gate
 
-The machine-readable plan is backed by three standard-library-only commands:
+The machine-readable plan is exercised by the following standard-library-only
+commands. They are local diagnostic/regression checks, not standalone release
+qualification:
 
 ```text
 python tools/validate_design.py
@@ -64,29 +82,33 @@ python tools/run_e2e.py --all
 python tools/release_gate.py
 ```
 
-`validate_design.py` is the authority check. It verifies the complete
-requirement-to-test-to-family-to-owner mapping, the 20 planned leaf issues, the
-GitHub issue map, the schema boundary, examples, adapter paths, and required
-documents. `run_acceptance.py --all` expands all 16 families into their
-declared case counts and executes all 134 cases. Its cross-format QA case also
-invokes the real-input gate. `run_e2e.py --all` invokes the public converter in
-child processes for real DOCX/XLSX/PDF/Markdown inputs, then checks generated
-IR, execution evidence, malformed inputs, and resource limits. A single
-acceptance case can be reproduced with `--family AT-<family> --case <number>`
-and machine-readable output with `--json`.
+`validate_design.py` is the authority check for the historical design graph. It
+checks the declared requirement-to-test-to-family-to-owner mapping, the
+historical 20-issue implementation plan, the GitHub issue map, schema boundary,
+examples, adapter paths, and required documents. `run_acceptance.py --all`
+expands the declared 16 families and 134 cases when the local environment is
+available. `run_e2e.py --all` invokes the public converter in child processes
+for bounded real DOCX/XLSX/PDF/Markdown cases, then checks generated IR,
+execution metadata, malformed inputs, and configured resource limits. These
+are diagnostic/regression checks; they do not independently qualify all
+constructs or the release. A single acceptance case can be reproduced with
+`--family AT-<family> --case <number>` and machine-readable output with
+`--json`.
 
-The release gate invokes all three commands and performs the final integration
-checks. It is fail-closed: a missing adapter, real-input fixture, execution
+`release_gate.py` orchestrates the declared checks and performs the final
+integration checks. It is fail-closed: a missing adapter, real-input fixture, execution
 evidence, malformed JSON, unexplained partial outcome, critical unknown
 extension, unbounded property bag, semantic predicate, source-byte store,
 forensic accounting, or lineage certificate is a release blocker. Renderer and
 OCR results remain observations and never replace source-declared facts.
 
 The acceptance runner checks the design contract; the public converter and
-real-input E2E gate prove that the four bounded adapters actually consume
-source files. Unsupported or unavailable capabilities are represented as
-diagnostics and are not promoted to success. Issue #68 tracked this E2E release
-blocker and is completed only with the green gate and its evidence comment.
+real-input path exercise the four bounded adapter surfaces. Unsupported or
+unavailable capabilities are represented as diagnostics and are not promoted
+to success. Issue #68 is a historical E2E tracker; its state does not override
+the current #87 recovery block. Release qualification is not restored until
+all #88–#105 evidence and live Issue state satisfy the recovery
+plan.
 
 ### Acceptance vocabulary
 

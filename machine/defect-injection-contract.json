@@ -1,0 +1,6711 @@
+{
+  "baseSuite": {
+    "command": [
+      "python",
+      "tools/run_acceptance.py",
+      "--all"
+    ],
+    "expectedExitCode": 0,
+    "id": "release-gate-base",
+    "timeoutSeconds": 300
+  },
+  "cases": [
+    {
+      "category": "canonical",
+      "detectingTestIds": [
+        "AT-AUTH-003",
+        "AT-IO-005"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_canonical.py",
+        "--probe",
+        "canonical-authority-validation"
+      ],
+      "id": "canonical-authority-validation",
+      "operatorId": "canonical-authority-validation",
+      "ownerIssues": [
+        98
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    if False:\n        _validate_authority(document)\n    projected = projection_document(document, projection)",
+            "old": "    _validate_authority(document)\n    projected = projection_document(document, projection)",
+            "path": "tools/canonicalize_ir.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "canonical",
+      "requirementIds": [
+        "DFIR-AUTH-003",
+        "DFIR-IO-005"
+      ],
+      "targetFunction": "canonical_bytes"
+    },
+    {
+      "category": "canonical",
+      "detectingTestIds": [
+        "AT-AUTH-003",
+        "AT-IO-005"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_canonical.py",
+        "--probe",
+        "canonical-authority-validation"
+      ],
+      "id": "canonical-authority-validation-variant-01",
+      "operatorId": "canonical-authority-validation-variant-01",
+      "ownerIssues": [
+        98
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    if 0:\n        _validate_authority(document)\n    projected = projection_document(document, projection)",
+            "old": "    _validate_authority(document)\n    projected = projection_document(document, projection)",
+            "path": "tools/canonicalize_ir.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "canonical",
+      "requirementIds": [
+        "DFIR-AUTH-003",
+        "DFIR-IO-005"
+      ],
+      "targetFunction": "canonical_bytes",
+      "variantOf": "canonical-authority-validation"
+    },
+    {
+      "category": "canonical",
+      "detectingTestIds": [
+        "AT-AUTH-003",
+        "AT-IO-005"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_canonical.py",
+        "--probe",
+        "canonical-authority-validation"
+      ],
+      "id": "canonical-authority-validation-variant-02",
+      "operatorId": "canonical-authority-validation-variant-02",
+      "ownerIssues": [
+        98
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    if document.get(\"documentId\") == \"__never__\":\n        _validate_authority(document)\n    projected = projection_document(document, projection)",
+            "old": "    _validate_authority(document)\n    projected = projection_document(document, projection)",
+            "path": "tools/canonicalize_ir.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "canonical",
+      "requirementIds": [
+        "DFIR-AUTH-003",
+        "DFIR-IO-005"
+      ],
+      "targetFunction": "canonical_bytes",
+      "variantOf": "canonical-authority-validation"
+    },
+    {
+      "category": "canonical",
+      "detectingTestIds": [
+        "AT-IO-002",
+        "AT-IO-007"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_canonical.py",
+        "--probe",
+        "canonical-collection-order"
+      ],
+      "id": "canonical-collection-order",
+      "operatorId": "canonical-collection-order",
+      "ownerIssues": [
+        98
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "            return result  # defect injection removes entity collection ordering",
+            "old": "            return sorted(result, key=lambda item: item[id_field])",
+            "path": "tools/canonicalize_ir.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "canonical",
+      "requirementIds": [
+        "DFIR-IO-002",
+        "DFIR-IO-007"
+      ],
+      "targetFunction": "_normalize"
+    },
+    {
+      "category": "canonical",
+      "detectingTestIds": [
+        "AT-IO-002",
+        "AT-IO-007"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_canonical.py",
+        "--probe",
+        "canonical-collection-order"
+      ],
+      "id": "canonical-collection-order-variant-01",
+      "operatorId": "canonical-collection-order-variant-01",
+      "ownerIssues": [
+        98
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "            return list(reversed(result))",
+            "old": "            return sorted(result, key=lambda item: item[id_field])",
+            "path": "tools/canonicalize_ir.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "canonical",
+      "requirementIds": [
+        "DFIR-IO-002",
+        "DFIR-IO-007"
+      ],
+      "targetFunction": "_normalize",
+      "variantOf": "canonical-collection-order"
+    },
+    {
+      "category": "canonical",
+      "detectingTestIds": [
+        "AT-IO-002",
+        "AT-IO-007"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_canonical.py",
+        "--probe",
+        "canonical-collection-order"
+      ],
+      "id": "canonical-collection-order-variant-02",
+      "operatorId": "canonical-collection-order-variant-02",
+      "ownerIssues": [
+        98
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "            return sorted(result, key=lambda item: item[id_field], reverse=True)",
+            "old": "            return sorted(result, key=lambda item: item[id_field])",
+            "path": "tools/canonicalize_ir.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "canonical",
+      "requirementIds": [
+        "DFIR-IO-002",
+        "DFIR-IO-007"
+      ],
+      "targetFunction": "_normalize",
+      "variantOf": "canonical-collection-order"
+    },
+    {
+      "category": "canonical",
+      "detectingTestIds": [
+        "AT-IO-001",
+        "AT-IO-002"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_canonical.py",
+        "--probe",
+        "canonical-key-order"
+      ],
+      "id": "canonical-key-order",
+      "operatorId": "canonical-key-order",
+      "ownerIssues": [
+        98
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "return {key: child for key, child in sorted(normalized, key=lambda item: item[0])}",
+            "old": "return {key: child for key, child in sorted(normalized, key=lambda item: _utf16_sort_key(item[0]))}",
+            "path": "tools/canonicalize_ir.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "canonical",
+      "requirementIds": [
+        "DFIR-IO-001",
+        "DFIR-IO-002"
+      ],
+      "targetFunction": "_normalize"
+    },
+    {
+      "category": "canonical",
+      "detectingTestIds": [
+        "AT-IO-001",
+        "AT-IO-002"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_canonical.py",
+        "--probe",
+        "canonical-key-order"
+      ],
+      "id": "canonical-key-order-variant-01",
+      "operatorId": "canonical-key-order-variant-01",
+      "ownerIssues": [
+        98
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "return {key: child for key, child in sorted(normalized, key=lambda item: len(item[0]))}",
+            "old": "return {key: child for key, child in sorted(normalized, key=lambda item: _utf16_sort_key(item[0]))}",
+            "path": "tools/canonicalize_ir.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "canonical",
+      "requirementIds": [
+        "DFIR-IO-001",
+        "DFIR-IO-002"
+      ],
+      "targetFunction": "_normalize",
+      "variantOf": "canonical-key-order"
+    },
+    {
+      "category": "canonical",
+      "detectingTestIds": [
+        "AT-IO-001",
+        "AT-IO-002"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_canonical.py",
+        "--probe",
+        "canonical-key-order"
+      ],
+      "id": "canonical-key-order-variant-02",
+      "operatorId": "canonical-key-order-variant-02",
+      "ownerIssues": [
+        98
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "return {key: child for key, child in sorted(normalized, key=lambda item: item[0], reverse=True)}",
+            "old": "return {key: child for key, child in sorted(normalized, key=lambda item: _utf16_sort_key(item[0]))}",
+            "path": "tools/canonicalize_ir.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "canonical",
+      "requirementIds": [
+        "DFIR-IO-001",
+        "DFIR-IO-002"
+      ],
+      "targetFunction": "_normalize",
+      "variantOf": "canonical-key-order"
+    },
+    {
+      "category": "canonical",
+      "detectingTestIds": [
+        "AT-IO-001",
+        "AT-IO-002"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_canonical.py",
+        "--probe",
+        "canonical-key-order"
+      ],
+      "id": "canonical-key-order-variant-03",
+      "operatorId": "canonical-key-order-variant-03",
+      "ownerIssues": [
+        98
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "return {key: child for key, child in sorted(normalized, key=lambda item: item[0][::-1])}",
+            "old": "return {key: child for key, child in sorted(normalized, key=lambda item: _utf16_sort_key(item[0]))}",
+            "path": "tools/canonicalize_ir.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "canonical",
+      "requirementIds": [
+        "DFIR-IO-001",
+        "DFIR-IO-002"
+      ],
+      "targetFunction": "_normalize",
+      "variantOf": "canonical-key-order"
+    },
+    {
+      "category": "adapter-common",
+      "detectingTestIds": [
+        "AT-STATUS-006",
+        "AT-QA-006"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "id": "common-diagnostic-emission",
+      "operatorId": "adapter-diagnostic-emission",
+      "ownerIssues": [
+        91
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "        if False:\n            self.diagnostics.append(item)",
+            "old": "        self.diagnostics.append(item)",
+            "path": "tools/adapter_common.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "adapter-common",
+      "requirementIds": [
+        "DFIR-STATUS-006"
+      ],
+      "targetFunction": "DocumentBuilder.add_diagnostic"
+    },
+    {
+      "category": "adapter-common",
+      "detectingTestIds": [
+        "AT-STATUS-003",
+        "AT-QA-003"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "id": "common-feature-inventory",
+      "operatorId": "adapter-feature-inventory",
+      "ownerIssues": [
+        91
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "        self.document[\"conversion\"][\"featureInventory\"] = []",
+            "old": "        self.document[\"conversion\"][\"featureInventory\"] = sorted(inventory.values(), key=lambda item: (item[\"feature\"], item[\"status\"]))",
+            "path": "tools/adapter_common.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "adapter-common",
+      "requirementIds": [
+        "DFIR-STATUS-003"
+      ],
+      "targetFunction": "DocumentBuilder.finish"
+    },
+    {
+      "category": "adapter-common",
+      "detectingTestIds": [
+        "AT-IO-004",
+        "AT-IO-007"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_common.py"
+      ],
+      "id": "common-identity-seed",
+      "operatorId": "adapter-identity-seed",
+      "ownerIssues": [
+        91,
+        98
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "        root_id = safe_id(\"node\", \"document\")",
+            "old": "        root_id = safe_id(\"node\", f\"{format_name}-document\")",
+            "path": "tools/adapter_common.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "adapter-common",
+      "requirementIds": [
+        "DFIR-IO-004",
+        "DFIR-IO-007"
+      ],
+      "targetFunction": "DocumentBuilder.__init__"
+    },
+    {
+      "category": "adapter-common",
+      "detectingTestIds": [
+        "AT-AUTH-006",
+        "AT-QA-003"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "id": "common-source-map-target",
+      "operatorId": "adapter-source-map-target",
+      "ownerIssues": [
+        91,
+        92
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "            \"targetId\": builder.root_id,",
+            "old": "            \"targetId\": target_id,",
+            "path": "tools/adapter_common.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "adapter-common",
+      "requirementIds": [
+        "DFIR-AUTH-006"
+      ],
+      "targetFunction": "DocumentBuilder.add_source_map"
+    },
+    {
+      "category": "adapter-common",
+      "detectingTestIds": [
+        "AT-STATUS-007",
+        "AT-QA-006"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "id": "common-unknown-construct",
+      "operatorId": "adapter-unknown-construct",
+      "ownerIssues": [
+        91
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "        pass  # defect injection drops feature dispositions",
+            "old": "        self.features.append(item)",
+            "path": "tools/adapter_common.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "adapter-common",
+      "requirementIds": [
+        "DFIR-STATUS-007"
+      ],
+      "targetFunction": "DocumentBuilder.add_feature"
+    },
+    {
+      "category": "docx",
+      "detectingTestIds": [
+        "AT-DOCX-005",
+        "AT-QA-004"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "docx",
+        "--probe",
+        "docx-drawing-handler"
+      ],
+      "id": "docx-drawing-handler",
+      "operatorId": "docx-drawing-handler",
+      "ownerIssues": [
+        94,
+        99
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                        elif False and item_local == \"drawing\":",
+            "old": "                        elif item_local == \"drawing\":",
+            "path": "tools/adapter_docx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-005"
+      ],
+      "targetFunction": "convert"
+    },
+    {
+      "category": "docx",
+      "detectingTestIds": [
+        "AT-DOCX-005",
+        "AT-QA-004"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "docx",
+        "--probe",
+        "docx-drawing-handler"
+      ],
+      "id": "docx-drawing-handler-variant-01",
+      "operatorId": "docx-drawing-handler-variant-01",
+      "ownerIssues": [
+        94,
+        99
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                        elif item_local == \"drawing\" and False:",
+            "old": "                        elif item_local == \"drawing\":",
+            "path": "tools/adapter_docx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-005"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "docx-drawing-handler"
+    },
+    {
+      "category": "docx",
+      "detectingTestIds": [
+        "AT-DOCX-005",
+        "AT-QA-004"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "docx",
+        "--probe",
+        "docx-drawing-handler"
+      ],
+      "id": "docx-drawing-handler-variant-02",
+      "operatorId": "docx-drawing-handler-variant-02",
+      "ownerIssues": [
+        94,
+        99
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                        elif item_local == \"drawing\" and 0:",
+            "old": "                        elif item_local == \"drawing\":",
+            "path": "tools/adapter_docx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-005"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "docx-drawing-handler"
+    },
+    {
+      "category": "docx",
+      "detectingTestIds": [
+        "AT-DOCX-005",
+        "AT-QA-004"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "docx",
+        "--probe",
+        "docx-drawing-handler"
+      ],
+      "id": "docx-drawing-handler-variant-03",
+      "operatorId": "docx-drawing-handler-variant-03",
+      "ownerIssues": [
+        94,
+        99
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                        elif item_local == \"drawing\" and item_local != \"drawing\":",
+            "old": "                        elif item_local == \"drawing\":",
+            "path": "tools/adapter_docx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-005"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "docx-drawing-handler"
+    },
+    {
+      "category": "docx",
+      "detectingTestIds": [
+        "AT-DOCX-004",
+        "AT-QA-003"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "docx",
+        "--probe",
+        "docx-hyperlink-run"
+      ],
+      "id": "docx-hyperlink-run",
+      "operatorId": "docx-hyperlink-run",
+      "ownerIssues": [
+        96,
+        99
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "            elif False and item_local == \"hyperlink\":",
+            "old": "            elif item_local == \"hyperlink\":",
+            "path": "tools/adapter_docx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-004"
+      ],
+      "targetFunction": "_parse_story_part"
+    },
+    {
+      "category": "docx",
+      "detectingTestIds": [
+        "AT-DOCX-004",
+        "AT-QA-003"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "docx",
+        "--probe",
+        "docx-hyperlink-run"
+      ],
+      "id": "docx-hyperlink-run-variant-01",
+      "operatorId": "docx-hyperlink-run-variant-01",
+      "ownerIssues": [
+        96,
+        99
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "            elif item_local == \"hyperlink\" and False:",
+            "old": "            elif item_local == \"hyperlink\":",
+            "path": "tools/adapter_docx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-004"
+      ],
+      "targetFunction": "_parse_story_part",
+      "variantOf": "docx-hyperlink-run"
+    },
+    {
+      "category": "docx",
+      "detectingTestIds": [
+        "AT-DOCX-004",
+        "AT-QA-003"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "docx",
+        "--probe",
+        "docx-hyperlink-run"
+      ],
+      "id": "docx-hyperlink-run-variant-02",
+      "operatorId": "docx-hyperlink-run-variant-02",
+      "ownerIssues": [
+        96,
+        99
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "            elif item_local == \"hyperlink\" and 0:",
+            "old": "            elif item_local == \"hyperlink\":",
+            "path": "tools/adapter_docx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-004"
+      ],
+      "targetFunction": "_parse_story_part",
+      "variantOf": "docx-hyperlink-run"
+    },
+    {
+      "category": "docx",
+      "detectingTestIds": [
+        "AT-DOCX-004",
+        "AT-QA-003"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "docx",
+        "--probe",
+        "docx-hyperlink-run"
+      ],
+      "id": "docx-hyperlink-run-variant-03",
+      "operatorId": "docx-hyperlink-run-variant-03",
+      "ownerIssues": [
+        96,
+        99
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "            elif item_local == \"hyperlink\" and item_local != \"hyperlink\":",
+            "old": "            elif item_local == \"hyperlink\":",
+            "path": "tools/adapter_docx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-004"
+      ],
+      "targetFunction": "_parse_story_part",
+      "variantOf": "docx-hyperlink-run"
+    },
+    {
+      "category": "docx",
+      "detectingTestIds": [
+        "AT-DOCX-006",
+        "AT-DOCX-007"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "docx",
+        "--probe",
+        "docx-missing-relationship"
+      ],
+      "id": "docx-missing-relationship",
+      "operatorId": "docx-missing-relationship",
+      "ownerIssues": [
+        96,
+        99
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                            relation_status = \"preserved\"",
+            "old": "                            relation_status = \"unavailable\"",
+            "path": "tools/adapter_docx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-006",
+        "DFIR-DOCX-007"
+      ],
+      "targetFunction": "convert"
+    },
+    {
+      "category": "docx",
+      "detectingTestIds": [
+        "AT-DOCX-006",
+        "AT-DOCX-007"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "docx",
+        "--probe",
+        "docx-missing-relationship"
+      ],
+      "id": "docx-missing-relationship-variant-01",
+      "operatorId": "docx-missing-relationship-variant-01",
+      "ownerIssues": [
+        96,
+        99
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                            relation_status = \"ambiguous\"",
+            "old": "                            relation_status = \"unavailable\"",
+            "path": "tools/adapter_docx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-006",
+        "DFIR-DOCX-007"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "docx-missing-relationship"
+    },
+    {
+      "category": "docx",
+      "detectingTestIds": [
+        "AT-DOCX-006",
+        "AT-DOCX-007"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "docx",
+        "--probe",
+        "docx-missing-relationship"
+      ],
+      "id": "docx-missing-relationship-variant-02",
+      "operatorId": "docx-missing-relationship-variant-02",
+      "ownerIssues": [
+        96,
+        99
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                            relation_status = \"unsupported\"",
+            "old": "                            relation_status = \"unavailable\"",
+            "path": "tools/adapter_docx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-006",
+        "DFIR-DOCX-007"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "docx-missing-relationship"
+    },
+    {
+      "category": "docx",
+      "detectingTestIds": [
+        "AT-DOCX-006",
+        "AT-DOCX-007"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "docx",
+        "--probe",
+        "docx-missing-relationship"
+      ],
+      "id": "docx-missing-relationship-variant-03",
+      "operatorId": "docx-missing-relationship-variant-03",
+      "ownerIssues": [
+        96,
+        99
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                            relation_status = \"failed\"",
+            "old": "                            relation_status = \"unavailable\"",
+            "path": "tools/adapter_docx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-006",
+        "DFIR-DOCX-007"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "docx-missing-relationship"
+    },
+    {
+      "category": "docx",
+      "detectingTestIds": [
+        "AT-DOCX-004",
+        "AT-DOCX-007"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "docx",
+        "--probe",
+        "docx-story-processing"
+      ],
+      "id": "docx-story-processing",
+      "operatorId": "docx-story-processing",
+      "ownerIssues": [
+        95,
+        96,
+        99
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                    pass  # defect injection skips header/footer stories",
+            "old": "                    _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles)",
+            "path": "tools/adapter_docx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-004",
+        "DFIR-DOCX-007"
+      ],
+      "targetFunction": "convert"
+    },
+    {
+      "category": "docx",
+      "detectingTestIds": [
+        "AT-DOCX-004",
+        "AT-DOCX-007"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "docx",
+        "--probe",
+        "docx-story-processing"
+      ],
+      "id": "docx-story-processing-variant-01",
+      "operatorId": "docx-story-processing-variant-01",
+      "ownerIssues": [
+        95,
+        96,
+        99
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                    if False:\n                        _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles)",
+            "old": "                    _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles)",
+            "path": "tools/adapter_docx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-004",
+        "DFIR-DOCX-007"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "docx-story-processing"
+    },
+    {
+      "category": "docx",
+      "detectingTestIds": [
+        "AT-DOCX-004",
+        "AT-DOCX-007"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "docx",
+        "--probe",
+        "docx-story-processing"
+      ],
+      "id": "docx-story-processing-variant-02",
+      "operatorId": "docx-story-processing-variant-02",
+      "ownerIssues": [
+        95,
+        96,
+        99
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                    if 0:\n                        _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles)",
+            "old": "                    _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles)",
+            "path": "tools/adapter_docx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-004",
+        "DFIR-DOCX-007"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "docx-story-processing"
+    },
+    {
+      "category": "docx",
+      "detectingTestIds": [
+        "AT-DOCX-004",
+        "AT-DOCX-007"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "docx",
+        "--probe",
+        "docx-story-processing"
+      ],
+      "id": "docx-story-processing-variant-03",
+      "operatorId": "docx-story-processing-variant-03",
+      "ownerIssues": [
+        95,
+        96,
+        99
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                    if part_name == \"__never__\":\n                        _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles)",
+            "old": "                    _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles)",
+            "path": "tools/adapter_docx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-004",
+        "DFIR-DOCX-007"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "docx-story-processing"
+    },
+    {
+      "category": "docx",
+      "detectingTestIds": [
+        "AT-DOCX-002",
+        "AT-STYLE-002"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "docx",
+        "--probe",
+        "docx-style-inheritance"
+      ],
+      "id": "docx-style-inheritance",
+      "operatorId": "docx-style-inheritance",
+      "ownerIssues": [
+        93,
+        99
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                    pass  # defect injection skips style inheritance",
+            "old": "                    _resolve_styles(builder, style_graph, style_declarations, styles)",
+            "path": "tools/adapter_docx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-002",
+        "DFIR-STYLE-002"
+      ],
+      "targetFunction": "convert"
+    },
+    {
+      "category": "docx",
+      "detectingTestIds": [
+        "AT-DOCX-002",
+        "AT-STYLE-002"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "docx",
+        "--probe",
+        "docx-style-inheritance"
+      ],
+      "id": "docx-style-inheritance-variant-01",
+      "operatorId": "docx-style-inheritance-variant-01",
+      "ownerIssues": [
+        93,
+        99
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                    if False:\n                        _resolve_styles(builder, style_graph, style_declarations, styles)",
+            "old": "                    _resolve_styles(builder, style_graph, style_declarations, styles)",
+            "path": "tools/adapter_docx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-002",
+        "DFIR-STYLE-002"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "docx-style-inheritance"
+    },
+    {
+      "category": "docx",
+      "detectingTestIds": [
+        "AT-DOCX-002",
+        "AT-STYLE-002"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "docx",
+        "--probe",
+        "docx-style-inheritance"
+      ],
+      "id": "docx-style-inheritance-variant-02",
+      "operatorId": "docx-style-inheritance-variant-02",
+      "ownerIssues": [
+        93,
+        99
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                    if 0:\n                        _resolve_styles(builder, style_graph, style_declarations, styles)",
+            "old": "                    _resolve_styles(builder, style_graph, style_declarations, styles)",
+            "path": "tools/adapter_docx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-002",
+        "DFIR-STYLE-002"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "docx-style-inheritance"
+    },
+    {
+      "category": "docx",
+      "detectingTestIds": [
+        "AT-DOCX-002",
+        "AT-STYLE-002"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "docx",
+        "--probe",
+        "docx-style-inheritance"
+      ],
+      "id": "docx-style-inheritance-variant-03",
+      "operatorId": "docx-style-inheritance-variant-03",
+      "ownerIssues": [
+        93,
+        99
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                    if styles is None:\n                        _resolve_styles(builder, style_graph, style_declarations, styles)",
+            "old": "                    _resolve_styles(builder, style_graph, style_declarations, styles)",
+            "path": "tools/adapter_docx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-002",
+        "DFIR-STYLE-002"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "docx-style-inheritance"
+    },
+    {
+      "category": "markdown",
+      "detectingTestIds": [
+        "AT-MD-004",
+        "AT-MD-005"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "markdown",
+        "--probe",
+        "markdown-delimiter-resolution"
+      ],
+      "id": "markdown-delimiter-resolution",
+      "operatorId": "markdown-delimiter-resolution",
+      "ownerIssues": [
+        102
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    tokens = _inline_tokens(raw, {}) or [{\"kind\": \"text\", \"raw\": raw, \"start\": 0, \"end\": len(raw)}]",
+            "old": "    tokens = _inline_tokens(raw, references) or [{\"kind\": \"text\", \"raw\": raw, \"start\": 0, \"end\": len(raw)}]",
+            "path": "tools/adapter_markdown.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-004",
+        "DFIR-MD-005"
+      ],
+      "targetFunction": "_add_inline"
+    },
+    {
+      "category": "markdown",
+      "detectingTestIds": [
+        "AT-MD-004",
+        "AT-MD-005"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "markdown",
+        "--probe",
+        "markdown-delimiter-resolution"
+      ],
+      "id": "markdown-delimiter-resolution-variant-01",
+      "operatorId": "markdown-delimiter-resolution-variant-01",
+      "ownerIssues": [
+        102
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    tokens = []",
+            "old": "    tokens = _inline_tokens(raw, references) or [{\"kind\": \"text\", \"raw\": raw, \"start\": 0, \"end\": len(raw)}]",
+            "path": "tools/adapter_markdown.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-004",
+        "DFIR-MD-005"
+      ],
+      "targetFunction": "_add_inline",
+      "variantOf": "markdown-delimiter-resolution"
+    },
+    {
+      "category": "markdown",
+      "detectingTestIds": [
+        "AT-MD-004",
+        "AT-MD-005"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "markdown",
+        "--probe",
+        "markdown-delimiter-resolution"
+      ],
+      "id": "markdown-delimiter-resolution-variant-02",
+      "operatorId": "markdown-delimiter-resolution-variant-02",
+      "ownerIssues": [
+        102
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    tokens = [{\"kind\": \"text\", \"raw\": raw, \"start\": 0, \"end\": len(raw)}]",
+            "old": "    tokens = _inline_tokens(raw, references) or [{\"kind\": \"text\", \"raw\": raw, \"start\": 0, \"end\": len(raw)}]",
+            "path": "tools/adapter_markdown.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-004",
+        "DFIR-MD-005"
+      ],
+      "targetFunction": "_add_inline",
+      "variantOf": "markdown-delimiter-resolution"
+    },
+    {
+      "category": "markdown",
+      "detectingTestIds": [
+        "AT-MD-004",
+        "AT-MD-005"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "markdown",
+        "--probe",
+        "markdown-delimiter-resolution"
+      ],
+      "id": "markdown-delimiter-resolution-variant-03",
+      "operatorId": "markdown-delimiter-resolution-variant-03",
+      "ownerIssues": [
+        102
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    tokens = _inline_tokens(\"\", references) or [{\"kind\": \"text\", \"raw\": raw, \"start\": 0, \"end\": len(raw)}]",
+            "old": "    tokens = _inline_tokens(raw, references) or [{\"kind\": \"text\", \"raw\": raw, \"start\": 0, \"end\": len(raw)}]",
+            "path": "tools/adapter_markdown.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-004",
+        "DFIR-MD-005"
+      ],
+      "targetFunction": "_add_inline",
+      "variantOf": "markdown-delimiter-resolution"
+    },
+    {
+      "category": "markdown",
+      "detectingTestIds": [
+        "AT-MD-003",
+        "AT-QA-003"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "markdown",
+        "--probe",
+        "markdown-reference-resolution"
+      ],
+      "id": "markdown-reference-resolution",
+      "operatorId": "markdown-reference-resolution",
+      "ownerIssues": [
+        96,
+        102
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 2,
+            "new": "    references = {}  # defect injection disables reference definitions",
+            "old": "    references = references or {}",
+            "path": "tools/adapter_markdown.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-003"
+      ],
+      "targetFunction": "_add_inline"
+    },
+    {
+      "category": "markdown",
+      "detectingTestIds": [
+        "AT-MD-003",
+        "AT-QA-003"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "markdown",
+        "--probe",
+        "markdown-reference-resolution"
+      ],
+      "id": "markdown-reference-resolution-variant-01",
+      "operatorId": "markdown-reference-resolution-variant-01",
+      "ownerIssues": [
+        96,
+        102
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 2,
+            "new": "    references = dict()",
+            "old": "    references = references or {}",
+            "path": "tools/adapter_markdown.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-003"
+      ],
+      "targetFunction": "_add_inline",
+      "variantOf": "markdown-reference-resolution"
+    },
+    {
+      "category": "markdown",
+      "detectingTestIds": [
+        "AT-MD-003",
+        "AT-QA-003"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "markdown",
+        "--probe",
+        "markdown-reference-resolution"
+      ],
+      "id": "markdown-reference-resolution-variant-02",
+      "operatorId": "markdown-reference-resolution-variant-02",
+      "ownerIssues": [
+        96,
+        102
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 2,
+            "new": "    references = None",
+            "old": "    references = references or {}",
+            "path": "tools/adapter_markdown.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-003"
+      ],
+      "targetFunction": "_add_inline",
+      "variantOf": "markdown-reference-resolution"
+    },
+    {
+      "category": "markdown",
+      "detectingTestIds": [
+        "AT-MD-003",
+        "AT-QA-003"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "markdown",
+        "--probe",
+        "markdown-reference-resolution"
+      ],
+      "id": "markdown-reference-resolution-variant-03",
+      "operatorId": "markdown-reference-resolution-variant-03",
+      "ownerIssues": [
+        96,
+        102
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 2,
+            "new": "    references = {\"__defect__\": (\"\", \"\")}",
+            "old": "    references = references or {}",
+            "path": "tools/adapter_markdown.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-003"
+      ],
+      "targetFunction": "_add_inline",
+      "variantOf": "markdown-reference-resolution"
+    },
+    {
+      "category": "markdown",
+      "detectingTestIds": [
+        "AT-MD-008",
+        "AT-QA-003"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "markdown",
+        "--probe",
+        "markdown-span-end"
+      ],
+      "id": "markdown-span-end",
+      "operatorId": "markdown-span-end",
+      "ownerIssues": [
+        92,
+        102
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "            \"tokenEnd\": max(0, token_end if token_end is not None else end_column - column + 1),",
+            "old": "            \"tokenEnd\": max(0, token_end if token_end is not None else end_column - column),",
+            "path": "tools/adapter_markdown.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-008"
+      ],
+      "targetFunction": "_source_map"
+    },
+    {
+      "category": "markdown",
+      "detectingTestIds": [
+        "AT-MD-008",
+        "AT-QA-003"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "markdown",
+        "--probe",
+        "markdown-span-end"
+      ],
+      "id": "markdown-span-end-variant-01",
+      "operatorId": "markdown-span-end-variant-01",
+      "ownerIssues": [
+        92,
+        102
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "            \"tokenEnd\": max(0, token_end if token_end is not None else end_column - column + 2),",
+            "old": "            \"tokenEnd\": max(0, token_end if token_end is not None else end_column - column),",
+            "path": "tools/adapter_markdown.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-008"
+      ],
+      "targetFunction": "_source_map",
+      "variantOf": "markdown-span-end"
+    },
+    {
+      "category": "markdown",
+      "detectingTestIds": [
+        "AT-MD-008",
+        "AT-QA-003"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "markdown",
+        "--probe",
+        "markdown-span-end"
+      ],
+      "id": "markdown-span-end-variant-02",
+      "operatorId": "markdown-span-end-variant-02",
+      "ownerIssues": [
+        92,
+        102
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "            \"tokenEnd\": max(0, token_end if token_end is not None else end_column - column + 3),",
+            "old": "            \"tokenEnd\": max(0, token_end if token_end is not None else end_column - column),",
+            "path": "tools/adapter_markdown.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-008"
+      ],
+      "targetFunction": "_source_map",
+      "variantOf": "markdown-span-end"
+    },
+    {
+      "category": "markdown",
+      "detectingTestIds": [
+        "AT-MD-008",
+        "AT-QA-003"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "markdown",
+        "--probe",
+        "markdown-span-end"
+      ],
+      "id": "markdown-span-end-variant-03",
+      "operatorId": "markdown-span-end-variant-03",
+      "ownerIssues": [
+        92,
+        102
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "            \"tokenEnd\": max(0, 0),",
+            "old": "            \"tokenEnd\": max(0, token_end if token_end is not None else end_column - column),",
+            "path": "tools/adapter_markdown.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-008"
+      ],
+      "targetFunction": "_source_map",
+      "variantOf": "markdown-span-end"
+    },
+    {
+      "category": "markdown",
+      "detectingTestIds": [
+        "AT-MD-002",
+        "AT-QA-004"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "markdown",
+        "--probe",
+        "markdown-table-separator"
+      ],
+      "id": "markdown-table-separator",
+      "operatorId": "markdown-table-separator",
+      "ownerIssues": [
+        95,
+        102
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    row_lines = list(lines)",
+            "old": "    row_lines = [lines[0], *lines[2:]] if len(lines) >= 2 and _is_table_separator(lines[1]) else list(lines)",
+            "path": "tools/adapter_markdown.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-002"
+      ],
+      "targetFunction": "_table"
+    },
+    {
+      "category": "markdown",
+      "detectingTestIds": [
+        "AT-MD-002",
+        "AT-QA-004"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "markdown",
+        "--probe",
+        "markdown-table-separator"
+      ],
+      "id": "markdown-table-separator-variant-01",
+      "operatorId": "markdown-table-separator-variant-01",
+      "ownerIssues": [
+        95,
+        102
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    row_lines = list(lines[1:])",
+            "old": "    row_lines = [lines[0], *lines[2:]] if len(lines) >= 2 and _is_table_separator(lines[1]) else list(lines)",
+            "path": "tools/adapter_markdown.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-002"
+      ],
+      "targetFunction": "_table",
+      "variantOf": "markdown-table-separator"
+    },
+    {
+      "category": "markdown",
+      "detectingTestIds": [
+        "AT-MD-002",
+        "AT-QA-004"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "markdown",
+        "--probe",
+        "markdown-table-separator"
+      ],
+      "id": "markdown-table-separator-variant-02",
+      "operatorId": "markdown-table-separator-variant-02",
+      "ownerIssues": [
+        95,
+        102
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    row_lines = [lines[0]]",
+            "old": "    row_lines = [lines[0], *lines[2:]] if len(lines) >= 2 and _is_table_separator(lines[1]) else list(lines)",
+            "path": "tools/adapter_markdown.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-002"
+      ],
+      "targetFunction": "_table",
+      "variantOf": "markdown-table-separator"
+    },
+    {
+      "category": "markdown",
+      "detectingTestIds": [
+        "AT-MD-002",
+        "AT-QA-004"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "markdown",
+        "--probe",
+        "markdown-table-separator"
+      ],
+      "id": "markdown-table-separator-variant-03",
+      "operatorId": "markdown-table-separator-variant-03",
+      "ownerIssues": [
+        95,
+        102
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    row_lines = list(reversed(lines))",
+            "old": "    row_lines = [lines[0], *lines[2:]] if len(lines) >= 2 and _is_table_separator(lines[1]) else list(lines)",
+            "path": "tools/adapter_markdown.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-002"
+      ],
+      "targetFunction": "_table",
+      "variantOf": "markdown-table-separator"
+    },
+    {
+      "category": "markdown",
+      "detectingTestIds": [
+        "AT-MD-008",
+        "AT-STATUS-007"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "markdown",
+        "--probe",
+        "markdown-unsupported-construct"
+      ],
+      "id": "markdown-unsupported-construct",
+      "operatorId": "markdown-unsupported-construct",
+      "ownerIssues": [
+        91,
+        102
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                node = _paragraph(builder, parent_id, \"\\n\".join(item[0] for item in node_records), node_records[0][1], column=node_records[0][2], references=references, footnotes=footnotes, state=state, status=\"preserved\")",
+            "old": "                node = _paragraph(builder, parent_id, \"\\n\".join(item[0] for item in node_records), node_records[0][1], column=node_records[0][2], references=references, footnotes=footnotes, state=state, status=\"unsupported\")",
+            "path": "tools/adapter_markdown.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-008",
+        "DFIR-STATUS-007"
+      ],
+      "targetFunction": "parse_blocks"
+    },
+    {
+      "category": "markdown",
+      "detectingTestIds": [
+        "AT-MD-008",
+        "AT-STATUS-007"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "markdown",
+        "--probe",
+        "markdown-unsupported-construct"
+      ],
+      "id": "markdown-unsupported-construct-variant-01",
+      "operatorId": "markdown-unsupported-construct-variant-01",
+      "ownerIssues": [
+        91,
+        102
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                node = _paragraph(builder, parent_id, \"\\n\".join(item[0] for item in node_records), node_records[0][1], column=node_records[0][2], references=references, footnotes=footnotes, state=state, status=\"normalized\")",
+            "old": "                node = _paragraph(builder, parent_id, \"\\n\".join(item[0] for item in node_records), node_records[0][1], column=node_records[0][2], references=references, footnotes=footnotes, state=state, status=\"unsupported\")",
+            "path": "tools/adapter_markdown.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-008",
+        "DFIR-STATUS-007"
+      ],
+      "targetFunction": "parse_blocks",
+      "variantOf": "markdown-unsupported-construct"
+    },
+    {
+      "category": "markdown",
+      "detectingTestIds": [
+        "AT-MD-008",
+        "AT-STATUS-007"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "markdown",
+        "--probe",
+        "markdown-unsupported-construct"
+      ],
+      "id": "markdown-unsupported-construct-variant-02",
+      "operatorId": "markdown-unsupported-construct-variant-02",
+      "ownerIssues": [
+        91,
+        102
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                node = _paragraph(builder, parent_id, \"\\n\".join(item[0] for item in node_records), node_records[0][1], column=node_records[0][2], references=references, footnotes=footnotes, state=state, status=\"ambiguous\")",
+            "old": "                node = _paragraph(builder, parent_id, \"\\n\".join(item[0] for item in node_records), node_records[0][1], column=node_records[0][2], references=references, footnotes=footnotes, state=state, status=\"unsupported\")",
+            "path": "tools/adapter_markdown.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-008",
+        "DFIR-STATUS-007"
+      ],
+      "targetFunction": "parse_blocks",
+      "variantOf": "markdown-unsupported-construct"
+    },
+    {
+      "category": "markdown",
+      "detectingTestIds": [
+        "AT-MD-008",
+        "AT-STATUS-007"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "markdown",
+        "--probe",
+        "markdown-unsupported-construct"
+      ],
+      "id": "markdown-unsupported-construct-variant-03",
+      "operatorId": "markdown-unsupported-construct-variant-03",
+      "ownerIssues": [
+        91,
+        102
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                node = _paragraph(builder, parent_id, \"\\n\".join(item[0] for item in node_records), node_records[0][1], column=node_records[0][2], references=references, footnotes=footnotes, state=state, status=\"unavailable\")",
+            "old": "                node = _paragraph(builder, parent_id, \"\\n\".join(item[0] for item in node_records), node_records[0][1], column=node_records[0][2], references=references, footnotes=footnotes, state=state, status=\"unsupported\")",
+            "path": "tools/adapter_markdown.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-008",
+        "DFIR-STATUS-007"
+      ],
+      "targetFunction": "parse_blocks",
+      "variantOf": "markdown-unsupported-construct"
+    },
+    {
+      "category": "meta",
+      "detectingTestIds": [],
+      "expectedOutcome": "equivalent",
+      "id": "meta-equivalent-comment",
+      "operatorId": "meta-equivalent-comment",
+      "ownerIssues": [
+        89
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "        self.path = Path(path)  # deterministic equivalent meta mutation",
+            "old": "        self.path = Path(path)",
+            "path": "tools/adapter_common.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "adapter-common",
+      "requirementIds": [
+        "DFIR-QA-008"
+      ],
+      "targetFunction": "DocumentBuilder.__init__"
+    },
+    {
+      "category": "pdf",
+      "detectingTestIds": [
+        "AT-PDF-005",
+        "AT-QA-006"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "pdf",
+        "--probe",
+        "pdf-annotation-target"
+      ],
+      "id": "pdf-annotation-target",
+      "operatorId": "pdf-annotation-target",
+      "ownerIssues": [
+        96,
+        101
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                builder.add_item(\"annotations\", {\"annotationId\": annotation_id, \"kind\": \"annotation\", \"targetIds\": [page_id], \"body\": \"PDF annotation destination retained as form fact\", \"status\": \"preserved\"}, \"annotationId\")",
+            "old": "                builder.add_item(\"annotations\", {\"annotationId\": annotation_id, \"kind\": \"hyperlink\", \"targetIds\": [page_id], \"body\": \"PDF annotation destination retained as form fact\", \"status\": \"preserved\"}, \"annotationId\")",
+            "path": "tools/adapter_pdf.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-005"
+      ],
+      "targetFunction": "convert"
+    },
+    {
+      "category": "pdf",
+      "detectingTestIds": [
+        "AT-PDF-005",
+        "AT-QA-006"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "pdf",
+        "--probe",
+        "pdf-annotation-target"
+      ],
+      "id": "pdf-annotation-target-variant-01",
+      "operatorId": "pdf-annotation-target-variant-01",
+      "ownerIssues": [
+        96,
+        101
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                builder.add_item(\"annotations\", {\"annotationId\": annotation_id, \"kind\": \"comment\", \"targetIds\": [page_id], \"body\": \"PDF annotation destination retained as form fact\", \"status\": \"preserved\"}, \"annotationId\")",
+            "old": "                builder.add_item(\"annotations\", {\"annotationId\": annotation_id, \"kind\": \"hyperlink\", \"targetIds\": [page_id], \"body\": \"PDF annotation destination retained as form fact\", \"status\": \"preserved\"}, \"annotationId\")",
+            "path": "tools/adapter_pdf.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-005"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "pdf-annotation-target"
+    },
+    {
+      "category": "pdf",
+      "detectingTestIds": [
+        "AT-PDF-005",
+        "AT-QA-006"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "pdf",
+        "--probe",
+        "pdf-annotation-target"
+      ],
+      "id": "pdf-annotation-target-variant-02",
+      "operatorId": "pdf-annotation-target-variant-02",
+      "ownerIssues": [
+        96,
+        101
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                builder.add_item(\"annotations\", {\"annotationId\": annotation_id, \"kind\": \"bookmark\", \"targetIds\": [page_id], \"body\": \"PDF annotation destination retained as form fact\", \"status\": \"preserved\"}, \"annotationId\")",
+            "old": "                builder.add_item(\"annotations\", {\"annotationId\": annotation_id, \"kind\": \"hyperlink\", \"targetIds\": [page_id], \"body\": \"PDF annotation destination retained as form fact\", \"status\": \"preserved\"}, \"annotationId\")",
+            "path": "tools/adapter_pdf.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-005"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "pdf-annotation-target"
+    },
+    {
+      "category": "pdf",
+      "detectingTestIds": [
+        "AT-PDF-005",
+        "AT-QA-006"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "pdf",
+        "--probe",
+        "pdf-annotation-target"
+      ],
+      "id": "pdf-annotation-target-variant-03",
+      "operatorId": "pdf-annotation-target-variant-03",
+      "ownerIssues": [
+        96,
+        101
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                builder.add_item(\"annotations\", {\"annotationId\": annotation_id, \"kind\": \"form\", \"targetIds\": [page_id], \"body\": \"PDF annotation destination retained as form fact\", \"status\": \"preserved\"}, \"annotationId\")",
+            "old": "                builder.add_item(\"annotations\", {\"annotationId\": annotation_id, \"kind\": \"hyperlink\", \"targetIds\": [page_id], \"body\": \"PDF annotation destination retained as form fact\", \"status\": \"preserved\"}, \"annotationId\")",
+            "path": "tools/adapter_pdf.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-005"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "pdf-annotation-target"
+    },
+    {
+      "category": "pdf",
+      "detectingTestIds": [
+        "AT-PDF-004",
+        "AT-QA-004"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "pdf",
+        "--probe",
+        "pdf-graphics-restore"
+      ],
+      "id": "pdf-graphics-restore",
+      "operatorId": "pdf-graphics-restore",
+      "ownerIssues": [
+        94,
+        101
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "            elif False and operator == \"Q\":",
+            "old": "            elif operator == \"Q\":",
+            "path": "tools/adapter_pdf.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-004"
+      ],
+      "targetFunction": "_interpret_content"
+    },
+    {
+      "category": "pdf",
+      "detectingTestIds": [
+        "AT-PDF-004",
+        "AT-QA-004"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "pdf",
+        "--probe",
+        "pdf-graphics-restore"
+      ],
+      "id": "pdf-graphics-restore-variant-01",
+      "operatorId": "pdf-graphics-restore-variant-01",
+      "ownerIssues": [
+        94,
+        101
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "            elif operator == \"Q\" and False:",
+            "old": "            elif operator == \"Q\":",
+            "path": "tools/adapter_pdf.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-004"
+      ],
+      "targetFunction": "_interpret_content",
+      "variantOf": "pdf-graphics-restore"
+    },
+    {
+      "category": "pdf",
+      "detectingTestIds": [
+        "AT-PDF-004",
+        "AT-QA-004"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "pdf",
+        "--probe",
+        "pdf-graphics-restore"
+      ],
+      "id": "pdf-graphics-restore-variant-02",
+      "operatorId": "pdf-graphics-restore-variant-02",
+      "ownerIssues": [
+        94,
+        101
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "            elif operator == \"Q\" and 0:",
+            "old": "            elif operator == \"Q\":",
+            "path": "tools/adapter_pdf.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-004"
+      ],
+      "targetFunction": "_interpret_content",
+      "variantOf": "pdf-graphics-restore"
+    },
+    {
+      "category": "pdf",
+      "detectingTestIds": [
+        "AT-PDF-006",
+        "AT-QA-004"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "pdf",
+        "--probe",
+        "pdf-interleaved-paint"
+      ],
+      "id": "pdf-interleaved-paint",
+      "operatorId": "pdf-interleaved-paint",
+      "ownerIssues": [
+        94,
+        101
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 2,
+            "new": "enumerate(sorted(builder.document[\"nodes\"][1:], key=lambda item: item[\"kind\"]))",
+            "old": "enumerate(builder.document[\"nodes\"][1:])",
+            "path": "tools/adapter_pdf.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-006"
+      ],
+      "targetFunction": "convert"
+    },
+    {
+      "category": "pdf",
+      "detectingTestIds": [
+        "AT-PDF-006",
+        "AT-QA-004"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "pdf",
+        "--probe",
+        "pdf-interleaved-paint"
+      ],
+      "id": "pdf-interleaved-paint-variant-01",
+      "operatorId": "pdf-interleaved-paint-variant-01",
+      "ownerIssues": [
+        94,
+        101
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 2,
+            "new": "enumerate(list(reversed(builder.document[\"nodes\"][1:])))",
+            "old": "enumerate(builder.document[\"nodes\"][1:])",
+            "path": "tools/adapter_pdf.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-006"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "pdf-interleaved-paint"
+    },
+    {
+      "category": "pdf",
+      "detectingTestIds": [
+        "AT-PDF-006",
+        "AT-QA-004"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "pdf",
+        "--probe",
+        "pdf-interleaved-paint"
+      ],
+      "id": "pdf-interleaved-paint-variant-02",
+      "operatorId": "pdf-interleaved-paint-variant-02",
+      "ownerIssues": [
+        94,
+        101
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 2,
+            "new": "enumerate(sorted(builder.document[\"nodes\"][1:], key=lambda item: item[\"nodeId\"]))",
+            "old": "enumerate(builder.document[\"nodes\"][1:])",
+            "path": "tools/adapter_pdf.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-006"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "pdf-interleaved-paint"
+    },
+    {
+      "category": "pdf",
+      "detectingTestIds": [
+        "AT-PDF-006",
+        "AT-QA-004"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "pdf",
+        "--probe",
+        "pdf-interleaved-paint"
+      ],
+      "id": "pdf-interleaved-paint-variant-03",
+      "operatorId": "pdf-interleaved-paint-variant-03",
+      "ownerIssues": [
+        94,
+        101
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 2,
+            "new": "enumerate(sorted(builder.document[\"nodes\"][1:], key=lambda item: item.get(\"status\", \"\")))",
+            "old": "enumerate(builder.document[\"nodes\"][1:])",
+            "path": "tools/adapter_pdf.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-006"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "pdf-interleaved-paint"
+    },
+    {
+      "category": "pdf",
+      "detectingTestIds": [
+        "AT-PDF-001",
+        "AT-PDF-006"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "pdf",
+        "--probe",
+        "pdf-page-order"
+      ],
+      "id": "pdf-page-order",
+      "operatorId": "pdf-page-order",
+      "ownerIssues": [
+        94,
+        101
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    pages = [(key, value) for key, value in reversed(list(objects.items())) if re.search(rb\"/Type\\s*/Page\\b\", value)]",
+            "old": "    pages = [(key, value) for key, value in sorted(objects.items()) if re.search(rb\"/Type\\s*/Page\\b\", value)]",
+            "path": "tools/adapter_pdf.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-001",
+        "DFIR-PDF-006"
+      ],
+      "targetFunction": "_page_content_streams"
+    },
+    {
+      "category": "pdf",
+      "detectingTestIds": [
+        "AT-PDF-001",
+        "AT-PDF-006"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "pdf",
+        "--probe",
+        "pdf-page-order"
+      ],
+      "id": "pdf-page-order-variant-01",
+      "operatorId": "pdf-page-order-variant-01",
+      "ownerIssues": [
+        94,
+        101
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    pages = [(key, value) for key, value in list(objects.items()) if re.search(rb\"/Type\\s*/Page\\b\", value)]",
+            "old": "    pages = [(key, value) for key, value in sorted(objects.items()) if re.search(rb\"/Type\\s*/Page\\b\", value)]",
+            "path": "tools/adapter_pdf.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-001",
+        "DFIR-PDF-006"
+      ],
+      "targetFunction": "_page_content_streams",
+      "variantOf": "pdf-page-order"
+    },
+    {
+      "category": "pdf",
+      "detectingTestIds": [
+        "AT-PDF-001",
+        "AT-PDF-006"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "pdf",
+        "--probe",
+        "pdf-page-order"
+      ],
+      "id": "pdf-page-order-variant-02",
+      "operatorId": "pdf-page-order-variant-02",
+      "ownerIssues": [
+        94,
+        101
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    pages = [(key, value) for key, value in sorted(objects.items(), reverse=True) if re.search(rb\"/Type\\s*/Page\\b\", value)]",
+            "old": "    pages = [(key, value) for key, value in sorted(objects.items()) if re.search(rb\"/Type\\s*/Page\\b\", value)]",
+            "path": "tools/adapter_pdf.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-001",
+        "DFIR-PDF-006"
+      ],
+      "targetFunction": "_page_content_streams",
+      "variantOf": "pdf-page-order"
+    },
+    {
+      "category": "pdf",
+      "detectingTestIds": [
+        "AT-PDF-002",
+        "AT-PDF-003"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "pdf",
+        "--probe",
+        "pdf-tounicode"
+      ],
+      "id": "pdf-tounicode",
+      "operatorId": "pdf-tounicode",
+      "ownerIssues": [
+        92,
+        101
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                mapping = []  # defect injection drops ToUnicode mappings",
+            "old": "                mapping = _parse_cmap(_decode_stream(cmap_data))",
+            "path": "tools/adapter_pdf.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-002"
+      ],
+      "targetFunction": "_pdf_font_mappings"
+    },
+    {
+      "category": "pdf",
+      "detectingTestIds": [
+        "AT-PDF-002",
+        "AT-PDF-003"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "pdf",
+        "--probe",
+        "pdf-tounicode"
+      ],
+      "id": "pdf-tounicode-variant-01",
+      "operatorId": "pdf-tounicode-variant-01",
+      "ownerIssues": [
+        92,
+        101
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                mapping = _parse_cmap(b\"\")",
+            "old": "                mapping = _parse_cmap(_decode_stream(cmap_data))",
+            "path": "tools/adapter_pdf.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-002"
+      ],
+      "targetFunction": "_pdf_font_mappings",
+      "variantOf": "pdf-tounicode"
+    },
+    {
+      "category": "pdf",
+      "detectingTestIds": [
+        "AT-PDF-002",
+        "AT-PDF-003"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "pdf",
+        "--probe",
+        "pdf-tounicode"
+      ],
+      "id": "pdf-tounicode-variant-02",
+      "operatorId": "pdf-tounicode-variant-02",
+      "ownerIssues": [
+        92,
+        101
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                mapping = _parse_cmap(_decode_stream(cmap_data)) if False else []",
+            "old": "                mapping = _parse_cmap(_decode_stream(cmap_data))",
+            "path": "tools/adapter_pdf.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-002"
+      ],
+      "targetFunction": "_pdf_font_mappings",
+      "variantOf": "pdf-tounicode"
+    },
+    {
+      "category": "pdf",
+      "detectingTestIds": [
+        "AT-PDF-004",
+        "AT-PDF-008"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "pdf",
+        "--probe",
+        "pdf-unknown-operator"
+      ],
+      "id": "pdf-unknown-operator",
+      "operatorId": "pdf-unknown-operator",
+      "ownerIssues": [
+        91,
+        101
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "            pass  # defect injection suppresses unknown-operator evidence",
+            "old": "            unsupported.append(operator)",
+            "path": "tools/adapter_pdf.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-004",
+        "DFIR-PDF-008"
+      ],
+      "targetFunction": "_interpret_content"
+    },
+    {
+      "category": "pdf",
+      "detectingTestIds": [
+        "AT-PDF-004",
+        "AT-PDF-008"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "pdf",
+        "--probe",
+        "pdf-unknown-operator"
+      ],
+      "id": "pdf-unknown-operator-variant-01",
+      "operatorId": "pdf-unknown-operator-variant-01",
+      "ownerIssues": [
+        91,
+        101
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "            unsupported.extend([])",
+            "old": "            unsupported.append(operator)",
+            "path": "tools/adapter_pdf.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-004",
+        "DFIR-PDF-008"
+      ],
+      "targetFunction": "_interpret_content",
+      "variantOf": "pdf-unknown-operator"
+    },
+    {
+      "category": "pdf",
+      "detectingTestIds": [
+        "AT-PDF-004",
+        "AT-PDF-008"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "pdf",
+        "--probe",
+        "pdf-unknown-operator"
+      ],
+      "id": "pdf-unknown-operator-variant-02",
+      "operatorId": "pdf-unknown-operator-variant-02",
+      "ownerIssues": [
+        91,
+        101
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "            unsupported += []",
+            "old": "            unsupported.append(operator)",
+            "path": "tools/adapter_pdf.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-004",
+        "DFIR-PDF-008"
+      ],
+      "targetFunction": "_interpret_content",
+      "variantOf": "pdf-unknown-operator"
+    },
+    {
+      "category": "query",
+      "detectingTestIds": [
+        "AT-QUERY-001",
+        "AT-QUERY-002"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "id": "query-field-mapping",
+      "operatorId": "query-field-mapping",
+      "ownerIssues": [
+        103
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    result.sort(key=lambda item: \"\")  # defect injection removes collection field ordering",
+            "old": "    result.sort(key=lambda item: str(item.get(identifier_key, \"\")))",
+            "path": "tools/query_ir.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "query",
+      "requirementIds": [
+        "DFIR-QUERY-001",
+        "DFIR-QUERY-002"
+      ],
+      "targetFunction": "list_entities"
+    },
+    {
+      "category": "query",
+      "detectingTestIds": [
+        "AT-QUERY-001",
+        "AT-QUERY-002"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "id": "query-field-mapping-variant-01",
+      "operatorId": "query-field-mapping-variant-01",
+      "ownerIssues": [
+        103
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    result.sort(key=lambda item: str(item.get(\"kind\", \"\")))",
+            "old": "    result.sort(key=lambda item: str(item.get(identifier_key, \"\")))",
+            "path": "tools/query_ir.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "query",
+      "requirementIds": [
+        "DFIR-QUERY-001",
+        "DFIR-QUERY-002"
+      ],
+      "targetFunction": "list_entities",
+      "variantOf": "query-field-mapping"
+    },
+    {
+      "category": "query",
+      "detectingTestIds": [
+        "AT-QUERY-001",
+        "AT-QUERY-002"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "id": "query-field-mapping-variant-02",
+      "operatorId": "query-field-mapping-variant-02",
+      "ownerIssues": [
+        103
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    result.sort(key=lambda item: str(item.get(\"status\", \"\")))",
+            "old": "    result.sort(key=lambda item: str(item.get(identifier_key, \"\")))",
+            "path": "tools/query_ir.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "query",
+      "requirementIds": [
+        "DFIR-QUERY-001",
+        "DFIR-QUERY-002"
+      ],
+      "targetFunction": "list_entities",
+      "variantOf": "query-field-mapping"
+    },
+    {
+      "category": "query",
+      "detectingTestIds": [
+        "AT-QUERY-001",
+        "AT-QUERY-002"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "id": "query-field-mapping-variant-03",
+      "operatorId": "query-field-mapping-variant-03",
+      "ownerIssues": [
+        103
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    result.sort(key=lambda item: str(item.get(\"missing\", \"\")))",
+            "old": "    result.sort(key=lambda item: str(item.get(identifier_key, \"\")))",
+            "path": "tools/query_ir.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "query",
+      "requirementIds": [
+        "DFIR-QUERY-001",
+        "DFIR-QUERY-002"
+      ],
+      "targetFunction": "list_entities",
+      "variantOf": "query-field-mapping"
+    },
+    {
+      "category": "query",
+      "detectingTestIds": [
+        "AT-QUERY-001",
+        "AT-QUERY-002"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "id": "query-field-mapping-variant-04",
+      "operatorId": "query-field-mapping-variant-04",
+      "ownerIssues": [
+        103
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    result.sort(key=lambda item: \"constant\")",
+            "old": "    result.sort(key=lambda item: str(item.get(identifier_key, \"\")))",
+            "path": "tools/query_ir.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "query",
+      "requirementIds": [
+        "DFIR-QUERY-001",
+        "DFIR-QUERY-002"
+      ],
+      "targetFunction": "list_entities",
+      "variantOf": "query-field-mapping"
+    },
+    {
+      "category": "query",
+      "detectingTestIds": [
+        "AT-AUTH-004",
+        "AT-QUERY-008"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "id": "query-index-validation",
+      "operatorId": "query-index-validation",
+      "ownerIssues": [
+        103
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    if False and index.get(\"authority\") != expected[\"authority\"]:",
+            "old": "    if index.get(\"authority\") != expected[\"authority\"]:",
+            "path": "tools/query_ir.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "query",
+      "requirementIds": [
+        "DFIR-AUTH-004",
+        "DFIR-QUERY-008"
+      ],
+      "targetFunction": "validate_index"
+    },
+    {
+      "category": "query",
+      "detectingTestIds": [
+        "AT-AUTH-004",
+        "AT-QUERY-008"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "id": "query-index-validation-variant-01",
+      "operatorId": "query-index-validation-variant-01",
+      "ownerIssues": [
+        103
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    if index.get(\"authority\") != expected[\"authority\"] and False:",
+            "old": "    if index.get(\"authority\") != expected[\"authority\"]:",
+            "path": "tools/query_ir.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "query",
+      "requirementIds": [
+        "DFIR-AUTH-004",
+        "DFIR-QUERY-008"
+      ],
+      "targetFunction": "validate_index",
+      "variantOf": "query-index-validation"
+    },
+    {
+      "category": "query",
+      "detectingTestIds": [
+        "AT-AUTH-004",
+        "AT-QUERY-008"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "id": "query-index-validation-variant-02",
+      "operatorId": "query-index-validation-variant-02",
+      "ownerIssues": [
+        103
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    if False and index.get(\"authority\") != expected[\"authority\"]:",
+            "old": "    if index.get(\"authority\") != expected[\"authority\"]:",
+            "path": "tools/query_ir.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "query",
+      "requirementIds": [
+        "DFIR-AUTH-004",
+        "DFIR-QUERY-008"
+      ],
+      "targetFunction": "validate_index",
+      "variantOf": "query-index-validation"
+    },
+    {
+      "category": "query",
+      "detectingTestIds": [
+        "AT-AUTH-004",
+        "AT-QUERY-008"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "id": "query-index-validation-variant-03",
+      "operatorId": "query-index-validation-variant-03",
+      "ownerIssues": [
+        103
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    if index.get(\"authority\") == \"__never__\":",
+            "old": "    if index.get(\"authority\") != expected[\"authority\"]:",
+            "path": "tools/query_ir.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "query",
+      "requirementIds": [
+        "DFIR-AUTH-004",
+        "DFIR-QUERY-008"
+      ],
+      "targetFunction": "validate_index",
+      "variantOf": "query-index-validation"
+    },
+    {
+      "category": "query",
+      "detectingTestIds": [
+        "AT-AUTH-004",
+        "AT-QUERY-008"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "id": "query-index-validation-variant-04",
+      "operatorId": "query-index-validation-variant-04",
+      "ownerIssues": [
+        103
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    if index.get(\"authority\") is None:",
+            "old": "    if index.get(\"authority\") != expected[\"authority\"]:",
+            "path": "tools/query_ir.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "query",
+      "requirementIds": [
+        "DFIR-AUTH-004",
+        "DFIR-QUERY-008"
+      ],
+      "targetFunction": "validate_index",
+      "variantOf": "query-index-validation"
+    },
+    {
+      "category": "release",
+      "detectingTestIds": [
+        "AT-AUTH-002",
+        "AT-QA-008"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_release.py",
+        "--probe",
+        "claim"
+      ],
+      "id": "release-claim-source-check",
+      "operatorId": "release-claim-source-check",
+      "ownerIssues": [
+        88,
+        105
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    require(True, \"independent corpus runner is not claimed\")  # defect injection bypasses claim binding",
+            "old": "    require(manifest.get(\"independentEvidence\", {}).get(\"runner\") == \"tools/independent_corpus.py\", \"independent corpus runner is not claimed\")",
+            "path": "tools/release_gate.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "release",
+      "requirementIds": [
+        "DFIR-AUTH-002",
+        "DFIR-QA-008"
+      ],
+      "targetFunction": "check_release_claims"
+    },
+    {
+      "category": "release",
+      "detectingTestIds": [
+        "AT-AUTH-002",
+        "AT-QA-008"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_release.py",
+        "--probe",
+        "claim"
+      ],
+      "id": "release-claim-source-check-variant-01",
+      "operatorId": "release-claim-source-check-variant-01",
+      "ownerIssues": [
+        88,
+        105
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    require(1 == 1, \"independent corpus runner is not claimed\")",
+            "old": "    require(manifest.get(\"independentEvidence\", {}).get(\"runner\") == \"tools/independent_corpus.py\", \"independent corpus runner is not claimed\")",
+            "path": "tools/release_gate.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "release",
+      "requirementIds": [
+        "DFIR-AUTH-002",
+        "DFIR-QA-008"
+      ],
+      "targetFunction": "check_release_claims",
+      "variantOf": "release-claim-source-check"
+    },
+    {
+      "category": "release",
+      "detectingTestIds": [
+        "AT-AUTH-002",
+        "AT-QA-008"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_release.py",
+        "--probe",
+        "claim"
+      ],
+      "id": "release-claim-source-check-variant-02",
+      "operatorId": "release-claim-source-check-variant-02",
+      "ownerIssues": [
+        88,
+        105
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    require(\"independent\" not in \"\", \"independent corpus runner is not claimed\")",
+            "old": "    require(manifest.get(\"independentEvidence\", {}).get(\"runner\") == \"tools/independent_corpus.py\", \"independent corpus runner is not claimed\")",
+            "path": "tools/release_gate.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "release",
+      "requirementIds": [
+        "DFIR-AUTH-002",
+        "DFIR-QA-008"
+      ],
+      "targetFunction": "check_release_claims",
+      "variantOf": "release-claim-source-check"
+    },
+    {
+      "category": "release",
+      "detectingTestIds": [
+        "AT-AUTH-002",
+        "AT-QA-008"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_release.py",
+        "--probe",
+        "required-checks"
+      ],
+      "id": "release-required-checks",
+      "operatorId": "release-required-checks",
+      "ownerIssues": [
+        88,
+        105
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    passed = True  # defect injection bypasses release checks",
+            "old": "    passed = all(check[\"status\"] == \"passed\" for check in checks)",
+            "path": "tools/release_gate.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "release",
+      "requirementIds": [
+        "DFIR-AUTH-002",
+        "DFIR-QA-008"
+      ],
+      "targetFunction": "main"
+    },
+    {
+      "category": "release",
+      "detectingTestIds": [
+        "AT-AUTH-002",
+        "AT-QA-008"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_release.py",
+        "--probe",
+        "required-checks"
+      ],
+      "id": "release-required-checks-variant-01",
+      "operatorId": "release-required-checks-variant-01",
+      "ownerIssues": [
+        88,
+        105
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    passed = bool(checks)",
+            "old": "    passed = all(check[\"status\"] == \"passed\" for check in checks)",
+            "path": "tools/release_gate.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "release",
+      "requirementIds": [
+        "DFIR-AUTH-002",
+        "DFIR-QA-008"
+      ],
+      "targetFunction": "main",
+      "variantOf": "release-required-checks"
+    },
+    {
+      "category": "release",
+      "detectingTestIds": [
+        "AT-AUTH-002",
+        "AT-QA-008"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_release.py",
+        "--probe",
+        "required-checks"
+      ],
+      "id": "release-required-checks-variant-02",
+      "operatorId": "release-required-checks-variant-02",
+      "ownerIssues": [
+        88,
+        105
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    passed = True if checks else False",
+            "old": "    passed = all(check[\"status\"] == \"passed\" for check in checks)",
+            "path": "tools/release_gate.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "release",
+      "requirementIds": [
+        "DFIR-AUTH-002",
+        "DFIR-QA-008"
+      ],
+      "targetFunction": "main",
+      "variantOf": "release-required-checks"
+    },
+    {
+      "category": "release",
+      "detectingTestIds": [
+        "AT-STATUS-002",
+        "AT-QA-006"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_release.py",
+        "--probe",
+        "status-aggregation"
+      ],
+      "id": "release-status-aggregation",
+      "operatorId": "release-status-aggregation",
+      "ownerIssues": [
+        88,
+        105
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "        passed = True  # defect injection ignores command status",
+            "old": "        passed = command_result.get(\"return_code\") == 0",
+            "path": "tools/release_gate.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "release",
+      "requirementIds": [
+        "DFIR-STATUS-002",
+        "DFIR-QA-006"
+      ],
+      "targetFunction": "main"
+    },
+    {
+      "category": "release",
+      "detectingTestIds": [
+        "AT-STATUS-002",
+        "AT-QA-006"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_release.py",
+        "--probe",
+        "status-aggregation"
+      ],
+      "id": "release-status-aggregation-variant-01",
+      "operatorId": "release-status-aggregation-variant-01",
+      "ownerIssues": [
+        88,
+        105
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "        passed = command_result.get(\"return_code\") is not None",
+            "old": "        passed = command_result.get(\"return_code\") == 0",
+            "path": "tools/release_gate.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "release",
+      "requirementIds": [
+        "DFIR-STATUS-002",
+        "DFIR-QA-006"
+      ],
+      "targetFunction": "main",
+      "variantOf": "release-status-aggregation"
+    },
+    {
+      "category": "release",
+      "detectingTestIds": [
+        "AT-STATUS-002",
+        "AT-QA-006"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_release.py",
+        "--probe",
+        "status-aggregation"
+      ],
+      "id": "release-status-aggregation-variant-02",
+      "operatorId": "release-status-aggregation-variant-02",
+      "ownerIssues": [
+        88,
+        105
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "        passed = bool(command_result)",
+            "old": "        passed = command_result.get(\"return_code\") == 0",
+            "path": "tools/release_gate.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "release",
+      "requirementIds": [
+        "DFIR-STATUS-002",
+        "DFIR-QA-006"
+      ],
+      "targetFunction": "main",
+      "variantOf": "release-status-aggregation"
+    },
+    {
+      "category": "release",
+      "detectingTestIds": [
+        "AT-STATUS-002",
+        "AT-QA-006"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_release.py",
+        "--probe",
+        "status-aggregation"
+      ],
+      "id": "release-status-aggregation-variant-03",
+      "operatorId": "release-status-aggregation-variant-03",
+      "ownerIssues": [
+        88,
+        105
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "        passed = command_result.get(\"return_code\") != -999",
+            "old": "        passed = command_result.get(\"return_code\") == 0",
+            "path": "tools/release_gate.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "release",
+      "requirementIds": [
+        "DFIR-STATUS-002",
+        "DFIR-QA-006"
+      ],
+      "targetFunction": "main",
+      "variantOf": "release-status-aggregation"
+    },
+    {
+      "category": "validator",
+      "detectingTestIds": [
+        "AT-TYPE-001",
+        "AT-QA-001"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "id": "val-closed-object",
+      "operatorId": "validator-closed-object",
+      "ownerIssues": [
+        90
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "            if False and extra:",
+            "old": "            if extra:",
+            "path": "tools/ir_validation.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "validator",
+      "requirementIds": [
+        "DFIR-MODEL-004",
+        "DFIR-TYPE-001"
+      ],
+      "targetFunction": "_validate_discriminated_variants"
+    },
+    {
+      "category": "validator",
+      "detectingTestIds": [
+        "AT-STATUS-002",
+        "AT-STATUS-007"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_validator.py",
+        "--probe",
+        "status"
+      ],
+      "id": "val-complete-status-hard-loss",
+      "operatorId": "adapter-finish-loss",
+      "ownerIssues": [
+        90,
+        91
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "            status = \"complete\"",
+            "old": "            status = \"failed\" if any(d.get(\"severity\") in {\"fatal\", \"error\"} for d in self.diagnostics) else \"partial\" if source_loss else \"complete\"",
+            "path": "tools/adapter_common.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "validator",
+      "requirementIds": [
+        "DFIR-STATUS-002",
+        "DFIR-STATUS-007"
+      ],
+      "targetFunction": "DocumentBuilder.finish"
+    },
+    {
+      "category": "validator",
+      "detectingTestIds": [
+        "AT-MODEL-005",
+        "AT-QA-002"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_validator.py",
+        "--probe",
+        "reciprocity"
+      ],
+      "id": "val-containment-reciprocity",
+      "operatorId": "validator-containment-reciprocity",
+      "ownerIssues": [
+        90
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "            if False and node_id in parent_of and parent_of[node_id] != parent_id:",
+            "old": "            if node_id in parent_of and parent_of[node_id] != parent_id:",
+            "path": "tools/ir_validation.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "validator",
+      "requirementIds": [
+        "DFIR-MODEL-005"
+      ],
+      "targetFunction": "validate_document"
+    },
+    {
+      "category": "validator",
+      "detectingTestIds": [
+        "AT-TYPE-001",
+        "AT-TYPE-005"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "id": "val-discriminator-branch",
+      "operatorId": "validator-discriminator-branch",
+      "ownerIssues": [
+        90
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "        if isinstance(kind, str) and kind in variants:",
+            "old": "        if isinstance(kind, str) and kind in variants and (is_color or is_geometry or is_anchor):",
+            "path": "tools/ir_validation.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "validator",
+      "requirementIds": [
+        "DFIR-MODEL-004",
+        "DFIR-TYPE-001"
+      ],
+      "targetFunction": "_validate_discriminated_variants"
+    },
+    {
+      "category": "validator",
+      "detectingTestIds": [
+        "AT-TYPE-001",
+        "AT-TYPE-005"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "id": "val-discriminator-branch-variant-01",
+      "operatorId": "validator-discriminator-branch-variant-01",
+      "ownerIssues": [
+        90
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "        if isinstance(kind, str) and kind in variants and False:",
+            "old": "        if isinstance(kind, str) and kind in variants and (is_color or is_geometry or is_anchor):",
+            "path": "tools/ir_validation.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "validator",
+      "requirementIds": [
+        "DFIR-MODEL-004",
+        "DFIR-TYPE-001"
+      ],
+      "targetFunction": "_validate_discriminated_variants",
+      "variantOf": "val-discriminator-branch"
+    },
+    {
+      "category": "validator",
+      "detectingTestIds": [
+        "AT-TYPE-001",
+        "AT-TYPE-005"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "id": "val-discriminator-branch-variant-02",
+      "operatorId": "validator-discriminator-branch-variant-02",
+      "ownerIssues": [
+        90
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "        if isinstance(kind, str) and kind in variants and 0:",
+            "old": "        if isinstance(kind, str) and kind in variants and (is_color or is_geometry or is_anchor):",
+            "path": "tools/ir_validation.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "validator",
+      "requirementIds": [
+        "DFIR-MODEL-004",
+        "DFIR-TYPE-001"
+      ],
+      "targetFunction": "_validate_discriminated_variants",
+      "variantOf": "val-discriminator-branch"
+    },
+    {
+      "category": "validator",
+      "detectingTestIds": [
+        "AT-TYPE-001",
+        "AT-TYPE-005"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "id": "val-discriminator-branch-variant-03",
+      "operatorId": "validator-discriminator-branch-variant-03",
+      "ownerIssues": [
+        90
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "        if isinstance(kind, str) and kind in variants and is_color:",
+            "old": "        if isinstance(kind, str) and kind in variants and (is_color or is_geometry or is_anchor):",
+            "path": "tools/ir_validation.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "validator",
+      "requirementIds": [
+        "DFIR-MODEL-004",
+        "DFIR-TYPE-001"
+      ],
+      "targetFunction": "_validate_discriminated_variants",
+      "variantOf": "val-discriminator-branch"
+    },
+    {
+      "category": "validator",
+      "detectingTestIds": [
+        "AT-EXT-002",
+        "AT-EXT-008"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_validator.py",
+        "--probe",
+        "extension"
+      ],
+      "id": "val-extension-payload-bypass",
+      "operatorId": "extension-payload-bypass",
+      "ownerIssues": [
+        90,
+        97
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    pass  # defect injection bypasses extension payload validation",
+            "old": "    _validate_schema(extension[\"payload\"], payload_schema, schema, f\"$.extensions[{extension['extensionId']}].payload\")",
+            "path": "tools/extension_registry.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "validator",
+      "requirementIds": [
+        "DFIR-EXT-002",
+        "DFIR-EXT-008"
+      ],
+      "targetFunction": "validate_extension"
+    },
+    {
+      "category": "validator",
+      "detectingTestIds": [
+        "AT-MODEL-001",
+        "AT-QA-001"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_validator.py",
+        "--probe",
+        "required"
+      ],
+      "id": "val-required-constraint",
+      "operatorId": "validator-required-constraint",
+      "ownerIssues": [
+        90
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "        missing = []  # defect injection disables required-field rejection",
+            "old": "        missing = [key for key in required if key not in value]",
+            "path": "tools/ir_validation.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "validator",
+      "requirementIds": [
+        "DFIR-MODEL-001",
+        "DFIR-QA-001"
+      ],
+      "targetFunction": "validate_document"
+    },
+    {
+      "category": "validator",
+      "detectingTestIds": [
+        "AT-MODEL-010",
+        "AT-QA-002"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_validator.py",
+        "--probe",
+        "wrong-type"
+      ],
+      "id": "val-wrong-type-reference",
+      "operatorId": "validator-wrong-type-reference",
+      "ownerIssues": [
+        90
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    if False and target_kinds is not None and kind_by_id is not None and value in kind_by_id and kind_by_id[value] not in target_kinds:",
+            "old": "    if target_kinds is not None and kind_by_id is not None and value in kind_by_id and kind_by_id[value] not in target_kinds:",
+            "path": "tools/ir_validation.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "validator",
+      "requirementIds": [
+        "DFIR-MODEL-010"
+      ],
+      "targetFunction": "_id_ref"
+    },
+    {
+      "category": "xlsx",
+      "detectingTestIds": [
+        "AT-XLSX-003",
+        "AT-IO-003"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "xlsx",
+        "--probe",
+        "xlsx-binary-float"
+      ],
+      "id": "xlsx-binary-float",
+      "operatorId": "xlsx-binary-float",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "        number = Decimal(float(value))",
+            "old": "        number = Decimal(value)",
+            "path": "tools/adapter_xlsx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-003",
+        "DFIR-IO-003"
+      ],
+      "targetFunction": "_typed"
+    },
+    {
+      "category": "xlsx",
+      "detectingTestIds": [
+        "AT-XLSX-003",
+        "AT-IO-003"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "xlsx",
+        "--probe",
+        "xlsx-binary-float"
+      ],
+      "id": "xlsx-binary-float-variant-01",
+      "operatorId": "xlsx-binary-float-variant-01",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "        number = Decimal(str(float(value)))",
+            "old": "        number = Decimal(value)",
+            "path": "tools/adapter_xlsx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-003",
+        "DFIR-IO-003"
+      ],
+      "targetFunction": "_typed",
+      "variantOf": "xlsx-binary-float"
+    },
+    {
+      "category": "xlsx",
+      "detectingTestIds": [
+        "AT-XLSX-003",
+        "AT-IO-003"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "xlsx",
+        "--probe",
+        "xlsx-binary-float"
+      ],
+      "id": "xlsx-binary-float-variant-02",
+      "operatorId": "xlsx-binary-float-variant-02",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "        number = Decimal(\"0\")",
+            "old": "        number = Decimal(value)",
+            "path": "tools/adapter_xlsx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-003",
+        "DFIR-IO-003"
+      ],
+      "targetFunction": "_typed",
+      "variantOf": "xlsx-binary-float"
+    },
+    {
+      "category": "xlsx",
+      "detectingTestIds": [
+        "AT-XLSX-005",
+        "AT-QA-005"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "xlsx",
+        "--probe",
+        "xlsx-date-system"
+      ],
+      "id": "xlsx-date-system",
+      "operatorId": "xlsx-date-system",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    return \"1900\" if props is not None and _attr(props, \"date1904\") in {\"1\", \"true\"} else \"1904\"",
+            "old": "    return \"1904\" if props is not None and _attr(props, \"date1904\") in {\"1\", \"true\"} else \"1900\"",
+            "path": "tools/adapter_xlsx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-005"
+      ],
+      "targetFunction": "_date_system"
+    },
+    {
+      "category": "xlsx",
+      "detectingTestIds": [
+        "AT-XLSX-005",
+        "AT-QA-005"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "xlsx",
+        "--probe",
+        "xlsx-date-system"
+      ],
+      "id": "xlsx-date-system-variant-01",
+      "operatorId": "xlsx-date-system-variant-01",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    return \"1904\" if props is not None else \"1900\"",
+            "old": "    return \"1904\" if props is not None and _attr(props, \"date1904\") in {\"1\", \"true\"} else \"1900\"",
+            "path": "tools/adapter_xlsx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-005"
+      ],
+      "targetFunction": "_date_system",
+      "variantOf": "xlsx-date-system"
+    },
+    {
+      "category": "xlsx",
+      "detectingTestIds": [
+        "AT-XLSX-005",
+        "AT-QA-005"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "xlsx",
+        "--probe",
+        "xlsx-date-system"
+      ],
+      "id": "xlsx-date-system-variant-02",
+      "operatorId": "xlsx-date-system-variant-02",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "    return \"1904\"",
+            "old": "    return \"1904\" if props is not None and _attr(props, \"date1904\") in {\"1\", \"true\"} else \"1900\"",
+            "path": "tools/adapter_xlsx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-005"
+      ],
+      "targetFunction": "_date_system",
+      "variantOf": "xlsx-date-system"
+    },
+    {
+      "category": "xlsx",
+      "detectingTestIds": [
+        "AT-XLSX-003",
+        "AT-XLSX-008"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "xlsx",
+        "--probe",
+        "xlsx-displayed-lane"
+      ],
+      "id": "xlsx-displayed-lane",
+      "operatorId": "xlsx-displayed-lane",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                        displayed = raw_value or \"\"  # defect injection aliases displayed and stored lanes",
+            "old": "                        displayed = _displayed(raw_value, cell_format, context[\"dateSystem\"])",
+            "path": "tools/adapter_xlsx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-003",
+        "DFIR-XLSX-008"
+      ],
+      "targetFunction": "convert"
+    },
+    {
+      "category": "xlsx",
+      "detectingTestIds": [
+        "AT-XLSX-003",
+        "AT-XLSX-008"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "xlsx",
+        "--probe",
+        "xlsx-displayed-lane"
+      ],
+      "id": "xlsx-displayed-lane-variant-01",
+      "operatorId": "xlsx-displayed-lane-variant-01",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                        displayed = raw_value",
+            "old": "                        displayed = _displayed(raw_value, cell_format, context[\"dateSystem\"])",
+            "path": "tools/adapter_xlsx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-003",
+        "DFIR-XLSX-008"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "xlsx-displayed-lane"
+    },
+    {
+      "category": "xlsx",
+      "detectingTestIds": [
+        "AT-XLSX-003",
+        "AT-XLSX-008"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "xlsx",
+        "--probe",
+        "xlsx-displayed-lane"
+      ],
+      "id": "xlsx-displayed-lane-variant-02",
+      "operatorId": "xlsx-displayed-lane-variant-02",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                        displayed = \"\"",
+            "old": "                        displayed = _displayed(raw_value, cell_format, context[\"dateSystem\"])",
+            "path": "tools/adapter_xlsx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-003",
+        "DFIR-XLSX-008"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "xlsx-displayed-lane"
+    },
+    {
+      "category": "xlsx",
+      "detectingTestIds": [
+        "AT-XLSX-003",
+        "AT-XLSX-008"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "xlsx",
+        "--probe",
+        "xlsx-displayed-lane"
+      ],
+      "id": "xlsx-displayed-lane-variant-03",
+      "operatorId": "xlsx-displayed-lane-variant-03",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                        displayed = str(raw_value)",
+            "old": "                        displayed = _displayed(raw_value, cell_format, context[\"dateSystem\"])",
+            "path": "tools/adapter_xlsx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-003",
+        "DFIR-XLSX-008"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "xlsx-displayed-lane"
+    },
+    {
+      "category": "xlsx",
+      "detectingTestIds": [
+        "AT-XLSX-003",
+        "AT-XLSX-008"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "xlsx",
+        "--probe",
+        "xlsx-formula-lanes"
+      ],
+      "id": "xlsx-formula-lanes",
+      "operatorId": "xlsx-formula-lanes",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                            cached_value = None",
+            "old": "                            cached_value = _typed(raw_value, cell_type, number_format=cell_format, date_system=context[\"dateSystem\"])",
+            "path": "tools/adapter_xlsx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-003",
+        "DFIR-XLSX-008"
+      ],
+      "targetFunction": "convert"
+    },
+    {
+      "category": "xlsx",
+      "detectingTestIds": [
+        "AT-XLSX-003",
+        "AT-XLSX-008"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "xlsx",
+        "--probe",
+        "xlsx-formula-lanes"
+      ],
+      "id": "xlsx-formula-lanes-variant-01",
+      "operatorId": "xlsx-formula-lanes-variant-01",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                            cached_value = None",
+            "old": "                            cached_value = _typed(raw_value, cell_type, number_format=cell_format, date_system=context[\"dateSystem\"])",
+            "path": "tools/adapter_xlsx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-003",
+        "DFIR-XLSX-008"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "xlsx-formula-lanes"
+    },
+    {
+      "category": "xlsx",
+      "detectingTestIds": [
+        "AT-XLSX-003",
+        "AT-XLSX-008"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "xlsx",
+        "--probe",
+        "xlsx-formula-lanes"
+      ],
+      "id": "xlsx-formula-lanes-variant-02",
+      "operatorId": "xlsx-formula-lanes-variant-02",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                            cached_value = {\"type\": \"blank\", \"value\": None, \"status\": \"unavailable\"}",
+            "old": "                            cached_value = _typed(raw_value, cell_type, number_format=cell_format, date_system=context[\"dateSystem\"])",
+            "path": "tools/adapter_xlsx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-003",
+        "DFIR-XLSX-008"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "xlsx-formula-lanes"
+    },
+    {
+      "category": "xlsx",
+      "detectingTestIds": [
+        "AT-XLSX-002",
+        "AT-QA-003"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "xlsx",
+        "--probe",
+        "xlsx-shared-string"
+      ],
+      "id": "xlsx-shared-string",
+      "operatorId": "xlsx-shared-string",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                                raw_value = raw_value  # defect injection skips shared-string lookup",
+            "old": "                                raw_value = shared[int(raw_value)]",
+            "path": "tools/adapter_xlsx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-002"
+      ],
+      "targetFunction": "convert"
+    },
+    {
+      "category": "xlsx",
+      "detectingTestIds": [
+        "AT-XLSX-002",
+        "AT-QA-003"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "xlsx",
+        "--probe",
+        "xlsx-shared-string"
+      ],
+      "id": "xlsx-shared-string-variant-01",
+      "operatorId": "xlsx-shared-string-variant-01",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                                raw_value = \"\"",
+            "old": "                                raw_value = shared[int(raw_value)]",
+            "path": "tools/adapter_xlsx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-002"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "xlsx-shared-string"
+    },
+    {
+      "category": "xlsx",
+      "detectingTestIds": [
+        "AT-XLSX-002",
+        "AT-QA-003"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "xlsx",
+        "--probe",
+        "xlsx-shared-string"
+      ],
+      "id": "xlsx-shared-string-variant-02",
+      "operatorId": "xlsx-shared-string-variant-02",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                                raw_value = shared[0] if False else raw_value",
+            "old": "                                raw_value = shared[int(raw_value)]",
+            "path": "tools/adapter_xlsx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-002"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "xlsx-shared-string"
+    },
+    {
+      "category": "xlsx",
+      "detectingTestIds": [
+        "AT-XLSX-006",
+        "AT-XLSX-007"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "xlsx",
+        "--probe",
+        "xlsx-table-relationship"
+      ],
+      "id": "xlsx-table-relationship",
+      "operatorId": "xlsx-table-relationship",
+      "ownerIssues": [
+        95,
+        96,
+        100
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                for table_name in []:  # defect injection skips worksheet table relationships",
+            "old": "                for table_name in sorted(name for name in table_names_for_sheet if name in names):",
+            "path": "tools/adapter_xlsx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-006",
+        "DFIR-XLSX-007"
+      ],
+      "targetFunction": "convert"
+    },
+    {
+      "category": "xlsx",
+      "detectingTestIds": [
+        "AT-XLSX-006",
+        "AT-XLSX-007"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "xlsx",
+        "--probe",
+        "xlsx-table-relationship"
+      ],
+      "id": "xlsx-table-relationship-variant-01",
+      "operatorId": "xlsx-table-relationship-variant-01",
+      "ownerIssues": [
+        95,
+        96,
+        100
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                for table_name in ():",
+            "old": "                for table_name in sorted(name for name in table_names_for_sheet if name in names):",
+            "path": "tools/adapter_xlsx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-006",
+        "DFIR-XLSX-007"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "xlsx-table-relationship"
+    },
+    {
+      "category": "xlsx",
+      "detectingTestIds": [
+        "AT-XLSX-006",
+        "AT-XLSX-007"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "xlsx",
+        "--probe",
+        "xlsx-table-relationship"
+      ],
+      "id": "xlsx-table-relationship-variant-02",
+      "operatorId": "xlsx-table-relationship-variant-02",
+      "ownerIssues": [
+        95,
+        96,
+        100
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                for table_name in [\"__missing__\"]:",
+            "old": "                for table_name in sorted(name for name in table_names_for_sheet if name in names):",
+            "path": "tools/adapter_xlsx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-006",
+        "DFIR-XLSX-007"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "xlsx-table-relationship"
+    },
+    {
+      "category": "xlsx",
+      "detectingTestIds": [
+        "AT-XLSX-006",
+        "AT-XLSX-007"
+      ],
+      "expectedOutcome": "non-equivalent",
+      "gateCommand": [
+        "python",
+        "tools/defect_profile_formats.py",
+        "--format",
+        "xlsx",
+        "--probe",
+        "xlsx-table-relationship"
+      ],
+      "id": "xlsx-table-relationship-variant-03",
+      "operatorId": "xlsx-table-relationship-variant-03",
+      "ownerIssues": [
+        95,
+        96,
+        100
+      ],
+      "patch": {
+        "changes": [
+          {
+            "count": 1,
+            "new": "                for table_name in sorted(()) :",
+            "old": "                for table_name in sorted(name for name in table_names_for_sheet if name in names):",
+            "path": "tools/adapter_xlsx.py"
+          }
+        ],
+        "kind": "replace"
+      },
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-006",
+        "DFIR-XLSX-007"
+      ],
+      "targetFunction": "convert",
+      "variantOf": "xlsx-table-relationship"
+    }
+  ],
+  "classifications": [
+    "generated",
+    "detected",
+    "undetected",
+    "equivalent",
+    "invalid",
+    "timeout",
+    "infrastructure-error"
+  ],
+  "importCheck": {
+    "command": [
+      "python",
+      "-c",
+      "import importlib.util, pathlib, sys\nfor index, path in enumerate(sys.argv[1:]):\n    module_name = 'fdir_defect_import_' + str(index)\n    spec = importlib.util.spec_from_file_location(module_name, path)\n    if spec is None or spec.loader is None:\n        raise ImportError(path)\n    module = importlib.util.module_from_spec(spec)\n    sys.modules[module_name] = module\n    spec.loader.exec_module(module)",
+      "{target_files}"
+    ],
+    "expectedExitCode": 0,
+    "timeoutSeconds": 60
+  },
+  "invariantMatrix": [
+    {
+      "caseId": "canonical-authority-validation",
+      "id": "DFIR-89-CANON-AUTHORITY",
+      "must": true,
+      "operatorId": "canonical-authority-validation",
+      "ownerIssues": [
+        98
+      ],
+      "releaseProfile": "canonical",
+      "requirementIds": [
+        "DFIR-AUTH-003",
+        "DFIR-IO-005"
+      ]
+    },
+    {
+      "caseId": "canonical-authority-validation-variant-01",
+      "id": "DFIR-89-CANON-AUTHORITY-V01",
+      "must": true,
+      "operatorId": "canonical-authority-validation-variant-01",
+      "ownerIssues": [
+        98
+      ],
+      "releaseProfile": "canonical",
+      "requirementIds": [
+        "DFIR-AUTH-003",
+        "DFIR-IO-005"
+      ]
+    },
+    {
+      "caseId": "canonical-authority-validation-variant-02",
+      "id": "DFIR-89-CANON-AUTHORITY-V02",
+      "must": true,
+      "operatorId": "canonical-authority-validation-variant-02",
+      "ownerIssues": [
+        98
+      ],
+      "releaseProfile": "canonical",
+      "requirementIds": [
+        "DFIR-AUTH-003",
+        "DFIR-IO-005"
+      ]
+    },
+    {
+      "caseId": "canonical-key-order",
+      "id": "DFIR-89-CANON-KEYS",
+      "must": true,
+      "operatorId": "canonical-key-order",
+      "ownerIssues": [
+        98
+      ],
+      "releaseProfile": "canonical",
+      "requirementIds": [
+        "DFIR-IO-001",
+        "DFIR-IO-002"
+      ]
+    },
+    {
+      "caseId": "canonical-key-order-variant-01",
+      "id": "DFIR-89-CANON-KEYS-V01",
+      "must": true,
+      "operatorId": "canonical-key-order-variant-01",
+      "ownerIssues": [
+        98
+      ],
+      "releaseProfile": "canonical",
+      "requirementIds": [
+        "DFIR-IO-001",
+        "DFIR-IO-002"
+      ]
+    },
+    {
+      "caseId": "canonical-key-order-variant-02",
+      "id": "DFIR-89-CANON-KEYS-V02",
+      "must": true,
+      "operatorId": "canonical-key-order-variant-02",
+      "ownerIssues": [
+        98
+      ],
+      "releaseProfile": "canonical",
+      "requirementIds": [
+        "DFIR-IO-001",
+        "DFIR-IO-002"
+      ]
+    },
+    {
+      "caseId": "canonical-key-order-variant-03",
+      "id": "DFIR-89-CANON-KEYS-V03",
+      "must": true,
+      "operatorId": "canonical-key-order-variant-03",
+      "ownerIssues": [
+        98
+      ],
+      "releaseProfile": "canonical",
+      "requirementIds": [
+        "DFIR-IO-001",
+        "DFIR-IO-002"
+      ]
+    },
+    {
+      "caseId": "canonical-collection-order",
+      "id": "DFIR-89-CANON-SORT",
+      "must": true,
+      "operatorId": "canonical-collection-order",
+      "ownerIssues": [
+        98
+      ],
+      "releaseProfile": "canonical",
+      "requirementIds": [
+        "DFIR-IO-002",
+        "DFIR-IO-007"
+      ]
+    },
+    {
+      "caseId": "canonical-collection-order-variant-01",
+      "id": "DFIR-89-CANON-SORT-V01",
+      "must": true,
+      "operatorId": "canonical-collection-order-variant-01",
+      "ownerIssues": [
+        98
+      ],
+      "releaseProfile": "canonical",
+      "requirementIds": [
+        "DFIR-IO-002",
+        "DFIR-IO-007"
+      ]
+    },
+    {
+      "caseId": "canonical-collection-order-variant-02",
+      "id": "DFIR-89-CANON-SORT-V02",
+      "must": true,
+      "operatorId": "canonical-collection-order-variant-02",
+      "ownerIssues": [
+        98
+      ],
+      "releaseProfile": "canonical",
+      "requirementIds": [
+        "DFIR-IO-002",
+        "DFIR-IO-007"
+      ]
+    },
+    {
+      "caseId": "common-diagnostic-emission",
+      "id": "DFIR-89-COM-DIAGNOSTIC",
+      "must": true,
+      "operatorId": "adapter-diagnostic-emission",
+      "ownerIssues": [
+        91
+      ],
+      "releaseProfile": "adapter-common",
+      "requirementIds": [
+        "DFIR-STATUS-006"
+      ]
+    },
+    {
+      "caseId": "common-identity-seed",
+      "id": "DFIR-89-COM-IDENTITY",
+      "must": true,
+      "operatorId": "adapter-identity-seed",
+      "ownerIssues": [
+        91,
+        98
+      ],
+      "releaseProfile": "adapter-common",
+      "requirementIds": [
+        "DFIR-IO-004",
+        "DFIR-IO-007"
+      ]
+    },
+    {
+      "caseId": "common-feature-inventory",
+      "id": "DFIR-89-COM-INVENTORY",
+      "must": true,
+      "operatorId": "adapter-feature-inventory",
+      "ownerIssues": [
+        91
+      ],
+      "releaseProfile": "adapter-common",
+      "requirementIds": [
+        "DFIR-STATUS-003"
+      ]
+    },
+    {
+      "caseId": "common-source-map-target",
+      "id": "DFIR-89-COM-SOURCEMAP",
+      "must": true,
+      "operatorId": "adapter-source-map-target",
+      "ownerIssues": [
+        91,
+        92
+      ],
+      "releaseProfile": "adapter-common",
+      "requirementIds": [
+        "DFIR-AUTH-006"
+      ]
+    },
+    {
+      "caseId": "common-unknown-construct",
+      "id": "DFIR-89-COM-UNKNOWN",
+      "must": true,
+      "operatorId": "adapter-unknown-construct",
+      "ownerIssues": [
+        91
+      ],
+      "releaseProfile": "adapter-common",
+      "requirementIds": [
+        "DFIR-STATUS-007"
+      ]
+    },
+    {
+      "caseId": "docx-drawing-handler",
+      "id": "DFIR-89-DOCX-DRAWING",
+      "must": true,
+      "operatorId": "docx-drawing-handler",
+      "ownerIssues": [
+        94,
+        99
+      ],
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-005"
+      ]
+    },
+    {
+      "caseId": "docx-drawing-handler-variant-01",
+      "id": "DFIR-89-DOCX-DRAWING-V01",
+      "must": true,
+      "operatorId": "docx-drawing-handler-variant-01",
+      "ownerIssues": [
+        94,
+        99
+      ],
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-005"
+      ]
+    },
+    {
+      "caseId": "docx-drawing-handler-variant-02",
+      "id": "DFIR-89-DOCX-DRAWING-V02",
+      "must": true,
+      "operatorId": "docx-drawing-handler-variant-02",
+      "ownerIssues": [
+        94,
+        99
+      ],
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-005"
+      ]
+    },
+    {
+      "caseId": "docx-drawing-handler-variant-03",
+      "id": "DFIR-89-DOCX-DRAWING-V03",
+      "must": true,
+      "operatorId": "docx-drawing-handler-variant-03",
+      "ownerIssues": [
+        94,
+        99
+      ],
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-005"
+      ]
+    },
+    {
+      "caseId": "docx-hyperlink-run",
+      "id": "DFIR-89-DOCX-HYPERLINK",
+      "must": true,
+      "operatorId": "docx-hyperlink-run",
+      "ownerIssues": [
+        96,
+        99
+      ],
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-004"
+      ]
+    },
+    {
+      "caseId": "docx-hyperlink-run-variant-01",
+      "id": "DFIR-89-DOCX-HYPERLINK-V01",
+      "must": true,
+      "operatorId": "docx-hyperlink-run-variant-01",
+      "ownerIssues": [
+        96,
+        99
+      ],
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-004"
+      ]
+    },
+    {
+      "caseId": "docx-hyperlink-run-variant-02",
+      "id": "DFIR-89-DOCX-HYPERLINK-V02",
+      "must": true,
+      "operatorId": "docx-hyperlink-run-variant-02",
+      "ownerIssues": [
+        96,
+        99
+      ],
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-004"
+      ]
+    },
+    {
+      "caseId": "docx-hyperlink-run-variant-03",
+      "id": "DFIR-89-DOCX-HYPERLINK-V03",
+      "must": true,
+      "operatorId": "docx-hyperlink-run-variant-03",
+      "ownerIssues": [
+        96,
+        99
+      ],
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-004"
+      ]
+    },
+    {
+      "caseId": "docx-missing-relationship",
+      "id": "DFIR-89-DOCX-RELATION",
+      "must": true,
+      "operatorId": "docx-missing-relationship",
+      "ownerIssues": [
+        96,
+        99
+      ],
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-006",
+        "DFIR-DOCX-007"
+      ]
+    },
+    {
+      "caseId": "docx-missing-relationship-variant-01",
+      "id": "DFIR-89-DOCX-RELATION-V01",
+      "must": true,
+      "operatorId": "docx-missing-relationship-variant-01",
+      "ownerIssues": [
+        96,
+        99
+      ],
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-006",
+        "DFIR-DOCX-007"
+      ]
+    },
+    {
+      "caseId": "docx-missing-relationship-variant-02",
+      "id": "DFIR-89-DOCX-RELATION-V02",
+      "must": true,
+      "operatorId": "docx-missing-relationship-variant-02",
+      "ownerIssues": [
+        96,
+        99
+      ],
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-006",
+        "DFIR-DOCX-007"
+      ]
+    },
+    {
+      "caseId": "docx-missing-relationship-variant-03",
+      "id": "DFIR-89-DOCX-RELATION-V03",
+      "must": true,
+      "operatorId": "docx-missing-relationship-variant-03",
+      "ownerIssues": [
+        96,
+        99
+      ],
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-006",
+        "DFIR-DOCX-007"
+      ]
+    },
+    {
+      "caseId": "docx-story-processing",
+      "id": "DFIR-89-DOCX-STORY",
+      "must": true,
+      "operatorId": "docx-story-processing",
+      "ownerIssues": [
+        95,
+        96,
+        99
+      ],
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-004",
+        "DFIR-DOCX-007"
+      ]
+    },
+    {
+      "caseId": "docx-story-processing-variant-01",
+      "id": "DFIR-89-DOCX-STORY-V01",
+      "must": true,
+      "operatorId": "docx-story-processing-variant-01",
+      "ownerIssues": [
+        95,
+        96,
+        99
+      ],
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-004",
+        "DFIR-DOCX-007"
+      ]
+    },
+    {
+      "caseId": "docx-story-processing-variant-02",
+      "id": "DFIR-89-DOCX-STORY-V02",
+      "must": true,
+      "operatorId": "docx-story-processing-variant-02",
+      "ownerIssues": [
+        95,
+        96,
+        99
+      ],
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-004",
+        "DFIR-DOCX-007"
+      ]
+    },
+    {
+      "caseId": "docx-story-processing-variant-03",
+      "id": "DFIR-89-DOCX-STORY-V03",
+      "must": true,
+      "operatorId": "docx-story-processing-variant-03",
+      "ownerIssues": [
+        95,
+        96,
+        99
+      ],
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-004",
+        "DFIR-DOCX-007"
+      ]
+    },
+    {
+      "caseId": "docx-style-inheritance",
+      "id": "DFIR-89-DOCX-STYLE",
+      "must": true,
+      "operatorId": "docx-style-inheritance",
+      "ownerIssues": [
+        93,
+        99
+      ],
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-002",
+        "DFIR-STYLE-002"
+      ]
+    },
+    {
+      "caseId": "docx-style-inheritance-variant-01",
+      "id": "DFIR-89-DOCX-STYLE-V01",
+      "must": true,
+      "operatorId": "docx-style-inheritance-variant-01",
+      "ownerIssues": [
+        93,
+        99
+      ],
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-002",
+        "DFIR-STYLE-002"
+      ]
+    },
+    {
+      "caseId": "docx-style-inheritance-variant-02",
+      "id": "DFIR-89-DOCX-STYLE-V02",
+      "must": true,
+      "operatorId": "docx-style-inheritance-variant-02",
+      "ownerIssues": [
+        93,
+        99
+      ],
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-002",
+        "DFIR-STYLE-002"
+      ]
+    },
+    {
+      "caseId": "docx-style-inheritance-variant-03",
+      "id": "DFIR-89-DOCX-STYLE-V03",
+      "must": true,
+      "operatorId": "docx-style-inheritance-variant-03",
+      "ownerIssues": [
+        93,
+        99
+      ],
+      "releaseProfile": "docx",
+      "requirementIds": [
+        "DFIR-DOCX-002",
+        "DFIR-STYLE-002"
+      ]
+    },
+    {
+      "caseId": "markdown-delimiter-resolution",
+      "id": "DFIR-89-MD-DELIMITER",
+      "must": true,
+      "operatorId": "markdown-delimiter-resolution",
+      "ownerIssues": [
+        102
+      ],
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-004",
+        "DFIR-MD-005"
+      ]
+    },
+    {
+      "caseId": "markdown-delimiter-resolution-variant-01",
+      "id": "DFIR-89-MD-DELIMITER-V01",
+      "must": true,
+      "operatorId": "markdown-delimiter-resolution-variant-01",
+      "ownerIssues": [
+        102
+      ],
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-004",
+        "DFIR-MD-005"
+      ]
+    },
+    {
+      "caseId": "markdown-delimiter-resolution-variant-02",
+      "id": "DFIR-89-MD-DELIMITER-V02",
+      "must": true,
+      "operatorId": "markdown-delimiter-resolution-variant-02",
+      "ownerIssues": [
+        102
+      ],
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-004",
+        "DFIR-MD-005"
+      ]
+    },
+    {
+      "caseId": "markdown-delimiter-resolution-variant-03",
+      "id": "DFIR-89-MD-DELIMITER-V03",
+      "must": true,
+      "operatorId": "markdown-delimiter-resolution-variant-03",
+      "ownerIssues": [
+        102
+      ],
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-004",
+        "DFIR-MD-005"
+      ]
+    },
+    {
+      "caseId": "markdown-reference-resolution",
+      "id": "DFIR-89-MD-REFERENCE",
+      "must": true,
+      "operatorId": "markdown-reference-resolution",
+      "ownerIssues": [
+        96,
+        102
+      ],
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-003"
+      ]
+    },
+    {
+      "caseId": "markdown-reference-resolution-variant-01",
+      "id": "DFIR-89-MD-REFERENCE-V01",
+      "must": true,
+      "operatorId": "markdown-reference-resolution-variant-01",
+      "ownerIssues": [
+        96,
+        102
+      ],
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-003"
+      ]
+    },
+    {
+      "caseId": "markdown-reference-resolution-variant-02",
+      "id": "DFIR-89-MD-REFERENCE-V02",
+      "must": true,
+      "operatorId": "markdown-reference-resolution-variant-02",
+      "ownerIssues": [
+        96,
+        102
+      ],
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-003"
+      ]
+    },
+    {
+      "caseId": "markdown-reference-resolution-variant-03",
+      "id": "DFIR-89-MD-REFERENCE-V03",
+      "must": true,
+      "operatorId": "markdown-reference-resolution-variant-03",
+      "ownerIssues": [
+        96,
+        102
+      ],
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-003"
+      ]
+    },
+    {
+      "caseId": "markdown-span-end",
+      "id": "DFIR-89-MD-SPAN",
+      "must": true,
+      "operatorId": "markdown-span-end",
+      "ownerIssues": [
+        92,
+        102
+      ],
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-008"
+      ]
+    },
+    {
+      "caseId": "markdown-span-end-variant-01",
+      "id": "DFIR-89-MD-SPAN-V01",
+      "must": true,
+      "operatorId": "markdown-span-end-variant-01",
+      "ownerIssues": [
+        92,
+        102
+      ],
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-008"
+      ]
+    },
+    {
+      "caseId": "markdown-span-end-variant-02",
+      "id": "DFIR-89-MD-SPAN-V02",
+      "must": true,
+      "operatorId": "markdown-span-end-variant-02",
+      "ownerIssues": [
+        92,
+        102
+      ],
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-008"
+      ]
+    },
+    {
+      "caseId": "markdown-span-end-variant-03",
+      "id": "DFIR-89-MD-SPAN-V03",
+      "must": true,
+      "operatorId": "markdown-span-end-variant-03",
+      "ownerIssues": [
+        92,
+        102
+      ],
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-008"
+      ]
+    },
+    {
+      "caseId": "markdown-table-separator",
+      "id": "DFIR-89-MD-TABLE",
+      "must": true,
+      "operatorId": "markdown-table-separator",
+      "ownerIssues": [
+        95,
+        102
+      ],
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-002"
+      ]
+    },
+    {
+      "caseId": "markdown-table-separator-variant-01",
+      "id": "DFIR-89-MD-TABLE-V01",
+      "must": true,
+      "operatorId": "markdown-table-separator-variant-01",
+      "ownerIssues": [
+        95,
+        102
+      ],
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-002"
+      ]
+    },
+    {
+      "caseId": "markdown-table-separator-variant-02",
+      "id": "DFIR-89-MD-TABLE-V02",
+      "must": true,
+      "operatorId": "markdown-table-separator-variant-02",
+      "ownerIssues": [
+        95,
+        102
+      ],
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-002"
+      ]
+    },
+    {
+      "caseId": "markdown-table-separator-variant-03",
+      "id": "DFIR-89-MD-TABLE-V03",
+      "must": true,
+      "operatorId": "markdown-table-separator-variant-03",
+      "ownerIssues": [
+        95,
+        102
+      ],
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-002"
+      ]
+    },
+    {
+      "caseId": "markdown-unsupported-construct",
+      "id": "DFIR-89-MD-UNSUPPORTED",
+      "must": true,
+      "operatorId": "markdown-unsupported-construct",
+      "ownerIssues": [
+        91,
+        102
+      ],
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-008",
+        "DFIR-STATUS-007"
+      ]
+    },
+    {
+      "caseId": "markdown-unsupported-construct-variant-01",
+      "id": "DFIR-89-MD-UNSUPPORTED-V01",
+      "must": true,
+      "operatorId": "markdown-unsupported-construct-variant-01",
+      "ownerIssues": [
+        91,
+        102
+      ],
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-008",
+        "DFIR-STATUS-007"
+      ]
+    },
+    {
+      "caseId": "markdown-unsupported-construct-variant-02",
+      "id": "DFIR-89-MD-UNSUPPORTED-V02",
+      "must": true,
+      "operatorId": "markdown-unsupported-construct-variant-02",
+      "ownerIssues": [
+        91,
+        102
+      ],
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-008",
+        "DFIR-STATUS-007"
+      ]
+    },
+    {
+      "caseId": "markdown-unsupported-construct-variant-03",
+      "id": "DFIR-89-MD-UNSUPPORTED-V03",
+      "must": true,
+      "operatorId": "markdown-unsupported-construct-variant-03",
+      "ownerIssues": [
+        91,
+        102
+      ],
+      "releaseProfile": "markdown",
+      "requirementIds": [
+        "DFIR-MD-008",
+        "DFIR-STATUS-007"
+      ]
+    },
+    {
+      "caseId": "meta-equivalent-comment",
+      "id": "DFIR-89-META-EQUIVALENT",
+      "must": true,
+      "operatorId": "meta-equivalent-comment",
+      "ownerIssues": [
+        89
+      ],
+      "releaseProfile": "adapter-common",
+      "requirementIds": [
+        "DFIR-QA-008"
+      ]
+    },
+    {
+      "caseId": "pdf-annotation-target",
+      "id": "DFIR-89-PDF-ANNOTATION",
+      "must": true,
+      "operatorId": "pdf-annotation-target",
+      "ownerIssues": [
+        96,
+        101
+      ],
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-005"
+      ]
+    },
+    {
+      "caseId": "pdf-annotation-target-variant-01",
+      "id": "DFIR-89-PDF-ANNOTATION-V01",
+      "must": true,
+      "operatorId": "pdf-annotation-target-variant-01",
+      "ownerIssues": [
+        96,
+        101
+      ],
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-005"
+      ]
+    },
+    {
+      "caseId": "pdf-annotation-target-variant-02",
+      "id": "DFIR-89-PDF-ANNOTATION-V02",
+      "must": true,
+      "operatorId": "pdf-annotation-target-variant-02",
+      "ownerIssues": [
+        96,
+        101
+      ],
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-005"
+      ]
+    },
+    {
+      "caseId": "pdf-annotation-target-variant-03",
+      "id": "DFIR-89-PDF-ANNOTATION-V03",
+      "must": true,
+      "operatorId": "pdf-annotation-target-variant-03",
+      "ownerIssues": [
+        96,
+        101
+      ],
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-005"
+      ]
+    },
+    {
+      "caseId": "pdf-unknown-operator",
+      "id": "DFIR-89-PDF-DIAGNOSTIC",
+      "must": true,
+      "operatorId": "pdf-unknown-operator",
+      "ownerIssues": [
+        91,
+        101
+      ],
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-004",
+        "DFIR-PDF-008"
+      ]
+    },
+    {
+      "caseId": "pdf-unknown-operator-variant-01",
+      "id": "DFIR-89-PDF-DIAGNOSTIC-V01",
+      "must": true,
+      "operatorId": "pdf-unknown-operator-variant-01",
+      "ownerIssues": [
+        91,
+        101
+      ],
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-004",
+        "DFIR-PDF-008"
+      ]
+    },
+    {
+      "caseId": "pdf-unknown-operator-variant-02",
+      "id": "DFIR-89-PDF-DIAGNOSTIC-V02",
+      "must": true,
+      "operatorId": "pdf-unknown-operator-variant-02",
+      "ownerIssues": [
+        91,
+        101
+      ],
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-004",
+        "DFIR-PDF-008"
+      ]
+    },
+    {
+      "caseId": "pdf-page-order",
+      "id": "DFIR-89-PDF-PAGE",
+      "must": true,
+      "operatorId": "pdf-page-order",
+      "ownerIssues": [
+        94,
+        101
+      ],
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-001",
+        "DFIR-PDF-006"
+      ]
+    },
+    {
+      "caseId": "pdf-page-order-variant-01",
+      "id": "DFIR-89-PDF-PAGE-V01",
+      "must": true,
+      "operatorId": "pdf-page-order-variant-01",
+      "ownerIssues": [
+        94,
+        101
+      ],
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-001",
+        "DFIR-PDF-006"
+      ]
+    },
+    {
+      "caseId": "pdf-page-order-variant-02",
+      "id": "DFIR-89-PDF-PAGE-V02",
+      "must": true,
+      "operatorId": "pdf-page-order-variant-02",
+      "ownerIssues": [
+        94,
+        101
+      ],
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-001",
+        "DFIR-PDF-006"
+      ]
+    },
+    {
+      "caseId": "pdf-interleaved-paint",
+      "id": "DFIR-89-PDF-PAINT",
+      "must": true,
+      "operatorId": "pdf-interleaved-paint",
+      "ownerIssues": [
+        94,
+        101
+      ],
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-006"
+      ]
+    },
+    {
+      "caseId": "pdf-interleaved-paint-variant-01",
+      "id": "DFIR-89-PDF-PAINT-V01",
+      "must": true,
+      "operatorId": "pdf-interleaved-paint-variant-01",
+      "ownerIssues": [
+        94,
+        101
+      ],
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-006"
+      ]
+    },
+    {
+      "caseId": "pdf-interleaved-paint-variant-02",
+      "id": "DFIR-89-PDF-PAINT-V02",
+      "must": true,
+      "operatorId": "pdf-interleaved-paint-variant-02",
+      "ownerIssues": [
+        94,
+        101
+      ],
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-006"
+      ]
+    },
+    {
+      "caseId": "pdf-interleaved-paint-variant-03",
+      "id": "DFIR-89-PDF-PAINT-V03",
+      "must": true,
+      "operatorId": "pdf-interleaved-paint-variant-03",
+      "ownerIssues": [
+        94,
+        101
+      ],
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-006"
+      ]
+    },
+    {
+      "caseId": "pdf-graphics-restore",
+      "id": "DFIR-89-PDF-STATE",
+      "must": true,
+      "operatorId": "pdf-graphics-restore",
+      "ownerIssues": [
+        94,
+        101
+      ],
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-004"
+      ]
+    },
+    {
+      "caseId": "pdf-graphics-restore-variant-01",
+      "id": "DFIR-89-PDF-STATE-V01",
+      "must": true,
+      "operatorId": "pdf-graphics-restore-variant-01",
+      "ownerIssues": [
+        94,
+        101
+      ],
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-004"
+      ]
+    },
+    {
+      "caseId": "pdf-graphics-restore-variant-02",
+      "id": "DFIR-89-PDF-STATE-V02",
+      "must": true,
+      "operatorId": "pdf-graphics-restore-variant-02",
+      "ownerIssues": [
+        94,
+        101
+      ],
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-004"
+      ]
+    },
+    {
+      "caseId": "pdf-tounicode",
+      "id": "DFIR-89-PDF-UNICODE",
+      "must": true,
+      "operatorId": "pdf-tounicode",
+      "ownerIssues": [
+        92,
+        101
+      ],
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-002"
+      ]
+    },
+    {
+      "caseId": "pdf-tounicode-variant-01",
+      "id": "DFIR-89-PDF-UNICODE-V01",
+      "must": true,
+      "operatorId": "pdf-tounicode-variant-01",
+      "ownerIssues": [
+        92,
+        101
+      ],
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-002"
+      ]
+    },
+    {
+      "caseId": "pdf-tounicode-variant-02",
+      "id": "DFIR-89-PDF-UNICODE-V02",
+      "must": true,
+      "operatorId": "pdf-tounicode-variant-02",
+      "ownerIssues": [
+        92,
+        101
+      ],
+      "releaseProfile": "pdf",
+      "requirementIds": [
+        "DFIR-PDF-002"
+      ]
+    },
+    {
+      "caseId": "query-field-mapping",
+      "id": "DFIR-89-QUERY-FIELD",
+      "must": true,
+      "operatorId": "query-field-mapping",
+      "ownerIssues": [
+        103
+      ],
+      "releaseProfile": "query",
+      "requirementIds": [
+        "DFIR-QUERY-001",
+        "DFIR-QUERY-002"
+      ]
+    },
+    {
+      "caseId": "query-field-mapping-variant-01",
+      "id": "DFIR-89-QUERY-FIELD-V01",
+      "must": true,
+      "operatorId": "query-field-mapping-variant-01",
+      "ownerIssues": [
+        103
+      ],
+      "releaseProfile": "query",
+      "requirementIds": [
+        "DFIR-QUERY-001",
+        "DFIR-QUERY-002"
+      ]
+    },
+    {
+      "caseId": "query-field-mapping-variant-02",
+      "id": "DFIR-89-QUERY-FIELD-V02",
+      "must": true,
+      "operatorId": "query-field-mapping-variant-02",
+      "ownerIssues": [
+        103
+      ],
+      "releaseProfile": "query",
+      "requirementIds": [
+        "DFIR-QUERY-001",
+        "DFIR-QUERY-002"
+      ]
+    },
+    {
+      "caseId": "query-field-mapping-variant-03",
+      "id": "DFIR-89-QUERY-FIELD-V03",
+      "must": true,
+      "operatorId": "query-field-mapping-variant-03",
+      "ownerIssues": [
+        103
+      ],
+      "releaseProfile": "query",
+      "requirementIds": [
+        "DFIR-QUERY-001",
+        "DFIR-QUERY-002"
+      ]
+    },
+    {
+      "caseId": "query-field-mapping-variant-04",
+      "id": "DFIR-89-QUERY-FIELD-V04",
+      "must": true,
+      "operatorId": "query-field-mapping-variant-04",
+      "ownerIssues": [
+        103
+      ],
+      "releaseProfile": "query",
+      "requirementIds": [
+        "DFIR-QUERY-001",
+        "DFIR-QUERY-002"
+      ]
+    },
+    {
+      "caseId": "query-index-validation",
+      "id": "DFIR-89-QUERY-INDEX",
+      "must": true,
+      "operatorId": "query-index-validation",
+      "ownerIssues": [
+        103
+      ],
+      "releaseProfile": "query",
+      "requirementIds": [
+        "DFIR-AUTH-004",
+        "DFIR-QUERY-008"
+      ]
+    },
+    {
+      "caseId": "query-index-validation-variant-01",
+      "id": "DFIR-89-QUERY-INDEX-V01",
+      "must": true,
+      "operatorId": "query-index-validation-variant-01",
+      "ownerIssues": [
+        103
+      ],
+      "releaseProfile": "query",
+      "requirementIds": [
+        "DFIR-AUTH-004",
+        "DFIR-QUERY-008"
+      ]
+    },
+    {
+      "caseId": "query-index-validation-variant-02",
+      "id": "DFIR-89-QUERY-INDEX-V02",
+      "must": true,
+      "operatorId": "query-index-validation-variant-02",
+      "ownerIssues": [
+        103
+      ],
+      "releaseProfile": "query",
+      "requirementIds": [
+        "DFIR-AUTH-004",
+        "DFIR-QUERY-008"
+      ]
+    },
+    {
+      "caseId": "query-index-validation-variant-03",
+      "id": "DFIR-89-QUERY-INDEX-V03",
+      "must": true,
+      "operatorId": "query-index-validation-variant-03",
+      "ownerIssues": [
+        103
+      ],
+      "releaseProfile": "query",
+      "requirementIds": [
+        "DFIR-AUTH-004",
+        "DFIR-QUERY-008"
+      ]
+    },
+    {
+      "caseId": "query-index-validation-variant-04",
+      "id": "DFIR-89-QUERY-INDEX-V04",
+      "must": true,
+      "operatorId": "query-index-validation-variant-04",
+      "ownerIssues": [
+        103
+      ],
+      "releaseProfile": "query",
+      "requirementIds": [
+        "DFIR-AUTH-004",
+        "DFIR-QUERY-008"
+      ]
+    },
+    {
+      "caseId": "release-required-checks",
+      "id": "DFIR-89-RELEASE-REQUIRED",
+      "must": true,
+      "operatorId": "release-required-checks",
+      "ownerIssues": [
+        88,
+        105
+      ],
+      "releaseProfile": "release",
+      "requirementIds": [
+        "DFIR-AUTH-002",
+        "DFIR-QA-008"
+      ]
+    },
+    {
+      "caseId": "release-required-checks-variant-01",
+      "id": "DFIR-89-RELEASE-REQUIRED-V01",
+      "must": true,
+      "operatorId": "release-required-checks-variant-01",
+      "ownerIssues": [
+        88,
+        105
+      ],
+      "releaseProfile": "release",
+      "requirementIds": [
+        "DFIR-AUTH-002",
+        "DFIR-QA-008"
+      ]
+    },
+    {
+      "caseId": "release-required-checks-variant-02",
+      "id": "DFIR-89-RELEASE-REQUIRED-V02",
+      "must": true,
+      "operatorId": "release-required-checks-variant-02",
+      "ownerIssues": [
+        88,
+        105
+      ],
+      "releaseProfile": "release",
+      "requirementIds": [
+        "DFIR-AUTH-002",
+        "DFIR-QA-008"
+      ]
+    },
+    {
+      "caseId": "release-claim-source-check",
+      "id": "DFIR-89-RELEASE-SHA",
+      "must": true,
+      "operatorId": "release-claim-source-check",
+      "ownerIssues": [
+        88,
+        105
+      ],
+      "releaseProfile": "release",
+      "requirementIds": [
+        "DFIR-AUTH-002",
+        "DFIR-QA-008"
+      ]
+    },
+    {
+      "caseId": "release-claim-source-check-variant-01",
+      "id": "DFIR-89-RELEASE-SHA-V01",
+      "must": true,
+      "operatorId": "release-claim-source-check-variant-01",
+      "ownerIssues": [
+        88,
+        105
+      ],
+      "releaseProfile": "release",
+      "requirementIds": [
+        "DFIR-AUTH-002",
+        "DFIR-QA-008"
+      ]
+    },
+    {
+      "caseId": "release-claim-source-check-variant-02",
+      "id": "DFIR-89-RELEASE-SHA-V02",
+      "must": true,
+      "operatorId": "release-claim-source-check-variant-02",
+      "ownerIssues": [
+        88,
+        105
+      ],
+      "releaseProfile": "release",
+      "requirementIds": [
+        "DFIR-AUTH-002",
+        "DFIR-QA-008"
+      ]
+    },
+    {
+      "caseId": "release-status-aggregation",
+      "id": "DFIR-89-RELEASE-STATUS",
+      "must": true,
+      "operatorId": "release-status-aggregation",
+      "ownerIssues": [
+        88,
+        105
+      ],
+      "releaseProfile": "release",
+      "requirementIds": [
+        "DFIR-STATUS-002",
+        "DFIR-QA-006"
+      ]
+    },
+    {
+      "caseId": "release-status-aggregation-variant-01",
+      "id": "DFIR-89-RELEASE-STATUS-V01",
+      "must": true,
+      "operatorId": "release-status-aggregation-variant-01",
+      "ownerIssues": [
+        88,
+        105
+      ],
+      "releaseProfile": "release",
+      "requirementIds": [
+        "DFIR-STATUS-002",
+        "DFIR-QA-006"
+      ]
+    },
+    {
+      "caseId": "release-status-aggregation-variant-02",
+      "id": "DFIR-89-RELEASE-STATUS-V02",
+      "must": true,
+      "operatorId": "release-status-aggregation-variant-02",
+      "ownerIssues": [
+        88,
+        105
+      ],
+      "releaseProfile": "release",
+      "requirementIds": [
+        "DFIR-STATUS-002",
+        "DFIR-QA-006"
+      ]
+    },
+    {
+      "caseId": "release-status-aggregation-variant-03",
+      "id": "DFIR-89-RELEASE-STATUS-V03",
+      "must": true,
+      "operatorId": "release-status-aggregation-variant-03",
+      "ownerIssues": [
+        88,
+        105
+      ],
+      "releaseProfile": "release",
+      "requirementIds": [
+        "DFIR-STATUS-002",
+        "DFIR-QA-006"
+      ]
+    },
+    {
+      "caseId": "val-closed-object",
+      "id": "DFIR-89-VAL-CLOSED",
+      "must": true,
+      "operatorId": "validator-closed-object",
+      "ownerIssues": [
+        90
+      ],
+      "releaseProfile": "validator",
+      "requirementIds": [
+        "DFIR-MODEL-004",
+        "DFIR-TYPE-001"
+      ]
+    },
+    {
+      "caseId": "val-discriminator-branch",
+      "id": "DFIR-89-VAL-DISCRIMINATOR",
+      "must": true,
+      "operatorId": "validator-discriminator-branch",
+      "ownerIssues": [
+        90
+      ],
+      "releaseProfile": "validator",
+      "requirementIds": [
+        "DFIR-MODEL-004",
+        "DFIR-TYPE-001"
+      ]
+    },
+    {
+      "caseId": "val-discriminator-branch-variant-01",
+      "id": "DFIR-89-VAL-DISCRIMINATOR-V01",
+      "must": true,
+      "operatorId": "validator-discriminator-branch-variant-01",
+      "ownerIssues": [
+        90
+      ],
+      "releaseProfile": "validator",
+      "requirementIds": [
+        "DFIR-MODEL-004",
+        "DFIR-TYPE-001"
+      ]
+    },
+    {
+      "caseId": "val-discriminator-branch-variant-02",
+      "id": "DFIR-89-VAL-DISCRIMINATOR-V02",
+      "must": true,
+      "operatorId": "validator-discriminator-branch-variant-02",
+      "ownerIssues": [
+        90
+      ],
+      "releaseProfile": "validator",
+      "requirementIds": [
+        "DFIR-MODEL-004",
+        "DFIR-TYPE-001"
+      ]
+    },
+    {
+      "caseId": "val-discriminator-branch-variant-03",
+      "id": "DFIR-89-VAL-DISCRIMINATOR-V03",
+      "must": true,
+      "operatorId": "validator-discriminator-branch-variant-03",
+      "ownerIssues": [
+        90
+      ],
+      "releaseProfile": "validator",
+      "requirementIds": [
+        "DFIR-MODEL-004",
+        "DFIR-TYPE-001"
+      ]
+    },
+    {
+      "caseId": "val-extension-payload-bypass",
+      "id": "DFIR-89-VAL-EXTENSION",
+      "must": true,
+      "operatorId": "extension-payload-bypass",
+      "ownerIssues": [
+        90,
+        97
+      ],
+      "releaseProfile": "validator",
+      "requirementIds": [
+        "DFIR-EXT-002",
+        "DFIR-EXT-008"
+      ]
+    },
+    {
+      "caseId": "val-containment-reciprocity",
+      "id": "DFIR-89-VAL-RECIPROCITY",
+      "must": true,
+      "operatorId": "validator-containment-reciprocity",
+      "ownerIssues": [
+        90
+      ],
+      "releaseProfile": "validator",
+      "requirementIds": [
+        "DFIR-MODEL-005"
+      ]
+    },
+    {
+      "caseId": "val-wrong-type-reference",
+      "id": "DFIR-89-VAL-REFERENCE-TYPE",
+      "must": true,
+      "operatorId": "validator-wrong-type-reference",
+      "ownerIssues": [
+        90
+      ],
+      "releaseProfile": "validator",
+      "requirementIds": [
+        "DFIR-MODEL-010"
+      ]
+    },
+    {
+      "caseId": "val-required-constraint",
+      "id": "DFIR-89-VAL-REQUIRED",
+      "must": true,
+      "operatorId": "validator-required-constraint",
+      "ownerIssues": [
+        90
+      ],
+      "releaseProfile": "validator",
+      "requirementIds": [
+        "DFIR-MODEL-001",
+        "DFIR-QA-001"
+      ]
+    },
+    {
+      "caseId": "val-complete-status-hard-loss",
+      "id": "DFIR-89-VAL-STATUS",
+      "must": true,
+      "operatorId": "adapter-finish-loss",
+      "ownerIssues": [
+        90,
+        91
+      ],
+      "releaseProfile": "validator",
+      "requirementIds": [
+        "DFIR-STATUS-002",
+        "DFIR-STATUS-007"
+      ]
+    },
+    {
+      "caseId": "xlsx-date-system",
+      "id": "DFIR-89-XLSX-DATE",
+      "must": true,
+      "operatorId": "xlsx-date-system",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-005"
+      ]
+    },
+    {
+      "caseId": "xlsx-date-system-variant-01",
+      "id": "DFIR-89-XLSX-DATE-V01",
+      "must": true,
+      "operatorId": "xlsx-date-system-variant-01",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-005"
+      ]
+    },
+    {
+      "caseId": "xlsx-date-system-variant-02",
+      "id": "DFIR-89-XLSX-DATE-V02",
+      "must": true,
+      "operatorId": "xlsx-date-system-variant-02",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-005"
+      ]
+    },
+    {
+      "caseId": "xlsx-binary-float",
+      "id": "DFIR-89-XLSX-DECIMAL",
+      "must": true,
+      "operatorId": "xlsx-binary-float",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-003",
+        "DFIR-IO-003"
+      ]
+    },
+    {
+      "caseId": "xlsx-binary-float-variant-01",
+      "id": "DFIR-89-XLSX-DECIMAL-V01",
+      "must": true,
+      "operatorId": "xlsx-binary-float-variant-01",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-003",
+        "DFIR-IO-003"
+      ]
+    },
+    {
+      "caseId": "xlsx-binary-float-variant-02",
+      "id": "DFIR-89-XLSX-DECIMAL-V02",
+      "must": true,
+      "operatorId": "xlsx-binary-float-variant-02",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-003",
+        "DFIR-IO-003"
+      ]
+    },
+    {
+      "caseId": "xlsx-displayed-lane",
+      "id": "DFIR-89-XLSX-DISPLAY",
+      "must": true,
+      "operatorId": "xlsx-displayed-lane",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-003",
+        "DFIR-XLSX-008"
+      ]
+    },
+    {
+      "caseId": "xlsx-displayed-lane-variant-01",
+      "id": "DFIR-89-XLSX-DISPLAY-V01",
+      "must": true,
+      "operatorId": "xlsx-displayed-lane-variant-01",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-003",
+        "DFIR-XLSX-008"
+      ]
+    },
+    {
+      "caseId": "xlsx-displayed-lane-variant-02",
+      "id": "DFIR-89-XLSX-DISPLAY-V02",
+      "must": true,
+      "operatorId": "xlsx-displayed-lane-variant-02",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-003",
+        "DFIR-XLSX-008"
+      ]
+    },
+    {
+      "caseId": "xlsx-displayed-lane-variant-03",
+      "id": "DFIR-89-XLSX-DISPLAY-V03",
+      "must": true,
+      "operatorId": "xlsx-displayed-lane-variant-03",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-003",
+        "DFIR-XLSX-008"
+      ]
+    },
+    {
+      "caseId": "xlsx-formula-lanes",
+      "id": "DFIR-89-XLSX-FORMULA",
+      "must": true,
+      "operatorId": "xlsx-formula-lanes",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-003",
+        "DFIR-XLSX-008"
+      ]
+    },
+    {
+      "caseId": "xlsx-formula-lanes-variant-01",
+      "id": "DFIR-89-XLSX-FORMULA-V01",
+      "must": true,
+      "operatorId": "xlsx-formula-lanes-variant-01",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-003",
+        "DFIR-XLSX-008"
+      ]
+    },
+    {
+      "caseId": "xlsx-formula-lanes-variant-02",
+      "id": "DFIR-89-XLSX-FORMULA-V02",
+      "must": true,
+      "operatorId": "xlsx-formula-lanes-variant-02",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-003",
+        "DFIR-XLSX-008"
+      ]
+    },
+    {
+      "caseId": "xlsx-table-relationship",
+      "id": "DFIR-89-XLSX-RELATION",
+      "must": true,
+      "operatorId": "xlsx-table-relationship",
+      "ownerIssues": [
+        95,
+        96,
+        100
+      ],
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-006",
+        "DFIR-XLSX-007"
+      ]
+    },
+    {
+      "caseId": "xlsx-table-relationship-variant-01",
+      "id": "DFIR-89-XLSX-RELATION-V01",
+      "must": true,
+      "operatorId": "xlsx-table-relationship-variant-01",
+      "ownerIssues": [
+        95,
+        96,
+        100
+      ],
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-006",
+        "DFIR-XLSX-007"
+      ]
+    },
+    {
+      "caseId": "xlsx-table-relationship-variant-02",
+      "id": "DFIR-89-XLSX-RELATION-V02",
+      "must": true,
+      "operatorId": "xlsx-table-relationship-variant-02",
+      "ownerIssues": [
+        95,
+        96,
+        100
+      ],
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-006",
+        "DFIR-XLSX-007"
+      ]
+    },
+    {
+      "caseId": "xlsx-table-relationship-variant-03",
+      "id": "DFIR-89-XLSX-RELATION-V03",
+      "must": true,
+      "operatorId": "xlsx-table-relationship-variant-03",
+      "ownerIssues": [
+        95,
+        96,
+        100
+      ],
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-006",
+        "DFIR-XLSX-007"
+      ]
+    },
+    {
+      "caseId": "xlsx-shared-string",
+      "id": "DFIR-89-XLSX-SHARED",
+      "must": true,
+      "operatorId": "xlsx-shared-string",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-002"
+      ]
+    },
+    {
+      "caseId": "xlsx-shared-string-variant-01",
+      "id": "DFIR-89-XLSX-SHARED-V01",
+      "must": true,
+      "operatorId": "xlsx-shared-string-variant-01",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-002"
+      ]
+    },
+    {
+      "caseId": "xlsx-shared-string-variant-02",
+      "id": "DFIR-89-XLSX-SHARED-V02",
+      "must": true,
+      "operatorId": "xlsx-shared-string-variant-02",
+      "ownerIssues": [
+        92,
+        100
+      ],
+      "releaseProfile": "xlsx",
+      "requirementIds": [
+        "DFIR-XLSX-002"
+      ]
+    }
+  ],
+  "issue": 89,
+  "policy": {
+    "baseRef": "HEAD",
+    "checkout": "git-archive-disposable-copy",
+    "cleanBaseRequired": true,
+    "commandsAreArgv": true,
+    "crashIsNotDetection": true,
+    "detectedOracle": "the same detector command passes on the base copy and exits with an accepted test/gate failure on the patched copy",
+    "equivalentOracle": "the declared equivalent patch leaves the detector observable result unchanged",
+    "invalidCasesStayInDenominator": true,
+    "patchApplyFailureClassification": "infrastructure-error",
+    "patchKind": "declarative-replacement-rendered-as-unified-diff",
+    "selectorPolicy": {
+      "astSelectorField": "patch.changes[].old",
+      "kind": "function-scoped-source-span",
+      "targetFileField": "patch.changes[].path",
+      "targetFunctionField": "targetFunction",
+      "verification": "the runner validates the named function marker and exact source-span occurrence before rendering the unified diff"
+    },
+    "sourceComparisonIsNeverDetection": true,
+    "thirdPartyDependencies": false,
+    "timeoutIsNotDetection": true
+  },
+  "releaseProfiles": {
+    "adapter-common": {
+      "command": [
+        "python",
+        "tools/run_acceptance.py",
+        "--all"
+      ],
+      "minimumNonEquivalentCases": 1,
+      "timeoutSeconds": 300
+    },
+    "canonical": {
+      "command": [
+        "python",
+        "tools/query_qualification.py"
+      ],
+      "minimumNonEquivalentCases": 10,
+      "timeoutSeconds": 300
+    },
+    "docx": {
+      "command": [
+        "python",
+        "tools/run_e2e.py",
+        "--all",
+        "--json"
+      ],
+      "minimumNonEquivalentCases": 20,
+      "timeoutSeconds": 300
+    },
+    "markdown": {
+      "command": [
+        "python",
+        "tools/run_e2e.py",
+        "--all",
+        "--json"
+      ],
+      "minimumNonEquivalentCases": 20,
+      "timeoutSeconds": 300
+    },
+    "pdf": {
+      "command": [
+        "python",
+        "tools/run_e2e.py",
+        "--all",
+        "--json"
+      ],
+      "minimumNonEquivalentCases": 20,
+      "timeoutSeconds": 300
+    },
+    "query": {
+      "command": [
+        "python",
+        "tools/query_qualification.py"
+      ],
+      "minimumNonEquivalentCases": 10,
+      "timeoutSeconds": 300
+    },
+    "release": {
+      "command": [
+        "python",
+        "tools/release_gate.py"
+      ],
+      "minimumNonEquivalentCases": 10,
+      "timeoutSeconds": 900
+    },
+    "validator": {
+      "command": [
+        "python",
+        "tools/run_acceptance.py",
+        "--all"
+      ],
+      "minimumNonEquivalentCases": 10,
+      "timeoutSeconds": 300
+    },
+    "xlsx": {
+      "command": [
+        "python",
+        "tools/run_e2e.py",
+        "--all",
+        "--json"
+      ],
+      "minimumNonEquivalentCases": 20,
+      "timeoutSeconds": 300
+    }
+  },
+  "repository": "horiyamayoh/fdir",
+  "runner": {
+    "defaultJobs": 1,
+    "id": "fdir-defect-injection-runner",
+    "jsonEncoding": "UTF-8",
+    "lineEnding": "LF",
+    "maxJobs": 8,
+    "maxOutputBytes": 262144,
+    "reportSchema": "fdir/defect-injection-campaign-report",
+    "sortKeys": true,
+    "version": "1.0.0",
+    "worktreePrefix": "fdir-defect-campaign-"
+  },
+  "schema": "fdir/defect-injection-contract",
+  "selfTest": {
+    "mustNotClaimDetectionFor": [
+      "timeout",
+      "infrastructure-error",
+      "invalid"
+    ],
+    "requiredCases": [
+      "patch-not-applicable",
+      "detector-disabled",
+      "base-suite-failure",
+      "parallel-isolation",
+      "equivalent-output",
+      "invalid-syntax",
+      "timeout",
+      "missing-command"
+    ]
+  },
+  "supportFiles": [
+    "tools/defect_profile_canonical.py",
+    "tools/defect_profile_common.py",
+    "tools/defect_profile_formats.py",
+    "tools/defect_profile_release.py",
+    "tools/defect_profile_validator.py"
+  ],
+  "syntaxCheck": {
+    "command": [
+      "python",
+      "-m",
+      "py_compile",
+      "{target_files}"
+    ],
+    "expectedExitCode": 0,
+    "timeoutSeconds": 60
+  },
+  "version": "1.0.0"
+}

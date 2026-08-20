@@ -613,10 +613,10 @@
         "status": {"$ref": "#/$defs/status"}
       },
       "oneOf": [
-        {"properties": {"type": {"const": "blank"}}, "required": ["value"], "properties": {"type":{"const":"blank"},"value":{"type":"null"},"status":{"$ref":"#/$defs/status"}}},
-        {"properties": {"type": {"const": "boolean"}}, "required": ["value"], "properties": {"type":{"const":"boolean"},"value":{"type":"boolean"},"status":{"$ref":"#/$defs/status"}}},
-        {"properties": {"type": {"enum": ["integer", "number", "decimal"]}}, "required": ["value"], "properties": {"type":{"enum":["integer","number","decimal"]},"value":{"type":["string","number","integer"]},"status":{"$ref":"#/$defs/status"}}},
-        {"properties": {"type": {"enum": ["string", "date", "datetime", "error"]}}, "required": ["value"], "properties": {"type":{"enum":["string","date","datetime","error"]},"value":{"type":["string","null"]},"status":{"$ref":"#/$defs/status"}}}
+        {"properties": {"type":{"const":"blank"},"value":{"type":"null"},"status":{"$ref":"#/$defs/status"}}, "required": ["value"]},
+        {"properties": {"type":{"const":"boolean"},"value":{"type":"boolean"},"status":{"$ref":"#/$defs/status"}}, "required": ["value"]},
+        {"properties": {"type":{"enum":["integer","number","decimal"]},"value":{"type":["string","number","integer"]},"status":{"$ref":"#/$defs/status"}}, "required": ["value"]},
+        {"properties": {"type":{"enum":["string","date","datetime","error"]},"value":{"type":["string","null"]},"status":{"$ref":"#/$defs/status"}}, "required": ["value"]}
       ]
     },
     "calculationContext": {
@@ -782,7 +782,7 @@
       "additionalProperties": false,
       "required": ["status", "features", "diagnostics"],
       "properties": {
-        "status": {"type": "string", "enum": ["complete", "partial", "failed"]},
+        "status": {"type": "string", "enum": ["complete", "complete-with-warnings", "partial", "failed"]},
         "capabilityProfile": {"type": "string"},
         "features": {"type": "array", "items": {"$ref": "#/$defs/featureResult"}},
         "featureInventory": {"type": "array", "items": {"$ref": "#/$defs/featureInventoryEntry"}},
@@ -819,7 +819,7 @@
     "diagnostic": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["diagnosticId", "code", "severity", "message"],
+      "required": ["diagnosticId", "code", "severity", "message", "action"],
       "properties": {
         "diagnosticId": {"$ref": "#/$defs/id"},
         "code": {"type": "string", "pattern": "^[A-Z0-9_.:-]+$"},

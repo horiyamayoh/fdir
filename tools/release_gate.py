@@ -37,6 +37,8 @@ EXTENSION_REGISTRY_PATH = ROOT / "machine" / "extension-registry.json"
 CANONICALIZATION_PATH = ROOT / "machine" / "canonicalization.json"
 QUERY_CONTRACT_PATH = ROOT / "machine" / "query-contract.json"
 RELEASE_CLAIM_MANIFEST_PATH = ROOT / "machine" / "release-claim-manifest.json"
+AUDIT_RECOVERY_PATH = ROOT / "machine" / "audit-recovery-plan.json"
+QUALIFICATION_CONTRACT_PATH = ROOT / "machine" / "qualification-contract.json"
 INDEPENDENT_CORPUS_MANIFEST_PATH = ROOT / "e2e" / "corpus" / "manifest.json"
 STRICT_COMPLETION_CONTRACT_PATH = ROOT / "machine" / "strict-completion-contract.json"
 TRACEABILITY_PATH = ROOT / "machine" / "traceability.json"
@@ -413,6 +415,51 @@ def check_release_claims() -> dict[str, int]:
     return {"child_claims": len(claims), "capability_claims": len(capability_claims), "independent_positive_cases": len(corpus["cases"]), "independent_negative_cases": len(corpus.get("negativeCases", [])), "strict_issue_bindings": len(strict_issue_evidence)}
 
 
+def check_audit_recovery_release_boundary() -> dict[str, int]:
+    """Require an explicit, contract-complete recovery qualification binding."""
+
+    recovery = load_json(AUDIT_RECOVERY_PATH)
+    require(isinstance(recovery, dict), "audit recovery plan root is not an object")
+    require(recovery.get("schema") == "fdir/audit-recovery-plan", "audit recovery plan schema is missing")
+    require(recovery.get("umbrellaIssue") == 87, "audit recovery plan is not bound to issue #87")
+    children = recovery.get("children")
+    require(isinstance(children, list), "audit recovery children are missing")
+    child_numbers = {
+        child.get("issueNumber")
+        for child in children
+        if isinstance(child, dict)
+    }
+    required_children = set(range(88, 106))
+    require(child_numbers == required_children, "audit recovery plan does not cover #88-#105 exactly")
+    require(recovery.get("releaseBlocked") is False, "audit recovery issue #87 still marks the release as blocked")
+    qualification = recovery.get("qualificationEvidence")
+    require(isinstance(qualification, dict) and qualification.get("status") == "passed",
+            "audit recovery plan has no passed qualification evidence binding")
+    require(qualification.get("manifestPath") == "qualification/<source-sha>/manifest.json",
+            "audit recovery qualification manifest path is not source-SHA templated")
+    contract = load_json(QUALIFICATION_CONTRACT_PATH)
+    expected_evidence = set(contract.get("scope", {}).get("requiredEvidenceIds", []))
+    require(set(qualification.get("requiredEvidenceIds", [])) == expected_evidence,
+            "audit recovery qualification evidence IDs do not match the contract")
+    for child in children:
+        require(child.get("status") == "completed" and isinstance(child.get("evidenceIds"), list) and len(child["evidenceIds"]) == 1,
+                f"audit recovery child is not evidence-bound: #{child.get('issueNumber')}")
+
+    claims = load_json(RELEASE_CLAIM_MANIFEST_PATH)
+    release = claims.get("release") if isinstance(claims, dict) else None
+    require(isinstance(release, dict), "release claim manifest has no release state")
+    require(release.get("releaseBlocked") is False and release.get("status") == "release-ready",
+            "release claim manifest is not release-ready")
+    binding = release.get("qualificationBinding")
+    require(isinstance(binding, dict) and binding.get("status") == "passed",
+            "release claim manifest has no passed qualification binding")
+    require(binding.get("manifestPath") == "qualification/<source-sha>/manifest.json",
+            "release claim qualification manifest path is not source-SHA templated")
+    require(set(binding.get("requiredEvidenceIds", [])) == expected_evidence,
+            "release claim qualification evidence IDs do not match the contract")
+    return {"recovery_children": len(children), "umbrella_issue": 87}
+
+
 def check_schema() -> dict[str, int]:
     schema = load_json(SCHEMA_PATH)
     require(isinstance(schema, dict), "IR schema root must be an object")
@@ -584,10 +631,16 @@ def run_command(name: str, display_command: str, argv: list[str]) -> dict[str, A
             encoding="utf-8",
             errors="replace",
             env=child_environment,
+            timeout=300,
             check=False,
         )
+    except subprocess.TimeoutExpired as exc:
+        stdout = exc.stdout.decode("utf-8", errors="replace") if isinstance(exc.stdout, bytes) else str(exc.stdout or "")
+        stderr = exc.stderr.decode("utf-8", errors="replace") if isinstance(exc.stderr, bytes) else str(exc.stderr or "")
+        result.update({"return_code": 124, "stdout": stdout.replace("\r\n", "\n"), "stderr": (stderr + "\ncommand timed out after 300 seconds").replace("\r\n", "\n"), "timed_out": True})
+        return result
     except OSError as exc:
-        result.update({"return_code": None, "stdout": "", "stderr": str(exc)})
+        result.update({"return_code": None, "stdout": "", "stderr": str(exc), "timed_out": False})
         return result
 
     result.update(
@@ -595,6 +648,7 @@ def run_command(name: str, display_command: str, argv: list[str]) -> dict[str, A
             "return_code": completed.returncode,
             "stdout": completed.stdout.replace("\r\n", "\n"),
             "stderr": completed.stderr.replace("\r\n", "\n"),
+            "timed_out": False,
         }
     )
     return result
@@ -645,6 +699,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         metavar="PATH",
         help="also write the deterministic JSON summary to PATH (relative to the repository root)",
     )
+    parser.add_argument(
+        "--bundle",
+        type=Path,
+        metavar="MANIFEST",
+        help="also require a commit-bound qualification bundle manifest to validate",
+    )
     return parser.parse_args(argv)
 
 
@@ -655,6 +715,9 @@ def main(argv: list[str] | None = None) -> int:
 
     for name, display, command in (
         ("design_validation", "python tools/validate_design.py", ["tools/validate_design.py"]),
+        ("model_contract", "python tools/validate_model_contract.py --check", ["tools/validate_model_contract.py", "--check"]),
+        ("qualification_schema", "python tools/validate_qualification_bundle.py --schema-only", ["tools/validate_qualification_bundle.py", "--schema-only"]),
+        ("evidence_integrity", "python tools/test_evidence_integrity.py --all", ["tools/test_evidence_integrity.py", "--all"]),
         ("acceptance_all", "python tools/run_acceptance.py --all", ["tools/run_acceptance.py", "--all"]),
         ("real_input_e2e", "python tools/run_e2e.py --all --json", ["tools/run_e2e.py", "--all", "--json"]),
         ("mutation_qualification", "python tools/mutation_qualification.py --json", ["tools/mutation_qualification.py", "--json"]),
@@ -689,6 +752,7 @@ def main(argv: list[str] | None = None) -> int:
         ("issue_plan_and_github_map", check_issue_plan),
         ("phase2_contracts", check_phase2_contracts),
         ("release_claims", check_release_claims),
+        ("audit_recovery_release_boundary", check_audit_recovery_release_boundary),
         ("traceability", check_traceability),
         ("schema", check_schema),
         ("examples", check_examples),
@@ -704,6 +768,20 @@ def main(argv: list[str] | None = None) -> int:
             checks.append({"name": name, "status": "failed", "error": f"unexpected {type(exc).__name__}: {exc}"})
         else:
             checks.append({"name": name, "status": "passed", "details": details})
+
+    if args.bundle is not None:
+        try:
+            try:
+                from validate_qualification_bundle import validate_bundle
+            except ImportError:  # pragma: no cover
+                from tools.validate_qualification_bundle import validate_bundle
+            bundle_result = validate_bundle(args.bundle, repo_root=ROOT)
+            if bundle_result.get("status") != "passed":
+                raise GateError(json.dumps(bundle_result.get("diagnostics", []), ensure_ascii=False))
+        except Exception as exc:
+            checks.append({"name": "qualification_bundle", "status": "failed", "error": str(exc)})
+        else:
+            checks.append({"name": "qualification_bundle", "status": "passed", "details": {"manifest": str(args.bundle)}})
 
     passed = all(check["status"] == "passed" for check in checks)
     summary: dict[str, Any] = {

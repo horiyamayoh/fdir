@@ -59,10 +59,18 @@ def adapter_module(format_name: str):
         return importlib.import_module(f"tools.{name}")
 
 
-def input_sha256(path: Path) -> str:
+def input_sha256(path: Path, *, max_bytes: int | None = None) -> str:
     digest = hashlib.sha256()
+    bytes_read = 0
     with path.open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
+        while True:
+            read_size = 1024 * 1024 if max_bytes is None else min(1024 * 1024, max_bytes - bytes_read + 1)
+            block = stream.read(max(1, read_size))
+            if not block:
+                break
+            bytes_read += len(block)
+            if max_bytes is not None and bytes_read > max_bytes:
+                raise AdapterError(f"input hash budget exceeded: {bytes_read} > {max_bytes}")
             digest.update(block)
     return digest.hexdigest()
 
@@ -80,9 +88,13 @@ def convert_path(path: Path, format_name: str | None = None, limits: AdapterLimi
     detected = detect_format(path, format_name)
     started = time.time()
     module_name = ADAPTERS[detected]
+    limit_check_passed = False
+    parser_attempted = False
     try:
         input_limit_check(path, limits)
+        limit_check_passed = True
         module = adapter_module(detected)
+        parser_attempted = True
         document = _call(module, "convert", path, limits)
         if not isinstance(document, dict):
             raise AdapterError("adapter convert() did not return an IR object")
@@ -93,15 +105,33 @@ def convert_path(path: Path, format_name: str | None = None, limits: AdapterLimi
         document = failed_document(path, detected, version, f"DFIR-{detected.upper()}-ADAPTER-FAILED", str(exc))
         validate_document(document)
         outcome = "failed"
+    input_bytes: int | None = None
+    input_hash: str | None = None
+    input_is_file = path.is_file()
+    if input_is_file:
+        try:
+            input_bytes = path.stat().st_size
+            if input_bytes <= limits.max_input_bytes:
+                input_hash = input_sha256(path, max_bytes=limits.max_input_bytes)
+        except (AdapterError, OSError):
+            # Evidence must not turn a bounded conversion failure into an
+            # unbounded read or a second failure at the adapter boundary.
+            input_hash = None
     evidence = {
         "schema": "fdir/adapter-execution-evidence",
         "version": "1.0.0",
         "input": {
             "path": str(path.resolve()),
             "format": detected,
-            "bytes": path.stat().st_size if path.is_file() else None,
-            "sha256": input_sha256(path) if path.is_file() else None,
-            "consumed": path.is_file(),
+            "bytes": input_bytes,
+            "sha256": input_hash,
+            "parserAttempted": parser_attempted,
+            "limitRejectedBeforeParse": input_is_file and not limit_check_passed,
+            # ``consumed`` means the public boundary inspected a regular input
+            # path, including a fail-closed pre-parse limit rejection.  The
+            # two explicit fields above distinguish that from adapter parser
+            # execution for callers that need the finer-grained fact.
+            "consumed": input_is_file,
         },
         "adapter": {"module": module_name, "operation": "convert"},
         "outcome": outcome,
@@ -127,6 +157,13 @@ def build_parser() -> argparse.ArgumentParser:
     convert.add_argument("--max-input-bytes", type=int, default=AdapterLimits.max_input_bytes)
     convert.add_argument("--max-nodes", type=int, default=AdapterLimits.max_nodes)
     convert.add_argument("--max-text-chars", type=int, default=AdapterLimits.max_text_chars)
+    convert.add_argument("--max-xml-parts", type=int, default=AdapterLimits.max_xml_parts)
+    convert.add_argument("--max-xml-bytes", type=int, default=AdapterLimits.max_xml_bytes)
+    convert.add_argument("--max-xml-nodes", type=int, default=AdapterLimits.max_xml_nodes)
+    convert.add_argument("--max-xml-depth", type=int, default=AdapterLimits.max_xml_depth)
+    convert.add_argument("--max-zip-entries", type=int, default=AdapterLimits.max_zip_entries)
+    convert.add_argument("--max-zip-uncompressed-bytes", type=int, default=AdapterLimits.max_zip_uncompressed_bytes)
+    convert.add_argument("--max-zip-entry-bytes", type=int, default=AdapterLimits.max_zip_entry_bytes)
     validate = sub.add_parser("validate")
     validate.add_argument("input", type=Path)
     return parser
@@ -149,7 +186,23 @@ def main(argv: list[str] | None = None) -> int:
         max_input_bytes=args.max_input_bytes,
         max_nodes=args.max_nodes,
         max_text_chars=args.max_text_chars,
+        max_xml_parts=args.max_xml_parts,
+        max_xml_bytes=args.max_xml_bytes,
+        max_xml_nodes=args.max_xml_nodes,
+        max_xml_depth=args.max_xml_depth,
+        max_zip_entries=args.max_zip_entries,
+        max_zip_uncompressed_bytes=args.max_zip_uncompressed_bytes,
+        max_zip_entry_bytes=args.max_zip_entry_bytes,
     )
+    input_path = args.input.resolve()
+    output_path = args.out.resolve()
+    evidence_path = args.evidence.resolve() if args.evidence else None
+    if output_path == input_path:
+        print("conversion output must not overwrite the input", file=sys.stderr)
+        return 2
+    if evidence_path is not None and evidence_path in {input_path, output_path}:
+        print("evidence output must be distinct from input and IR output", file=sys.stderr)
+        return 2
     document, evidence = convert_path(args.input, args.format, limits)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

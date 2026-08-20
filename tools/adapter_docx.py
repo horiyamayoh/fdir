@@ -15,9 +15,9 @@ import zipfile
 import xml.etree.ElementTree as ET
 
 try:
-    from adapter_common import AdapterError, AdapterLimits, DocumentBuilder, decimal, input_limit_check, safe_id
+    from adapter_common import AdapterError, AdapterLimits, DocumentBuilder, decimal, input_limit_check, read_bounded_xml, safe_id, validate_zip_archive
 except ImportError:  # pragma: no cover
-    from tools.adapter_common import AdapterError, AdapterLimits, DocumentBuilder, decimal, input_limit_check, safe_id
+    from tools.adapter_common import AdapterError, AdapterLimits, DocumentBuilder, decimal, input_limit_check, read_bounded_xml, safe_id, validate_zip_archive
 
 
 NS_W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -49,21 +49,21 @@ def _wattr(element: ET.Element, key: str, default: str = "") -> str:
     return element.attrib.get(f"{{{NS_W}}}{key}", default) or element.attrib.get(key, default)
 
 
-def _read_xml(archive: zipfile.ZipFile, name: str) -> ET.Element:
-    return ET.fromstring(archive.read(name))
+def _read_xml(archive: zipfile.ZipFile, name: str, limits: AdapterLimits | None = None) -> ET.Element:
+    return read_bounded_xml(archive, name, limits or AdapterLimits())
 
 
-def _rels(archive: zipfile.ZipFile, name: str) -> dict[str, tuple[str, str, str]]:
+def _rels(archive: zipfile.ZipFile, name: str, limits: AdapterLimits | None = None) -> dict[str, tuple[str, str, str]]:
     if name not in archive.namelist():
         return {}
-    root = _read_xml(archive, name)
+    root = _read_xml(archive, name, limits)
     return {_attr(item, "Id"): (_attr(item, "Target"), _attr(item, "Type"), _attr(item, "TargetMode")) for item in root if _local(item.tag) == "Relationship"}
 
 
-def _content_types(archive: zipfile.ZipFile) -> dict[str, str]:
+def _content_types(archive: zipfile.ZipFile, limits: AdapterLimits | None = None) -> dict[str, str]:
     if "[Content_Types].xml" not in archive.namelist():
         return {}
-    root = _read_xml(archive, "[Content_Types].xml")
+    root = _read_xml(archive, "[Content_Types].xml", limits)
     defaults: dict[str, str] = {}
     overrides: dict[str, str] = {}
     for item in list(root):
@@ -103,10 +103,12 @@ def _relationship_target(source_name: str, target: str) -> str:
 def inspect(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any]:
     limits = input_limit_check(Path(path), limits)
     with zipfile.ZipFile(path) as archive:
-        names = archive.namelist()
+        names = validate_zip_archive(archive, limits)
+        if len(names) > limits.max_xml_parts:
+            raise AdapterError(f"DOCX package part limit exceeded: {len(names)} > {limits.max_xml_parts}")
         if "word/document.xml" not in names:
             raise AdapterError("DOCX package lacks word/document.xml")
-        root = _read_xml(archive, "word/document.xml")
+        root = _read_xml(archive, "word/document.xml", limits)
         return {
             "format": "docx",
             "version": "ECMA-376",
@@ -327,6 +329,7 @@ def _parse_story_part(
     part_name: str,
     part_id: str,
     styles: dict[str, tuple[str, str]],
+    limits: AdapterLimits | None = None,
 ) -> bool:
     """Parse header/footer story roots into the same typed node graph.
 
@@ -335,7 +338,7 @@ def _parse_story_part(
     and records any other element as an explicit residual on the story part.
     """
 
-    root = _read_xml(archive, part_name)
+    root = _read_xml(archive, part_name, limits)
     story_candidates = _children(root, "hdr") or _children(root, "ftr")
     story_root = story_candidates[0] if story_candidates else root
     story_part = builder.find("parts", "partId", part_id)
@@ -381,8 +384,12 @@ def _parse_story_part(
                         _extension(builder, run_id, "revision", {"kind": revision_kind, "author": _wattr(item, "author"), "revisionId": _wattr(item, "id")})
                         builder.add_feature("revision", "preserved", target_id=run_id)
             elif item_local == "hyperlink":
+                nested_run_ids: list[str] = []
+                for nested in item.iter():
+                    if _local(nested.tag) == "r":
+                        nested_run_ids.append(_add_text_run(builder, paragraph_id, nested, paragraph_number, styles, part_name=part_name))
                 annotation_id = safe_id("annotation", f"docx-story-hyperlink-{part_name}-{paragraph_number}-{len(builder.document['annotations'])}")
-                builder.add_item("annotations", {"annotationId": annotation_id, "kind": "hyperlink", "targetIds": [paragraph_id], "body": _wattr(item, "anchor") or _wattr(item, "id", ""), "status": "preserved"}, "annotationId")
+                builder.add_item("annotations", {"annotationId": annotation_id, "kind": "hyperlink", "targetIds": [paragraph_id, *nested_run_ids], "body": _wattr(item, "anchor") or _wattr(item, "id", ""), "status": "preserved"}, "annotationId")
             elif item_local != "pPr":
                 diagnostic = builder.add_diagnostic(
                     "DFIR-DOCX-STORY-CHILD-UNSUPPORTED",
@@ -415,7 +422,7 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
     builder = DocumentBuilder(path, "docx", "ECMA-376", limits=limits)
     try:
         with zipfile.ZipFile(path) as archive:
-            names = archive.namelist()
+            names = validate_zip_archive(archive, limits)
             if len(names) > limits.max_xml_parts:
                 diagnostic = builder.add_diagnostic("DFIR-DOCX-PACKAGE-LIMIT", f"package has {len(names)} parts; limit is {limits.max_xml_parts}", severity="error", phase="parse")
                 builder.add_feature("package-validation", "failed", diagnostic_ids=[diagnostic])
@@ -424,10 +431,10 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
                 diagnostic = builder.add_diagnostic("DFIR-DOCX-DOCUMENT-MISSING", "DOCX package lacks word/document.xml", severity="error", phase="parse")
                 builder.add_feature("document", "failed", diagnostic_ids=[diagnostic])
                 return builder.finish(status="failed")
-            root = _read_xml(archive, "word/document.xml")
+            root = _read_xml(archive, "word/document.xml", limits)
             styles: dict[str, tuple[str, str]] = {}
             if "word/styles.xml" in names:
-                style_root = _read_xml(archive, "word/styles.xml")
+                style_root = _read_xml(archive, "word/styles.xml", limits)
                 style_graph: dict[str, str | None] = {}
                 style_declarations: dict[str, dict[str, Any]] = {}
                 for style in _children(style_root, "style"):
@@ -443,7 +450,7 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
                     builder.add_feature("style-inheritance", "failed", diagnostic_ids=[diagnostic])
                 else:
                     _resolve_styles(builder, style_graph, style_declarations, styles)
-            content_types = _content_types(archive)
+            content_types = _content_types(archive, limits)
             package_part_id = safe_id("part", "docx-package")
             builder.add_item("parts", {"partId": package_part_id, "kind": "package", "name": "OOXML package", "contentType": "application/vnd.openxmlformats-package", "rootNodeIds": [builder.root_id], "status": "preserved"}, "partId")
             part_id = safe_id("part", "docx-document")
@@ -475,7 +482,7 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
                     part_ids[source_name] = source_part_id
                     builder.add_item("parts", {"partId": source_part_id, "kind": "unknown", "name": source_name, "external": True, "rootNodeIds": [], "relationshipIds": [], "status": "unavailable"}, "partId")
                 source_part = builder.find("parts", "partId", source_part_id)
-                for relationship_key, (target, relationship_type, target_mode) in _rels(archive, relationship_file).items():
+                for relationship_key, (target, relationship_type, target_mode) in _rels(archive, relationship_file, limits).items():
                     relation_id = safe_id("relation", f"docx-{relationship_file}-{relationship_key}")
                     if target_mode == "External":
                         target_id = safe_id("resource", f"docx-external-{target}")
@@ -505,7 +512,7 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
             for package_part in list(builder.document.get("parts", [])):
                 part_name = str(package_part.get("name", ""))
                 if re.fullmatch(r"word/(header|footer)\d+\.xml", part_name):
-                    _parse_story_part(builder, archive, part_name, str(package_part["partId"]), styles)
+                    _parse_story_part(builder, archive, part_name, str(package_part["partId"]), styles, limits)
             builder.add_item("surfaces", {"surfaceId": surface_id, "partId": part_id, "kind": "page", "ordinal": 0, "status": "preserved"}, "surfaceId")
             body = next(iter(_children(root, "body")), root)
             table_entities: list[dict[str, Any]] = []
@@ -553,7 +560,12 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
                         elif item_local in {"commentRangeStart", "commentRangeEnd", "commentReference", "footnoteReference", "endnoteReference", "hyperlink"}:
                             annotation_id = safe_id("annotation", f"docx-{item_local}-{paragraph_number}-{len(builder.document['annotations'])}")
                             kind_name = {"commentReference": "comment", "footnoteReference": "footnote", "endnoteReference": "endnote", "hyperlink": "hyperlink"}.get(item_local, "bookmark")
-                            builder.add_item("annotations", {"annotationId": annotation_id, "kind": kind_name, "targetIds": [paragraph_id], "body": _wattr(item, "id") or _wattr(item, "anchor") or _wattr(item, "id", ""), "status": "preserved"}, "annotationId")
+                            nested_run_ids: list[str] = []
+                            if item_local == "hyperlink":
+                                for nested in item.iter():
+                                    if _local(nested.tag) == "r":
+                                        nested_run_ids.append(_add_text_run(builder, paragraph_id, nested, paragraph_number, styles))
+                            builder.add_item("annotations", {"annotationId": annotation_id, "kind": kind_name, "targetIds": [paragraph_id, *nested_run_ids], "body": _wattr(item, "id") or _wattr(item, "anchor") or _wattr(item, "id", ""), "status": "preserved"}, "annotationId")
                     builder.add_feature("paragraph", "preserved", target_id=paragraph_id)
                 elif local == "tbl":
                     table_number = len(table_entities) + 1
@@ -587,7 +599,7 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
                     builder.add_feature(local, "unsupported", target_id=builder.root_id, diagnostic_ids=[diagnostic])
             for comment_part in ("word/comments.xml", "word/footnotes.xml", "word/endnotes.xml"):
                 if comment_part in names:
-                    part_root = _read_xml(archive, comment_part)
+                    part_root = _read_xml(archive, comment_part, limits)
                     for item in _children(part_root, "comment") + _children(part_root, "footnote") + _children(part_root, "endnote"):
                         identifier = _wattr(item, "id")
                         body_text = "".join(text.text or "" for text in item.iter() if _local(text.tag) in {"t", "delText"})

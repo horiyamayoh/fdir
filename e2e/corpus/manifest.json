@@ -29,7 +29,7 @@
       "path": "xlsx-independent",
       "expected": ["Independent XLSX", "SUM(A1:A2)"],
       "caseClass": "positive",
-      "expectedStatus": "complete"
+      "expectedStatus": "complete-with-warnings"
     },
     {
       "id": "pdf-independent",

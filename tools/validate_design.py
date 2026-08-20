@@ -18,6 +18,8 @@ TEST_PATH = ROOT / "machine" / "acceptance-tests.json"
 ISSUE_PATH = ROOT / "machine" / "issue-plan.json"
 GITHUB_MAP_PATH = ROOT / "machine" / "github-issue-map.json"
 RELEASE_GATE_PATH = ROOT / "machine" / "release-gate.json"
+AUDIT_RECOVERY_PATH = ROOT / "machine" / "audit-recovery-plan.json"
+QUALIFICATION_CONTRACT_PATH = ROOT / "machine" / "qualification-contract.json"
 SCHEMA_PATH = ROOT / "schemas" / "document-form-ir.schema.json"
 
 
@@ -149,7 +151,7 @@ def validate_release_gate_manifest(manifest: dict) -> None:
     for key, value in {"requirements": 134, "acceptanceFamilies": 16, "acceptanceCases": 134, "leafIssues": 20, "e2eIssue": 68}.items():
         require(expected.get(key) == value, f"release gate expected count mismatch: {key}")
     commands = manifest.get("commands")
-    require(isinstance(commands, list) and "python tools/validate_design.py" in commands and "python tools/run_acceptance.py --all" in commands and "python tools/run_e2e.py --all" in commands and "python tools/mutation_qualification.py --json" in commands and "python tools/query_qualification.py" in commands and "python tools/independent_corpus.py --json" in commands and "python tools/strict_completion_gate.py" in commands,
+    require(isinstance(commands, list) and "python tools/validate_design.py" in commands and "python tools/run_acceptance.py --all" in commands and "python tools/run_e2e.py --all" in commands and "python tools/mutation_qualification.py --json" in commands and "python tools/query_qualification.py" in commands and "python tools/independent_corpus.py --json" in commands and "python tools/strict_completion_gate.py" in commands and "python tools/validate_model_contract.py --check" in commands and "python tools/test_evidence_integrity.py --all" in commands and "python tools/validate_qualification_bundle.py --schema-only" in commands,
             "release gate commands are incomplete")
     for relative in manifest.get("requiredAdapters", []):
         require((ROOT / relative).is_file(), f"release gate adapter is missing: {relative}")
@@ -159,9 +161,134 @@ def validate_release_gate_manifest(manifest: dict) -> None:
     require(set(manifest.get("requiredFormats", [])) == {"docx", "xlsx", "pdf", "markdown"}, "release gate formats are incomplete")
     for relative in manifest.get("requiredExamples", []):
         require((ROOT / relative).is_file(), f"release gate example is missing: {relative}")
-    for relative in ("machine/phase2-issue-plan.json", "machine/capability-profile.json", "machine/reference-registry.json", "machine/extension-registry.json", "machine/canonicalization.json", "machine/query-contract.json", "machine/release-claim-manifest.json", "machine/strict-completion-contract.json", "e2e/corpus/manifest.json", "tools/mutation_qualification.py", "tools/query_qualification.py", "tools/independent_corpus.py", "tools/strict_completion_gate.py"):
+    for relative in ("machine/phase2-issue-plan.json", "machine/capability-profile.json", "machine/reference-registry.json", "machine/extension-registry.json", "machine/canonicalization.json", "machine/query-contract.json", "machine/release-claim-manifest.json", "machine/strict-completion-contract.json", "machine/audit-recovery-plan.json", "machine/qualification-contract.json", "machine/model-contract.json", "machine/defect-injection-contract.json", "schemas/qualification-evidence.schema.json", "e2e/corpus/manifest.json", "tools/mutation_qualification.py", "tools/query_qualification.py", "tools/independent_corpus.py", "tools/strict_completion_gate.py", "tools/build_qualification_bundle.py", "tools/validate_qualification_bundle.py", "tools/test_evidence_integrity.py", "tools/generate_model_contract.py", "tools/validate_model_contract.py", "tools/run_defect_injection_campaign.py"):
         require((ROOT / relative).is_file(), f"phase2 release artifact is missing: {relative}")
-    require(len(manifest.get("checks", [])) >= 9 and "real-input-e2e" in manifest.get("checks", []), "release gate checks are incomplete")
+    require(len(manifest.get("checks", [])) >= 13 and {"real-input-e2e", "audit-recovery", "audit-recovery-release-boundary", "qualification-evidence", "model-contract", "defect-injection"}.issubset(set(manifest.get("checks", []))), "release gate checks are incomplete")
+
+
+def validate_audit_recovery_plan(plan: dict) -> None:
+    """Validate the recovery DAG and its explicit release-boundary state."""
+
+    require(plan.get("schema") == "fdir/audit-recovery-plan", "audit recovery plan schema is wrong")
+    require(plan.get("version") == "1.0.0", "audit recovery plan version is not pinned")
+    require(plan.get("repository") == "horiyamayoh/fdir", "audit recovery plan repository is wrong")
+    require(plan.get("umbrellaIssue") == 87 and isinstance(plan.get("releaseBlocked"), bool),
+            "audit recovery plan must bind issue #87 and a boolean release state")
+    audited_closed = plan.get("auditedClosedIssues")
+    audited_open = plan.get("auditedOpenProgramIssues")
+    require(isinstance(audited_closed, list) and isinstance(audited_open, list),
+            "audit recovery issue sets are missing")
+    require(all(isinstance(number, int) and number > 0 for number in audited_closed + audited_open),
+            "audit recovery issue sets contain an invalid number")
+    children = plan.get("children")
+    require(isinstance(children, list), "audit recovery children are missing")
+    child_by_number: dict[int, dict] = {}
+    for child in children:
+        require(isinstance(child, dict), "audit recovery child is not an object")
+        number = child.get("issueNumber")
+        require(isinstance(number, int) and 88 <= number <= 105,
+                f"audit recovery child number is outside #88-#105: {number}")
+        require(number not in child_by_number, f"duplicate audit recovery child: #{number}")
+        require(isinstance(child.get("title"), str) and child["title"].strip(),
+                f"audit recovery child has no title: #{number}")
+        require(isinstance(child.get("dependsOn"), list) and isinstance(child.get("auditsClaimsFrom"), list),
+                f"audit recovery child metadata is incomplete: #{number}")
+        child_by_number[number] = child
+    require(set(child_by_number) == set(range(88, 106)),
+            "audit recovery plan must cover every child issue #88-#105 exactly once")
+    for number, child in child_by_number.items():
+        for dependency in child["dependsOn"]:
+            require(isinstance(dependency, int) and dependency in child_by_number and dependency != number,
+                    f"audit recovery dependency is not a child or is self-referential: #{number} -> {dependency}")
+        for source_issue in child["auditsClaimsFrom"]:
+            require(isinstance(source_issue, int) and source_issue > 0,
+                    f"audit recovery claim source is invalid: #{number} -> {source_issue}")
+        require(child.get("statusSource") == "github-issue-api",
+                f"audit recovery child must use live GitHub state: #{number}")
+        if plan.get("releaseBlocked") is False:
+            require(child.get("status") == "completed",
+                    f"release-ready recovery child is not completed: #{number}")
+            require(child.get("evidenceIds") == [f"issue-{number}-" + {
+                88: "qualification-contract", 89: "defect-injection", 90: "model-contract",
+                91: "occurrence-accounting", 92: "exact-values", 93: "style-provenance",
+                94: "geometry-order", 95: "topology", 96: "relationship-closure",
+                97: "extension-registry", 98: "canonical-identity", 99: "docx-profile",
+                100: "xlsx-profile", 101: "pdf-profile", 102: "markdown-profile",
+                103: "query-index", 104: "independent-corpus", 105: "release-quality",
+            }[number]], f"release-ready recovery child evidence binding is invalid: #{number}")
+
+    visiting: set[int] = set()
+    visited: set[int] = set()
+
+    def visit(number: int) -> None:
+        if number in visiting:
+            raise DesignError(f"audit recovery dependency cycle includes #{number}")
+        if number in visited:
+            return
+        visiting.add(number)
+        for dependency in child_by_number[number]["dependsOn"]:
+            visit(dependency)
+        visiting.remove(number)
+        visited.add(number)
+
+    for number in child_by_number:
+        visit(number)
+    close_policy = plan.get("closePolicy")
+    require(isinstance(close_policy, dict), "audit recovery close policy is missing")
+    for key in ("forbidStringOnlyEvidence", "forbidClosedStateAsEvidence", "forbidReleaseClaimsUntilChildrenComplete"):
+        require(close_policy.get(key) is True, f"audit recovery close policy is weak: {key}")
+    forbidden_claims = plan.get("forbiddenReleaseClaims")
+    require(isinstance(forbidden_claims, list) and forbidden_claims and all(isinstance(item, str) and item for item in forbidden_claims),
+            "audit recovery forbidden release claims are missing")
+    if plan.get("releaseBlocked") is False:
+        qualification = plan.get("qualificationEvidence")
+        require(isinstance(qualification, dict), "release-ready audit plan has no qualification evidence binding")
+        require(qualification.get("status") == "passed", "release-ready audit qualification is not passed")
+        require(qualification.get("manifestPath") == "qualification/<source-sha>/manifest.json",
+                "audit qualification manifest path must be source-SHA templated")
+        require(qualification.get("sourceShaPolicy") == "exact-bundle-manifest",
+                "audit qualification source SHA policy is not exact-bundle-manifest")
+        contract = load(QUALIFICATION_CONTRACT_PATH)
+        expected_ids = set(contract.get("scope", {}).get("requiredEvidenceIds", [])) if isinstance(contract, dict) else set()
+        require(set(qualification.get("requiredEvidenceIds", [])) == expected_ids,
+                "audit qualification evidence IDs do not match the contract")
+
+
+def validate_release_claim_boundary(claims: dict, recovery: dict) -> None:
+    """Keep release claims synchronized with the recovery evidence boundary."""
+
+    require(isinstance(recovery.get("releaseBlocked"), bool), "release claim boundary has no boolean audit state")
+    release = claims.get("release")
+    require(isinstance(release, dict), "release claim manifest has no release state")
+    if recovery.get("releaseBlocked") is True:
+        require(release.get("releaseBlocked") is True and release.get("status") == "release-blocked",
+                "blocked audit must publish a release-blocked claim")
+    else:
+        require(release.get("releaseBlocked") is False and release.get("status") == "release-ready",
+                "release-ready audit must publish a release-ready claim")
+        binding = release.get("qualificationBinding")
+        require(isinstance(binding, dict) and binding.get("status") == "passed",
+                "release-ready claim has no passed qualification binding")
+        require(binding.get("manifestPath") == "qualification/<source-sha>/manifest.json",
+                "release qualification manifest path must be source-SHA templated")
+        require(binding.get("sourceShaPolicy") == "exact-bundle-manifest",
+                "release qualification source SHA policy is not exact-bundle-manifest")
+        contract = load(QUALIFICATION_CONTRACT_PATH)
+        expected_ids = set(contract.get("scope", {}).get("requiredEvidenceIds", [])) if isinstance(contract, dict) else set()
+        require(set(binding.get("requiredEvidenceIds", [])) == expected_ids,
+                "release qualification evidence IDs do not match the contract")
+    forbidden = {str(item).casefold() for item in recovery.get("forbiddenReleaseClaims", [])}
+    claim_texts: list[str] = []
+    for section in (claims.get("capabilityClaims", []), claims.get("issueClaims", [])):
+        if isinstance(section, list):
+            claim_texts.extend(str(item.get("claim", "")) for item in section if isinstance(item, dict))
+    for text in claim_texts:
+        for phrase in forbidden:
+            # Match a claim term, not a longer word such as
+            # ``completeness`` when the forbidden term is ``complete``.
+            pattern = rf"(?<![A-Za-z0-9_]){re.escape(phrase)}(?![A-Za-z0-9_])"
+            require(re.search(pattern, text.casefold()) is None,
+                    f"blocked release claim remains published: {phrase}")
 
 
 def validate_schema(schema: dict) -> None:
@@ -263,18 +390,24 @@ def main() -> int:
         issue_plan = load(ISSUE_PATH)
         github_map = load(GITHUB_MAP_PATH)
         release_manifest = load(RELEASE_GATE_PATH)
+        release_claims = load(ROOT / "machine" / "release-claim-manifest.json")
+        audit_recovery = load(AUDIT_RECOVERY_PATH)
         schema = load(SCHEMA_PATH)
         require(isinstance(requirements, dict), "requirements root must be an object")
         require(isinstance(tests, dict), "tests root must be an object")
         require(isinstance(issue_plan, dict), "issue plan root must be an object")
         require(isinstance(github_map, dict), "GitHub issue map root must be an object")
         require(isinstance(release_manifest, dict), "release gate manifest root must be an object")
+        require(isinstance(release_claims, dict), "release claim manifest root must be an object")
+        require(isinstance(audit_recovery, dict), "audit recovery plan root must be an object")
         require(isinstance(schema, dict), "schema root must be an object")
         requirement_map = ids(requirements.get("requirements", []), "id", "requirement")
         family_map = validate_families(tests, requirement_map)
         issue_map = validate_issues(issue_plan, requirements["requirements"], family_map)
         validate_github_issue_map(github_map, issue_map)
         validate_release_gate_manifest(release_manifest)
+        validate_audit_recovery_plan(audit_recovery)
+        validate_release_claim_boundary(release_claims, audit_recovery)
         validate_requirements(requirements, issue_map, family_map)
         validate_schema(schema)
         validate_examples()

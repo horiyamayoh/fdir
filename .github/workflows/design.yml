@@ -18,7 +18,33 @@ jobs:
           python-version: "3.12"
       - name: Validate design authority
         run: python tools/validate_design.py
+      - name: Validate generated model contract
+        run: python tools/validate_model_contract.py --check
+      - name: Validate qualification schema
+        run: python tools/validate_qualification_bundle.py --schema-only
+      - name: Run Evidence integrity matrix
+        run: python tools/test_evidence_integrity.py --all
+      - name: Build commit-bound qualification bundle
+        shell: bash
+        run: |
+          SOURCE_SHA="$(git rev-parse HEAD)"
+          BUNDLE_ROOT="$RUNNER_TEMP/qualification/$SOURCE_SHA"
+          python tools/build_qualification_bundle.py --source-sha "$SOURCE_SHA" --out "$BUNDLE_ROOT" --timeout 1800
+      - name: Validate commit-bound qualification bundle
+        run: python tools/validate_qualification_bundle.py "$RUNNER_TEMP/qualification/${{ github.sha }}/manifest.json"
       - name: Run final release gate
-        run: python tools/release_gate.py
+        run: python tools/release_gate.py --bundle "$RUNNER_TEMP/qualification/${{ github.sha }}/manifest.json"
+      - name: Publish qualification digest
+        shell: bash
+        run: |
+          sha256sum "$RUNNER_TEMP/qualification/${GITHUB_SHA}/manifest.json" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Run real-input adapter E2E
         run: python tools/run_e2e.py --all
+      - name: Upload qualification bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fdir-qualification-bundle-${{ github.sha }}
+          path: ${{ runner.temp }}/qualification
+          if-no-files-found: error
+          retention-days: 14

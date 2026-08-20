@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from collections import deque
 import json
 import sys
 from pathlib import Path
@@ -21,7 +22,7 @@ class QueryError(ValueError):
 
 
 INDEX_SCHEMA = "fdir/document-form-index"
-INDEX_VERSION = "1.1.0"
+INDEX_VERSION = "1.2.0"
 REPRESENTATIONS = {"source", "normalized", "stored", "computed", "displayed", "rendered", "observed"}
 
 
@@ -136,15 +137,101 @@ def get_entity(document: dict[str, Any], collection: str, identifier: str) -> di
     return values[0]
 
 
+def _json_pointer_escape(value: str) -> str:
+    return value.replace("~", "~0").replace("/", "~1")
+
+
+def _json_pointer_unescape(value: str) -> str:
+    return value.replace("~1", "/").replace("~0", "~")
+
+
+def _field_value(entity: dict[str, Any], pointer: str) -> Any:
+    if pointer in {"", "/"}:
+        return entity
+    if not isinstance(pointer, str) or not pointer.startswith("/"):
+        raise QueryError("field pointer must be empty or start with '/'")
+    current: Any = entity
+    for raw_segment in pointer[1:].split("/"):
+        segment = _json_pointer_unescape(raw_segment)
+        if isinstance(current, dict):
+            if segment not in current:
+                raise QueryError(f"unknown field pointer: {pointer}")
+            current = current[segment]
+        elif isinstance(current, list):
+            if segment == "-" or not segment.isdigit():
+                raise QueryError(f"invalid array field pointer: {pointer}")
+            index = int(segment)
+            if index >= len(current):
+                raise QueryError(f"array field pointer is out of range: {pointer}")
+            current = current[index]
+        else:
+            raise QueryError(f"field pointer traverses a scalar: {pointer}")
+    return current
+
+
+def get_field(document: dict[str, Any], collection: str, identifier: str, pointer: str) -> Any:
+    """Return one authoritative entity field using an RFC 6901-style pointer.
+
+    Entity lookup alone is not a field-level query contract: callers could
+    receive the full object while the index omitted a nested value.  This
+    operation makes every serialized field addressable and gives the
+    qualification layer a concrete operation to exercise.
+    """
+
+    entity = get_entity(document, collection, identifier)
+    return _field_value(entity, pointer)
+
+
+def _field_pointers(value: Any, prefix: str = "") -> Iterable[str]:
+    if isinstance(value, dict):
+        for key in sorted(value):
+            pointer = f"{prefix}/{_json_pointer_escape(key)}"
+            yield pointer
+            yield from _field_pointers(value[key], pointer)
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            pointer = f"{prefix}/{index}"
+            yield pointer
+            yield from _field_pointers(child, pointer)
+
+
+def query_field_coverage(document: dict[str, Any]) -> dict[str, Any]:
+    """Prove that every serialized entity field can be retrieved directly."""
+
+    document = _ensure_document(document)
+    checked: list[dict[str, str]] = []
+    unqueryable: list[dict[str, str]] = []
+    for collection, identifier_key in COLLECTION_KEYS.items():
+        for item in _items(document, collection):
+            identifier = item[identifier_key]
+            for pointer in _field_pointers(item):
+                try:
+                    _field_value(item, pointer)
+                except QueryError as exc:
+                    unqueryable.append({
+                        "collection": collection,
+                        "id": identifier,
+                        "pointer": pointer,
+                        "error": str(exc),
+                    })
+                else:
+                    checked.append({"collection": collection, "id": identifier, "pointer": pointer})
+    return {
+        "status": "passed" if not unqueryable else "failed",
+        "checked": checked,
+        "unqueryableFacts": unqueryable,
+    }
+
+
 def descendants(document: dict[str, Any], node_id: str) -> list[dict[str, Any]]:
     document = _ensure_document(document)
     nodes = {item.get("nodeId"): item for item in _items(document, "nodes")}
     if node_id not in nodes:
         raise QueryError(f"unknown node: {node_id}")
     result: list[dict[str, Any]] = []
-    pending = list(nodes[node_id].get("childIds", []))
+    pending = deque(nodes[node_id].get("childIds", []))
     while pending:
-        child_id = pending.pop(0)
+        child_id = pending.popleft()
         child = nodes[child_id]
         result.append(child)
         pending.extend(child.get("childIds", []))
@@ -256,6 +343,7 @@ def index_parity(document: dict[str, Any], index: dict[str, Any] | None = None) 
     document = _ensure_document(document)
     candidate = rebuild_index(document) if index is None else index
     validate_index(document, candidate)
+    field_coverage = query_field_coverage(document)
     direct_entity_count = sum(len(_items(document, collection)) for collection in COLLECTION_KEYS)
     fact_count = direct_entity_count
     return {
@@ -265,8 +353,9 @@ def index_parity(document: dict[str, Any], index: dict[str, Any] | None = None) 
         "directFactCount": fact_count,
         "indexFactCount": len(candidate["facts"]),
         "reverseReferenceCount": len(candidate["reverseReferences"]),
-        "operations": ["list-entities", "get-entity", "rebuild-index", "validate-index"],
-        "unqueryableFacts": [],
+        "operations": ["list-entities", "get-entity", "get-field", "field-coverage", "rebuild-index", "validate-index"],
+        "unqueryableFacts": field_coverage["unqueryableFacts"],
+        "fieldCoverage": field_coverage,
         "mismatches": [],
     }
 
@@ -320,6 +409,13 @@ def build_parser() -> argparse.ArgumentParser:
     lookup.add_argument("collection")
     lookup.add_argument("identifier")
 
+    field = sub.add_parser("get-field")
+    field.add_argument("collection")
+    field.add_argument("identifier")
+    field.add_argument("pointer")
+
+    coverage = sub.add_parser("field-coverage")
+
     descendant = sub.add_parser("descendants")
     descendant.add_argument("node_id")
 
@@ -371,6 +467,10 @@ def main(argv: list[str] | None = None) -> int:
             result = list_entities(document, args.collection, kind=args.kind, status=args.status, identifier=args.id, offset=args.offset, limit=args.limit)
         elif args.operation == "get-entity":
             result = get_entity(document, args.collection, args.identifier)
+        elif args.operation == "get-field":
+            result = get_field(document, args.collection, args.identifier, args.pointer)
+        elif args.operation == "field-coverage":
+            result = query_field_coverage(document)
         elif args.operation == "descendants":
             result = descendants(document, args.node_id)
         elif args.operation == "ancestors":

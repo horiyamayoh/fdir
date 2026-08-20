@@ -25,5 +25,6 @@ Expected source-derived checks are:
 
 Generated source files, IR, evidence sidecars, and JSON reports live under
 the ignored `e2e/.run/` directory. No pre-authored IR can satisfy this gate;
-the report records the consumed input path, size, SHA-256, adapter, outcome,
+the report records the inspected input path, size, SHA-256, adapter outcome,
+whether the parser was attempted (and whether a limit rejected it first),
 diagnostics, canonical digest, and query result.

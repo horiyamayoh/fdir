@@ -20,6 +20,9 @@ except ImportError:  # pragma: no cover
     from tools.adapter_common import AdapterError, AdapterLimits, DocumentBuilder, input_limit_check, safe_id
 
 
+_MAX_MARKDOWN_NESTING = 32
+
+
 def _find_unescaped(value: str, needle: str, start: int) -> int:
     escaped = False
     for index in range(start, len(value)):
@@ -246,7 +249,9 @@ def inspect(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
     }
 
 
-def _strip_inline(value: str, references: dict[str, tuple[str, str]] | None = None) -> str:
+def _strip_inline(value: str, references: dict[str, tuple[str, str]] | None = None, *, depth: int = 0) -> str:
+    if depth >= _MAX_MARKDOWN_NESTING:
+        return html.unescape(_unescape(value))
     normalized: list[str] = []
     for token in _inline_tokens(value, references):
         kind = token["kind"]
@@ -255,7 +260,7 @@ def _strip_inline(value: str, references: dict[str, tuple[str, str]] | None = No
         elif kind == "code":
             normalized.append(token["content"])
         elif kind in {"emphasis", "link", "reference-link", "image"}:
-            normalized.append(_strip_inline(token.get("content", token.get("label", "")), references))
+            normalized.append(_strip_inline(token.get("content", token.get("label", "")), references, depth=depth + 1))
         elif kind in {"footnote-ref", "raw-html"}:
             normalized.append(token["raw"])
         else:
@@ -288,19 +293,29 @@ def _linked_resource(builder: DocumentBuilder, url: str, *, kind: str, identity:
     parsed = urlparse(url)
     external = bool(parsed.scheme or url.startswith("//"))
     if parsed.scheme == "data":
-        availability = "available"
+        # The bounded adapter records the authored reference but never
+        # decodes or stores an inline payload.  Marking it available would
+        # claim work that was not performed and could retain an unbounded
+        # data URL in the IR.
+        availability = "unavailable"
         media_type = parsed.path.split(";", 1)[0] or "application/octet-stream"
-        external_target = None
+        external_target = f"data:{media_type}"
+        derived_handle = f"data:{media_type}"
     elif external:
         availability = "unavailable"
-        media_type = "application/octet-stream"
+        media_type = mimetypes.guess_type(Path(parsed.path).name)[0] or "application/octet-stream"
         external_target = url
+        derived_handle = url
     else:
-        candidate = (builder.path.parent / unquote(parsed.path or url)).resolve()
-        availability = "available" if candidate.is_file() else "unavailable"
-        media_type = mimetypes.guess_type(candidate.name)[0] or "application/octet-stream"
-        external_target = None if availability == "available" else url
-    item: dict[str, Any] = {"resourceId": resource_id, "kind": kind, "mediaType": media_type, "availability": availability, "derivedHandle": url}
+        # Do not probe the local filesystem.  A Markdown conversion should
+        # not disclose whether a relative path (or a symlink/parent escape)
+        # exists.  A caller that wants local-resource resolution must provide
+        # a separate, explicitly authorized resolver.
+        availability = "unavailable"
+        media_type = mimetypes.guess_type(Path(unquote(parsed.path or url)).name)[0] or "application/octet-stream"
+        external_target = url
+        derived_handle = url
+    item: dict[str, Any] = {"resourceId": resource_id, "kind": kind, "mediaType": media_type, "availability": availability, "derivedHandle": derived_handle}
     if external_target:
         item["externalTarget"] = external_target
     builder.add_item("resources", item, "resourceId")
@@ -729,6 +744,12 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
         first = _list_parts(records[index][0])
         if first is None:
             return index
+        if first[2] > _MAX_MARKDOWN_NESTING:
+            node_id = _paragraph(builder, parent_id, records[index][0], records[index][1], column=records[index][2], references=references, footnotes=footnotes, state=state, status="unsupported")
+            diagnostic = _diagnostic(builder, "DFIR-MD-NESTING-LIMIT", "Markdown list nesting exceeded the bounded block depth.", target_id=node_id)
+            builder.add_feature("list", "unsupported", target_id=node_id, diagnostic_ids=[diagnostic])
+            state["forcePartial"] = True
+            return index + 1
         base_level = first[2]
         list_id = safe_id("node", f"markdown-list-{records[index][1]}-{len(builder.document['nodes'])}")
         builder.add_node("list", list_id, parent_id=parent_id, status="preserved")
@@ -870,8 +891,18 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
                 section_id = safe_id("node", f"markdown-blockquote-{number}-{len(builder.document['nodes'])}")
                 builder.add_node("section", section_id, parent_id=parent_id, status="preserved")
                 _source_map(builder, section_id, number, column, original[-1][1], len(original[-1][0]) + 1, token_start=0, token_end=sum(len(item[0]) for item in original))
-                parse_blocks(group, section_id)
-                builder.add_feature("blockquote", "preserved", target_id=section_id)
+                blockquote_depth = int(state.get("blockquoteDepth", 0))
+                if blockquote_depth >= _MAX_MARKDOWN_NESTING:
+                    diagnostic = _diagnostic(builder, "DFIR-MD-NESTING-LIMIT", "Markdown blockquote nesting exceeded the bounded block depth.", target_id=section_id)
+                    builder.add_feature("blockquote", "unsupported", target_id=section_id, diagnostic_ids=[diagnostic])
+                    state["forcePartial"] = True
+                else:
+                    state["blockquoteDepth"] = blockquote_depth + 1
+                    try:
+                        parse_blocks(group, section_id)
+                    finally:
+                        state["blockquoteDepth"] = blockquote_depth
+                    builder.add_feature("blockquote", "preserved", target_id=section_id)
                 continue
             paragraph = [records[index]]
             index += 1

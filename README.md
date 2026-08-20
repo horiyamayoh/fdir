@@ -40,40 +40,53 @@ FDIR は、DOCX、XLSX、PDF、Markdown などに記録された構造・表現�
 
 ## 現在の状態
 
+> **Release status: BLOCKED.** This repository is not release-qualified.
+
+The controlling recovery record is
+[`machine/audit-recovery-plan.json`](machine/audit-recovery-plan.json). It
+marks release as blocked under umbrella Issue #87 and requires the
+commit-bound, live-state qualification program in Issues #88–#105. A closed
+Issue, a file’s existence, a field or enum being present, or a command exiting
+zero is not sufficient release evidence.
+
 この変更は製品実装のリセットです。旧 assertion-first／evidence／accounting／source-byte storage 実装は退役させ、上記文書・スキーマ・要件を新しい開発の権威にします。現時点で四形式の変換器が完成したことは主張しません。実装は新 Issue 群を順に完了した時点で追加します。
 
 設計成果物の整合性は次で確認できます。
 
     python tools/validate_design.py
 
-### Current implementation status
+### Implemented adapter surface (not qualified evidence)
 
-The reset note above is historical. The current repository includes bounded
-stdlib adapters that consume real DOCX, XLSX, PDF, and Markdown files through
-`tools/convert_document.py`. `tools/run_e2e.py --all` proves source
-consumption, generated IR, execution evidence, malformed-input handling, and
-resource-limit failures. Unsupported format features remain explicit
-diagnostics; renderer and OCR outputs remain optional observations.
+The repository contains bounded standard-library adapter paths for DOCX, XLSX,
+PDF, and Markdown through `tools/convert_document.py`. These paths are an
+implemented reference surface and may exercise selected real-input fixtures;
+they are not a claim of complete format coverage, standards conformance,
+relationship completeness, source-faithful reconstruction, or release
+readiness. Unsupported or unavailable features must remain explicit diagnostics
+or residual states, but their presence in the model does not by itself qualify
+the adapter.
 
-### Executable release gate
+The historical reset note above describes the start of this workstream. The
+current implementation surface and the qualification state are separate:
+implementation work may be present while the release remains blocked.
 
-The design release is executable and fail-closed. Run the following commands
-from the repository root:
+### Local diagnostic commands and release gate
+
+The following commands are reproducible local checks from the repository root:
 
     python tools/validate_design.py
     python tools/run_acceptance.py --all
     python tools/run_e2e.py --all
     python tools/release_gate.py
 
-The first command validates the authority graph (134 requirements, 16
-acceptance families, and the 20 planned leaf issues). The second executes every
-acceptance case, including positive, negative, partial-conversion,
-unknown-extension, query, and resource-boundary cases. The third command opens
-real DOCX/XLSX/PDF/Markdown inputs through the public converter, checks the
-generated IR and execution-evidence sidecar, and exercises malformed and input
-limit failures. The final command runs all three checks and fails if any
-command, adapter, fixture, schema, documentation, or product-boundary check
-fails. Issue #68 is the release-blocking real-input E2E tracker.
+`validate_design.py` checks the declared authority graph (134 requirements, 16
+acceptance families, and the historical 20-issue implementation plan).
+`run_acceptance.py --all` and `run_e2e.py --all` exercise the declared
+acceptance matrix and bounded real-input paths. `release_gate.py` combines
+those checks, but none of these command results overrides the recovery plan or
+constitutes the required commit-bound qualification bundle. Release remains
+blocked until all #88–#105 evidence, dependencies, and live Issue state
+satisfy that plan.
 
 ### Real-input conversion
 
@@ -86,7 +99,16 @@ The evidence sidecar is ingestion metadata outside the IR. It records the
 input path, size, SHA-256, adapter module, and whether the file was consumed;
 source bytes are never copied into the IR.
 
-GitHub issue key/number mapping is recorded in [machine/github-issue-map.json](machine/github-issue-map.json). The disposition of superseded legacy issues is recorded in [machine/legacy-issue-map.json](machine/legacy-issue-map.json).
+GitHub issue key/number mapping is recorded in [machine/github-issue-map.json](machine/github-issue-map.json). The disposition of superseded legacy issues is recorded in [machine/legacy-issue-map.json](machine/legacy-issue-map.json). Those maps are traceability inputs, not release qualification evidence.
+
+The 120-plus requirement inventory and historical issue plan describe intended
+scope. Current closure is governed by the audit recovery plan: implementation,
+source-fact coverage, negative evidence, reproducibility, and live Issue state
+must all be demonstrated before a release claim is restored. The following
+claims are therefore intentionally not made: `production-ready`, `complete`,
+`zero silent loss`, `relationship-complete`, `source-faithful`, `universal
+query`, `independent qualification`, `full CommonMark/GFM`, `full PDF 1.7`,
+and `full ECMA-376`.
 
 要件は 120 件を下回らない粒度へ展開し、各要件に受入テストと担当 Issue を割り当てます。Issue を閉じる条件は、実装・テスト・文書・未対応状態の説明がそろい、未所有要件がないことです。
 

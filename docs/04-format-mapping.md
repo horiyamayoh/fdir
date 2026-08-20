@@ -1,5 +1,22 @@
 # 4. DOCX・XLSX・PDF・Markdown マッピング
 
+## 4.0 実装範囲と qualification の境界
+
+この章の表と例は、common core と形式拡張の mapping contract、想定する
+loss/ambiguity、必要な diagnostic を記述します。表に行があることや、例に
+`status: preserved` があることは、すべての実装・形式機能が実装済みまたは
+qualified であることを意味しません。
+
+The repository currently has bounded adapter paths for all four named formats,
+but release qualification is explicitly blocked by
+[`machine/audit-recovery-plan.json`](../machine/audit-recovery-plan.json).
+Implementation presence, a synthetic example, or a selected real-input check
+is not evidence of complete coverage. In particular, this chapter does not
+claim relationship completeness, source-faithful reconstruction, or full
+ECMA-376/PDF/CommonMark-GFM conformance. Unsupported, unavailable, ambiguous,
+and approximated constructs remain part of the expected contract until the
+applicable recovery evidence is complete.
+
 ## 4.1 共通マッピングの読み方
 
 各 adapter は source construct を直接 any に詰めず、まず common core の typed entity へ写像し、その後で形式固有差異を Extension へ記録します。normalization は記録形式上の差を吸収するだけで、業務意味の同値化ではありません。

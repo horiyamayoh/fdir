@@ -11,36 +11,58 @@
 
 生成 projection、query index、fixture manifest、CI report はこれらの権威を置き換えません。
 
+`machine/audit-recovery-plan.json` is the current release-status guard. It does
+not replace the model authority above; it records why release qualification is
+blocked, which recovery Issues (#88–#105) must be satisfied, and which claims
+must not be made before then.
+
 ## Current phase
 
-現在は旧 FDIR 2.1 の実装を退役させ、Document Form IR の型付き設計・要件・Issue 境界を整えるリセット段階です。四形式の parser、renderer、OCR が完成したという主張はありません。
+現在は、旧 FDIR 2.1 の実装を退役させた後の、型付き設計・bounded adapter 実装・監査復旧を並行する段階です。リリース資格はまだありません。
 
-The implementation now includes bounded stdlib adapters for real DOCX, XLSX,
-PDF, and Markdown inputs, plus a public conversion command and real-input E2E
-gate. Unsupported features are represented by diagnostics and conversion
-status. Optional renderer/OCR workers remain observations and are marked
-unavailable when not configured; they do not replace source-declared facts.
+The repository includes bounded standard-library adapter paths for real DOCX,
+XLSX, PDF, and Markdown inputs, plus a public conversion command and a
+real-input test path. This is implemented surface only. It does not establish
+complete format coverage, standards conformance, relationship completeness,
+source-faithful reconstruction, or release readiness. Unsupported features
+must remain diagnostics and conversion residuals; optional renderer/OCR workers
+remain observations and do not replace source-declared facts.
 
 The historical reset sentence above describes the starting point of this
-workstream. The current implementation status is the bounded four-format
-adapter and E2E path described here and in `docs/06-interfaces-and-implementation.md`.
+workstream. The current implementation surface is described in
+`docs/06-interfaces-and-implementation.md`; its qualification status is
+controlled separately by the audit recovery plan.
+
+### Release status
+
+Release is explicitly **blocked**. Do not convert adapter presence, a green
+design check, a closed Issue, or a command exit into a release claim. The
+recovery plan requires a commit-bound qualification bundle and current live
+Issue state for #88–#105, with dependencies satisfied. Until that program is
+complete, the repository must not claim production readiness, completeness,
+zero silent loss, relationship completeness, source faithfulness, universal
+query coverage, independent qualification, or full standards coverage.
 
 ## Validation
 
-The complete local gate is:
+The following are local diagnostic and regression checks, not standalone
+release qualification:
 
     python tools/validate_design.py
     python tools/run_acceptance.py --all
     python tools/run_e2e.py --all
     python tools/release_gate.py
 
-`run_acceptance.py --all` must report 134 passing cases across 16 acceptance
-families. `run_e2e.py --all` must report real-input cases across all four
-formats, including malformed and resource-limit outcomes. Use
+The declared design inventory contains 134 cases across 16 acceptance
+families. `run_acceptance.py --all` exercises that inventory when the local
+environment is available. `run_e2e.py --all` exercises bounded real-input
+cases across the four adapter paths, including malformed and resource-limit
+outcomes. Use
 `--family AT-<family> --case <number>` to reproduce one acceptance case and
 `--json` to archive a stable machine-readable result. `release_gate.py` is the
-fail-closed integration command used by CI and includes the real-input E2E and
-boundary review.
+fail-closed integration command used by CI and includes the real-input path and
+boundary review, but it cannot override the explicit release block in the
+recovery plan.
 
 実装 Issue が進んだ後は、schema validation、invariant tests、format fixture、partial conversion、unknown extension、deterministic serialization、resource-limit tests を追加します。
 
