@@ -230,6 +230,7 @@ def build_bundle(
     *,
     contract_path: Path = CONTRACT_PATH,
     allow_dirty: bool = False,
+    allow_repository_output: bool = False,
     timeout_seconds: int = 120,
 ) -> dict[str, Any]:
     if timeout_seconds < 1:
@@ -243,7 +244,7 @@ def build_bundle(
         raise BundleBuildError("qualification Evidence schema is not Draft 2020-12")
 
     output = output.resolve()
-    if output == ROOT or ROOT in output.parents:
+    if output == ROOT or (ROOT in output.parents and not allow_repository_output):
         raise BundleBuildError("bundle output must not be the repository root or a repository ancestor")
     if output.exists() and any(output.iterdir()):
         raise BundleBuildError(f"refusing to overwrite a non-empty bundle directory: {output}")

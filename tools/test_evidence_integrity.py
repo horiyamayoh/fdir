@@ -14,8 +14,9 @@ import json
 from pathlib import Path
 import shutil
 import sys
-import tempfile
 from typing import Any, Callable
+import os
+import uuid
 
 try:
     from build_qualification_bundle import build_bundle
@@ -222,8 +223,12 @@ def run_all() -> dict[str, Any]:
     if schema_case["status"] != "passed":
         return {"schema": "fdir/evidence-integrity-report", "version": "1.0.0", "status": "failed", "positive": [schema_case], "negative": [], "positiveCount": 0, "negativeCount": 0}
 
-    with tempfile.TemporaryDirectory(prefix="fdir-evidence-integrity-") as temporary:
-        root = Path(temporary)
+    # The managed Windows image denies access to Python-created 0700 temp
+    # directories.  Use the repository's ignored run area for this disposable
+    # matrix and explicitly allow the bundle builder to write there.
+    root = ROOT / "e2e" / ".run" / f"evidence-integrity-{os.getpid()}-{uuid.uuid4().hex[:8]}"
+    root.mkdir(parents=True, exist_ok=True)
+    try:
         # The production contract contains all recovery evidence lanes.  The
         # integrity matrix is about bundle tamper resistance, so use a
         # one-lane disposable contract here instead of rerunning the costly
@@ -239,7 +244,7 @@ def run_all() -> dict[str, Any]:
         integrity_contract_path = root / "qualification-contract.json"
         _write_json(integrity_contract_path, integrity_contract)
         positive_bundle = root / "positive"
-        build_result = build_bundle(positive_bundle, source_sha=source_sha, contract_path=integrity_contract_path, allow_dirty=True)
+        build_result = build_bundle(positive_bundle, source_sha=source_sha, contract_path=integrity_contract_path, allow_dirty=True, allow_repository_output=True)
         positive_validation = validate_bundle(positive_bundle / "manifest.json", repo_root=ROOT, contract_path=integrity_contract_path, allow_dirty=True)
         positive = {
             "id": "positive-bundle",
@@ -279,6 +284,10 @@ def run_all() -> dict[str, Any]:
             "positiveCount": 2,
             "negativeCount": len(negative),
         }
+    finally:
+        # Keep the ignored directory available for post-failure inspection;
+        # the workspace cleanup process owns eventual removal.
+        pass
 
 
 def main(argv: list[str] | None = None) -> int:
