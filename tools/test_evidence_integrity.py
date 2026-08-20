@@ -181,6 +181,82 @@ def _mutate_manifest_digest(bundle: Path) -> None:
     _write_json(manifest_path, manifest)
 
 
+def _mutate_issue_binding(bundle: Path) -> None:
+    manifest = load_json(bundle / "manifest.json")
+    report_path = bundle / Path("reports", f"{manifest['evidenceIds'][0]}.json")
+    report = load_json(report_path)
+    report["issueNumbers"] = [89]
+    _write_json(report_path, report)
+    _refresh_manifest(bundle)
+
+
+def _mutate_generator(bundle: Path) -> None:
+    manifest = load_json(bundle / "manifest.json")
+    report_path = bundle / Path("reports", f"{manifest['evidenceIds'][0]}.json")
+    report = load_json(report_path)
+    report["generator"] = "tools/not-a-generator.py"
+    _write_json(report_path, report)
+    _refresh_manifest(bundle)
+
+
+def _mutate_empty_assertions(bundle: Path) -> None:
+    manifest = load_json(bundle / "manifest.json")
+    report_path = bundle / Path("reports", f"{manifest['evidenceIds'][0]}.json")
+    report = load_json(report_path)
+    report["assertions"] = []
+    _write_json(report_path, report)
+    _refresh_manifest(bundle)
+
+
+def _mutate_ci_url(bundle: Path) -> None:
+    manifest = load_json(bundle / "manifest.json")
+    report_path = bundle / Path("reports", f"{manifest['evidenceIds'][0]}.json")
+    report = load_json(report_path)
+    report["ci"]["runUrl"] = "https://github.com/another-owner/another-repo/actions/runs/1"
+    _write_json(report_path, report)
+    _refresh_manifest(bundle)
+
+
+def _mutate_waiver(bundle: Path) -> None:
+    manifest = load_json(bundle / "manifest.json")
+    report_path = bundle / Path("reports", f"{manifest['evidenceIds'][0]}.json")
+    report = load_json(report_path)
+    report["waivers"] = [{"waiverId": "hide-survivor", "reason": "synthetic", "approvedBy": "synthetic"}]
+    _write_json(report_path, report)
+    _refresh_manifest(bundle)
+
+
+def _mutate_missing_output(bundle: Path) -> None:
+    manifest = load_json(bundle / "manifest.json")
+    output_path = next(item["path"] for item in manifest["files"] if str(item["path"]).startswith("artifacts/"))
+    (bundle / Path(*output_path.split("/"))).unlink()
+
+
+def _mutate_unresolved_evidence_id(bundle: Path) -> None:
+    manifest_path = bundle / "manifest.json"
+    manifest = load_json(manifest_path)
+    manifest["evidenceIds"] = [*manifest.get("evidenceIds", []), "issue-88-no-such-evidence"]
+    _write_json(manifest_path, manifest)
+
+
+def _mutate_command_generator(bundle: Path) -> None:
+    manifest = load_json(bundle / "manifest.json")
+    report_path = bundle / Path("reports", f"{manifest['evidenceIds'][0]}.json")
+    report = load_json(report_path)
+    report["command"] = ["python", "tools/not-a-command.py"]
+    _write_json(report_path, report)
+    _refresh_manifest(bundle)
+
+
+def _mutate_empty_test_cases(bundle: Path) -> None:
+    manifest = load_json(bundle / "manifest.json")
+    report_path = bundle / Path("reports", f"{manifest['evidenceIds'][0]}.json")
+    report = load_json(report_path)
+    report["testCases"] = []
+    _write_json(report_path, report)
+    _refresh_manifest(bundle)
+
+
 MUTATIONS: dict[str, tuple[str, Callable[[Path], None]]] = {
     "modified-output": ("OUTPUT_DIGEST_MISMATCH", _mutate_output),
     "different-source-sha": ("SOURCE_SHA_MISMATCH", _mutate_source_sha),
@@ -190,6 +266,15 @@ MUTATIONS: dict[str, tuple[str, Callable[[Path], None]]] = {
     "dirty-tree": ("DIRTY_TREE", _mutate_dirty_tree),
     "assertion-mismatch": ("ASSERTION_MISMATCH", _mutate_assertion),
     "manifest-digest": ("MANIFEST_DIGEST_MISMATCH", _mutate_manifest_digest),
+    "issue-binding": ("ISSUE_BINDING_MISMATCH", _mutate_issue_binding),
+    "generator-missing": ("GENERATOR_MISSING", _mutate_generator),
+    "empty-assertions": ("ASSERTIONS_REQUIRED", _mutate_empty_assertions),
+    "ci-url-mismatch": ("CI_URL_MISMATCH", _mutate_ci_url),
+    "waiver-survivor": ("WAIVER_NOT_ALLOWED", _mutate_waiver),
+    "missing-output": ("OUTPUT_MISSING", _mutate_missing_output),
+    "unresolved-evidence-id": ("MANIFEST_EVIDENCE_IDS", _mutate_unresolved_evidence_id),
+    "command-generator-missing": ("COMMAND_GENERATOR_PATH", _mutate_command_generator),
+    "empty-test-cases": ("TEST_CASES_REQUIRED", _mutate_empty_test_cases),
 }
 
 

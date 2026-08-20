@@ -78,7 +78,16 @@
     {"id":"duplicate-evidence-id","mutation":"copy a report to a second path without changing evidenceId","expectedDiagnostic":"DUPLICATE_EVIDENCE_ID"},
     {"id":"dirty-tree","mutation":"mark the manifest and report as dirty under the release-clean policy","expectedDiagnostic":"DIRTY_TREE"},
     {"id":"assertion-mismatch","mutation":"change an assertion expected value without changing actual","expectedDiagnostic":"ASSERTION_MISMATCH"},
-    {"id":"manifest-digest","mutation":"change the manifest declaration without recomputing manifestDigest","expectedDiagnostic":"MANIFEST_DIGEST_MISMATCH"}
+    {"id":"manifest-digest","mutation":"change the manifest declaration without recomputing manifestDigest","expectedDiagnostic":"MANIFEST_DIGEST_MISMATCH"},
+    {"id":"issue-binding","mutation":"bind a report to a different recovery issue and refresh only payload metadata","expectedDiagnostic":"ISSUE_BINDING_MISMATCH"},
+    {"id":"generator-missing","mutation":"replace the recorded generator path with a missing repository file","expectedDiagnostic":"GENERATOR_MISSING"},
+    {"id":"empty-assertions","mutation":"remove every assertion while keeping the report otherwise shaped","expectedDiagnostic":"ASSERTIONS_REQUIRED"},
+    {"id":"ci-url-mismatch","mutation":"replace the CI run URL with a different repository","expectedDiagnostic":"CI_URL_MISMATCH"},
+    {"id":"waiver-survivor","mutation":"add an unapproved waiver that would hide a surviving case","expectedDiagnostic":"WAIVER_NOT_ALLOWED"},
+    {"id":"missing-output","mutation":"remove a declared artifact without changing its manifest record","expectedDiagnostic":"OUTPUT_MISSING"},
+    {"id":"unresolved-evidence-id","mutation":"add an evidence ID to the manifest without defining a report","expectedDiagnostic":"MANIFEST_EVIDENCE_IDS"},
+    {"id":"command-generator-missing","mutation":"replace the command's Python executable with a missing repository file","expectedDiagnostic":"COMMAND_GENERATOR_PATH"},
+    {"id":"empty-test-cases","mutation":"remove every test case while keeping the report otherwise shaped","expectedDiagnostic":"TEST_CASES_REQUIRED"}
   ],
   "policies": {
     "noThirdPartyDependencies": true,
