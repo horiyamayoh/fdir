@@ -1,0 +1,715 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fdir:adapter-protocol:1",
+  "title": "FDIR adapter protocol envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "protocolVersion",
+    "kind",
+    "sessionId",
+    "requestId",
+    "sequence",
+    "critical",
+    "body"
+  ],
+  "properties": {
+    "schema": {
+      "const": "fdir/adapter-protocol/1"
+    },
+    "protocolVersion": {
+      "const": "1.0.0"
+    },
+    "kind": {
+      "enum": [
+        "client-hello",
+        "worker-hello",
+        "execute",
+        "cancel",
+        "chunk",
+        "output",
+        "terminal"
+      ]
+    },
+    "sessionId": {
+      "$ref": "#/$defs/nonEmptyString"
+    },
+    "requestId": {
+      "$ref": "#/$defs/nonEmptyString"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "critical": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/nonEmptyString"
+      }
+    },
+    "body": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "kind": {
+          "const": "client-hello"
+        },
+        "body": {
+          "$ref": "#/$defs/clientHello"
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "worker-hello"
+        },
+        "body": {
+          "$ref": "#/$defs/workerHello"
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "execute"
+        },
+        "body": {
+          "$ref": "#/$defs/execute"
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "cancel"
+        },
+        "body": {
+          "$ref": "#/$defs/cancel"
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "chunk"
+        },
+        "body": {
+          "$ref": "#/$defs/chunk"
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "output"
+        },
+        "body": {
+          "$ref": "#/$defs/output"
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "terminal"
+        },
+        "body": {
+          "$ref": "#/$defs/terminal"
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\u0000-\\u001f]+$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "lane": {
+      "enum": [
+        "native-substrate-census",
+        "semantic-helper",
+        "renderer-observation",
+        "ocr-inference-observation",
+        "storage-codec"
+      ]
+    },
+    "laneArray": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/lane"
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "handle",
+        "digest",
+        "byteLength",
+        "mediaType"
+      ],
+      "properties": {
+        "handle": {
+          "type": "string",
+          "pattern": "^artifact:[^/\\\\[:space:]]+$"
+        },
+        "digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "byteLength": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "mediaType": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maxCpuMillis",
+        "maxMemoryBytes",
+        "maxOutputBytes",
+        "maxObjects",
+        "maxRecursionDepth",
+        "maxDecompressionRatio",
+        "maxWallClockMillis",
+        "maxTemporaryStorageBytes",
+        "maxChunkBytes",
+        "maxInFlightChunks"
+      ],
+      "properties": {
+        "maxCpuMillis": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxMemoryBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxOutputBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxObjects": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxRecursionDepth": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxDecompressionRatio": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxWallClockMillis": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxTemporaryStorageBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxChunkBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxInFlightChunks": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cpuMillis",
+        "peakMemoryBytes",
+        "outputBytes",
+        "objectCount",
+        "recursionDepth",
+        "compressedInputBytes",
+        "decompressedBytes",
+        "wallClockMillis",
+        "temporaryStorageBytes",
+        "emittedChunks"
+      ],
+      "properties": {
+        "cpuMillis": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "peakMemoryBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "outputBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "objectCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "recursionDepth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "compressedInputBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "decompressedBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "wallClockMillis": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "temporaryStorageBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "emittedChunks": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workerId",
+        "workerVersion",
+        "buildDigest",
+        "configurationDigest",
+        "platform",
+        "dependencyIds"
+      ],
+      "properties": {
+        "workerId": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "workerVersion": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "buildDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "configurationDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "platform": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "dependencyIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        }
+      }
+    },
+    "clientHello": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "supportedVersions",
+        "requestedCapability",
+        "profile",
+        "requiredLanes",
+        "artifact"
+      ],
+      "properties": {
+        "supportedVersions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "contains": {
+            "const": "1.0.0"
+          },
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        },
+        "requestedCapability": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "profile": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "requiredLanes": {
+          "$ref": "#/$defs/laneArray"
+        },
+        "artifact": {
+          "$ref": "#/$defs/artifact"
+        }
+      }
+    },
+    "workerHello": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selectedVersion",
+        "manifestDigest",
+        "capabilities",
+        "lanes",
+        "qualificationState",
+        "productionReady"
+      ],
+      "properties": {
+        "selectedVersion": {
+          "const": "1.0.0"
+        },
+        "manifestDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        },
+        "lanes": {
+          "$ref": "#/$defs/laneArray"
+        },
+        "qualificationState": {
+          "$ref": "#/$defs/qualificationState"
+        },
+        "productionReady": {
+          "type": "boolean"
+        }
+      }
+    },
+    "execute": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifestDigest",
+        "artifact",
+        "capability",
+        "profile",
+        "lanes",
+        "budget",
+        "configurationDigest",
+        "contextDigest",
+        "replayKey"
+      ],
+      "properties": {
+        "manifestDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "artifact": {
+          "$ref": "#/$defs/artifact"
+        },
+        "capability": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "profile": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "lanes": {
+          "$ref": "#/$defs/laneArray"
+        },
+        "budget": {
+          "$ref": "#/$defs/budget"
+        },
+        "configurationDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "contextDigest": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/digest"
+            }
+          ]
+        },
+        "replayKey": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "cancel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reason"
+      ],
+      "properties": {
+        "reason": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "chunk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lane",
+        "chunkSequence",
+        "byteLength",
+        "final",
+        "payloadDigest"
+      ],
+      "properties": {
+        "lane": {
+          "$ref": "#/$defs/lane"
+        },
+        "chunkSequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "byteLength": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "final": {
+          "type": "boolean"
+        },
+        "payloadDigest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "output": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/nativeOutput"
+        },
+        {
+          "$ref": "#/$defs/semanticOutput"
+        },
+        {
+          "$ref": "#/$defs/rendererOutput"
+        },
+        {
+          "$ref": "#/$defs/ocrOutput"
+        },
+        {
+          "$ref": "#/$defs/storageOutput"
+        }
+      ]
+    },
+    "nativeOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lane",
+        "inventoryItemId",
+        "selector",
+        "evidenceDigest"
+      ],
+      "properties": {
+        "lane": {
+          "const": "native-substrate-census"
+        },
+        "inventoryItemId": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "selector": {},
+        "evidenceDigest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "semanticOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lane",
+        "candidateId",
+        "sourceOccurrenceIds",
+        "value"
+      ],
+      "properties": {
+        "lane": {
+          "const": "semantic-helper"
+        },
+        "candidateId": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "sourceOccurrenceIds": {
+          "$ref": "#/$defs/sourceOccurrenceIds"
+        },
+        "value": {}
+      }
+    },
+    "rendererOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lane",
+        "observationId",
+        "sourceOccurrenceIds",
+        "rendererVersion",
+        "value"
+      ],
+      "properties": {
+        "lane": {
+          "const": "renderer-observation"
+        },
+        "observationId": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "sourceOccurrenceIds": {
+          "$ref": "#/$defs/sourceOccurrenceIds"
+        },
+        "rendererVersion": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "value": {}
+      }
+    },
+    "ocrOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lane",
+        "observationId",
+        "sourceOccurrenceIds",
+        "method",
+        "confidenceMillionths",
+        "value"
+      ],
+      "properties": {
+        "lane": {
+          "const": "ocr-inference-observation"
+        },
+        "observationId": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "sourceOccurrenceIds": {
+          "$ref": "#/$defs/sourceOccurrenceIds"
+        },
+        "method": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "confidenceMillionths": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "value": {}
+      }
+    },
+    "storageOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lane",
+        "objectDigest",
+        "byteLength"
+      ],
+      "properties": {
+        "lane": {
+          "const": "storage-codec"
+        },
+        "objectDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "byteLength": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "sourceOccurrenceIds": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/nonEmptyString"
+      }
+    },
+    "terminal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome",
+        "artifactDigest",
+        "manifestDigest",
+        "outputComplete",
+        "retryable",
+        "usage",
+        "provenance",
+        "diagnosticCode"
+      ],
+      "properties": {
+        "outcome": {
+          "enum": [
+            "complete",
+            "partial",
+            "unsupported",
+            "unresolved",
+            "cancelled",
+            "failed",
+            "unreadable",
+            "resource-limited",
+            "policy-excluded",
+            "timed-out",
+            "worker-crash",
+            "sandbox-denied",
+            "protocol-mismatch",
+            "identity-mismatch",
+            "malformed-response",
+            "truncated-output"
+          ]
+        },
+        "artifactDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "manifestDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "outputComplete": {
+          "type": "boolean"
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "usage": {
+          "$ref": "#/$defs/usage"
+        },
+        "provenance": {
+          "$ref": "#/$defs/provenance"
+        },
+        "diagnosticCode": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "qualificationState": {
+      "enum": [
+        "candidate",
+        "admitted-unqualified",
+        "adapter-qualified",
+        "production-qualified",
+        "rejected"
+      ]
+    }
+  }
+}

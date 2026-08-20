@@ -12,7 +12,7 @@ The canonical integration command is:
 python3 tools/quality.py --mode full --cache-policy off .
 ```
 
-The command writes a deterministic JSON receipt and returns a nonzero status whenever a required gate fails, raises unexpectedly, discovers no tests, encounters stale generated output, or cannot establish the requested cache or release state.
+The command writes a deterministic JSON receipt and returns a nonzero status whenever a required gate fails, raises unexpectedly, discovers no tests, encounters stale generated output, or cannot establish the requested cache or release state. Full discovery includes the Issue #12 adapter-protocol vectors and mock non-Rust process harness; their receipt contract is recorded in [`adapter-protocol.json`](adapter-protocol.json).
 
 ## Modes
 

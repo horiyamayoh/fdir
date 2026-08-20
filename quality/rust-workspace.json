@@ -33,7 +33,7 @@
         "fdir-core"
       ],
       "name": "fdir-adapter-sdk",
-      "responsibility": "language-neutral adapter protocol metadata"
+      "responsibility": "strict language-neutral adapter protocol, replay, resource, and isolation contract"
     },
     {
       "dependencies": [
@@ -96,7 +96,7 @@
   "generatedContract": "crates/fdir-contract/src/generated.rs",
   "modelVersion": "2.1.0",
   "productionFeatures": [],
-  "protocolVersion": "0.1.0-dev.1",
+  "protocolVersion": "1.0.0",
   "schema": "fdir/rust-workspace/1",
   "workspaceManifest": "Cargo.toml"
 }

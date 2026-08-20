@@ -1,0 +1,15 @@
+{
+  "body": {
+    "evidenceDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "inventoryItemId": "item-1",
+    "lane": "native-substrate-census",
+    "selector": "bytes:0-12"
+  },
+  "critical": ["protocolVersion"],
+  "kind": "output",
+  "protocolVersion": "2.0.0",
+  "requestId": "request-1",
+  "schema": "fdir/adapter-protocol/1",
+  "sequence": 0,
+  "sessionId": "session-1"
+}
