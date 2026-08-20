@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 import re
 from typing import Any
@@ -230,6 +231,68 @@ def validate_normative_schema(document: dict[str, Any]) -> None:
     _validate_schema(document, schema, schema, "$")
 
 
+def _validate_discriminated_variants(value: Any, path: str = "$") -> None:
+    """Close the variant branches whose shared schema properties are broad.
+
+    JSON Schema's ``oneOf`` verifies required fields, but a branch can still
+    inherit unrelated optional fields from the shared property bag.  The
+    authoritative validator therefore applies the discriminator's exact
+    field set as a second, fail-closed check.
+    """
+
+    if isinstance(value, dict):
+        kind = value.get("kind")
+        variants: dict[str, tuple[set[str], set[str]]] = {
+            "rgb": ({"kind", "r", "g", "b", "a"}, {"r", "g", "b"}),
+            "gray": ({"kind", "gray", "a"}, {"gray"}),
+            "cmyk": ({"kind", "c", "m", "y", "k", "a"}, {"c", "m", "y", "k"}),
+            "theme": ({"kind", "themeId", "slot", "a"}, {"slot"}),
+            "point": ({"kind", "x", "y"}, {"x", "y"}),
+            "line": ({"kind", "x", "y", "points"}, {"x", "y", "points"}),
+            "polyline": ({"kind", "points"}, {"points"}),
+            "polygon": ({"kind", "points"}, {"points"}),
+            "rectangle": ({"kind", "x", "y", "width", "height"}, {"x", "y", "width", "height"}),
+            "rotatedRectangle": ({"kind", "x", "y", "width", "height", "rotation"}, {"x", "y", "width", "height", "rotation"}),
+            "bezier": ({"kind", "segments", "arrowhead"}, {"segments"}),
+            "clip": ({"kind", "segments"}, {"segments"}),
+            "arrowhead": ({"kind", "arrowhead"}, {"arrowhead"}),
+            "move": ({"kind", "to"}, {"to"}),
+            "close": ({"kind"}, set()),
+            "inline": ({"kind", "nodeId"}, {"nodeId"}),
+            "page": ({"kind", "surfaceId"}, {"surfaceId"}),
+            "paragraph": ({"kind", "nodeId"}, {"nodeId"}),
+            "cell-range": ({"kind", "gridId", "from", "to", "moveWithCells", "sizeWithCells"}, {"gridId", "from", "to"}),
+            "floating": ({"kind", "surfaceId", "offset"}, {"surfaceId"}),
+            "endpoint-pair": ({"kind", "nodeId"}, {"nodeId"}),
+        }
+        color_kinds = {"rgb", "gray", "cmyk", "theme"}
+        geometry_kinds = {"point", "line", "polyline", "polygon", "rectangle", "rotatedRectangle", "bezier", "clip", "arrowhead", "move", "close"}
+        anchor_kinds = {"inline", "page", "paragraph", "cell-range", "floating", "endpoint-pair"}
+        is_color = isinstance(kind, str) and kind in color_kinds
+        is_geometry = isinstance(kind, str) and kind in geometry_kinds and (".primitives[" in path or ".segments[" in path)
+        is_anchor = isinstance(kind, str) and kind in anchor_kinds and path.endswith(".anchor")
+        if isinstance(kind, str) and kind in variants and (is_color or is_geometry or is_anchor):
+            allowed, required = variants[kind]
+            if ".segments[" in path and kind in {"move", "line", "bezier", "close"}:
+                allowed, required = {
+                    "move": ({"kind", "to"}, {"to"}),
+                    "line": ({"kind", "to"}, {"to"}),
+                    "bezier": ({"kind", "points"}, {"points"}),
+                    "close": ({"kind"}, set()),
+                }[kind]
+            missing = sorted(required - set(value))
+            extra = sorted(set(value) - allowed)
+            if missing:
+                raise IRValidationError(f"{path} discriminator {kind} is missing: {', '.join(missing)}", "DFIR-DISCRIMINATOR-REQUIRED")
+            if extra:
+                raise IRValidationError(f"{path} discriminator {kind} has forbidden fields: {', '.join(extra)}", "DFIR-DISCRIMINATOR-FORBIDDEN")
+        for key, child in value.items():
+            _validate_discriminated_variants(child, f"{path}.{key}")
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            _validate_discriminated_variants(child, f"{path}[{index}]")
+
+
 def _validate_capability_contract(document: dict[str, Any], source: dict[str, Any], conversion: dict[str, Any]) -> None:
     profile_id = conversion.get("capabilityProfile")
     if not isinstance(profile_id, str) or not profile_id:
@@ -320,6 +383,21 @@ def _status_of(item: Any) -> str | None:
     return item.get("status") if isinstance(item, dict) else None
 
 
+def _canonical_decimal(value: Any) -> bool:
+    if not isinstance(value, str) or re.fullmatch(r"^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$", value) is None:
+        return False
+    try:
+        parsed = Decimal(value)
+    except InvalidOperation:
+        return False
+    if not parsed.is_finite() or parsed == 0:
+        return value == "0"
+    fixed = format(parsed, "f")
+    if "." in fixed:
+        fixed = fixed.rstrip("0").rstrip(".")
+    return fixed == value
+
+
 def _typed_value_check(value: dict[str, Any], path: str) -> None:
     value_type = value.get("type")
     raw = value.get("value")
@@ -332,7 +410,9 @@ def _typed_value_check(value: dict[str, Any], path: str) -> None:
             raise IRValidationError(f"{path} numeric value has the wrong type", "DFIR-TYPED-VALUE-MISMATCH")
         if isinstance(raw, float) and (raw != raw or raw in (float("inf"), float("-inf"))):
             raise IRValidationError(f"{path} numeric value is non-finite", "DFIR-TYPED-VALUE-MISMATCH")
-        if value_type == "decimal" and (not isinstance(raw, str) or re.fullmatch(r"^-?(0|[1-9][0-9]*)(\.[0-9]+)?$", raw) is None):
+        if value_type == "integer" and isinstance(raw, float):
+            raise IRValidationError(f"{path} integer value must not be a floating point number", "DFIR-TYPED-VALUE-MISMATCH")
+        if value_type in {"number", "decimal"} and isinstance(raw, str) and not _canonical_decimal(raw):
             raise IRValidationError(f"{path} decimal is not canonical", "DFIR-DECIMAL-NONCANONICAL")
         if value_type == "integer" and isinstance(raw, str) and re.fullmatch(r"^-?(0|[1-9][0-9]*)$", raw) is None:
             raise IRValidationError(f"{path} integer is not exact", "DFIR-TYPED-VALUE-MISMATCH")
@@ -347,6 +427,7 @@ def validate_document(document: dict[str, Any]) -> list[str]:
         raise IRValidationError("IR root must be an object", "DFIR-IR-ROOT")
     _walk(document)
     validate_normative_schema(document)
+    _validate_discriminated_variants(document)
     if document.get("schema") != {"name": "fdir/document-form", "version": "1.0.0"}:
         raise IRValidationError("unsupported IR schema", "DFIR-SCHEMA-VERSION")
     source = document.get("sourceFormat")
@@ -468,6 +549,10 @@ def validate_document(document: dict[str, Any]) -> list[str]:
             _id_ref(relationship_id, ids, {"relations"}, f"part {part_id}.relationshipIds", optional=False)
         if part.get("parentPartId") is not None:
             _id_ref(part["parentPartId"], ids, {"parts"}, f"part {part_id}.parentPartId", optional=False)
+        for relationship_id in part.get("relationshipIds", []):
+            relation = items_by_collection["relations"].get(relationship_id)
+            if relation is not None and relation.get("fromId") != part_id:
+                raise IRValidationError(f"part {part_id} relationship {relationship_id} has a different fromId", "DFIR-PART-RELATION-RECIPROCITY")
     _check_cycle({identifier: item.get("parentPartId") for identifier, item in items_by_collection["parts"].items()}, "DFIR-PART-CYCLE", "part")
 
     for surface_id, surface in items_by_collection["surfaces"].items():
@@ -479,13 +564,29 @@ def validate_document(document: dict[str, Any]) -> list[str]:
             _id_ref(layout_id, ids, {"layouts"}, f"surface {surface_id}.layoutIds", optional=False)
 
     for table_id, table in items_by_collection["tables"].items():
-        _id_ref(table.get("nodeId"), ids, {"nodes"}, f"table {table_id}.nodeId", optional=False, target_kinds={"table", "section"}, kind_by_id=kind_by_id)
+        table_node_id = table.get("nodeId")
+        _id_ref(table_node_id, ids, {"nodes"}, f"table {table_id}.nodeId", optional=False, target_kinds={"table", "section"}, kind_by_id=kind_by_id)
+        table_node = nodes[table_node_id]
         for field, kinds in (("rowIds", {"row"}), ("columnIds", {"column"}), ("cellIds", {"cell"})):
             values = table.get(field, [])
             if len(set(values)) != len(values):
                 raise IRValidationError(f"table {table_id}.{field} has duplicates", "DFIR-TABLE-DUPLICATE-MEMBER")
             for value in values:
                 _id_ref(value, ids, {"nodes"}, f"table {table_id}.{field}", optional=False, target_kinds=kinds, kind_by_id=kind_by_id)
+        row_ids = set(table.get("rowIds", []))
+        column_ids = set(table.get("columnIds", []))
+        cell_ids = set(table.get("cellIds", []))
+        if any(nodes[row_id].get("parentId") != table_node_id for row_id in row_ids):
+            raise IRValidationError(f"table {table_id} row containment is not reciprocal", "DFIR-TABLE-CONTAINMENT")
+        if any(nodes[column_id].get("parentId") != table_node_id for column_id in column_ids):
+            raise IRValidationError(f"table {table_id} column containment is not reciprocal", "DFIR-TABLE-CONTAINMENT")
+        for cell_id in cell_ids:
+            parent_id = nodes[cell_id].get("parentId")
+            if parent_id not in row_ids or nodes[parent_id].get("parentId") != table_node_id:
+                raise IRValidationError(f"table {table_id} cell containment is not reciprocal", "DFIR-TABLE-CONTAINMENT")
+        declared_children = set(table_node.get("childIds", []))
+        if not row_ids.issubset(declared_children) or not column_ids.issubset(declared_children):
+            raise IRValidationError(f"table {table_id} omits a declared row or column child", "DFIR-TABLE-CONTAINMENT")
 
     for style_id, style in items_by_collection["styles"].items():
         if style.get("basedOn") is not None:

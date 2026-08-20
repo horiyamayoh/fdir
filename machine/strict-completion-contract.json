@@ -28,7 +28,7 @@
       "schema": "fdir/independent-fidelity-corpus-report",
       "requiredFormats": ["docx", "xlsx", "pdf", "markdown"],
       "requiredCaseClasses": ["positive", "malformed", "unsupported", "resource-limit"],
-      "requiredFieldsPerCase": ["sourceDigest", "featureInventory", "queryParity", "dispositions"]
+      "requiredFieldsPerCase": ["sourceDigest", "sourceFeatureIds", "sourceFeatureInventory", "featureInventory", "queryParity", "dispositions", "residuals"]
     },
     "query": {
       "command": "python tools/query_qualification.py",
@@ -40,7 +40,7 @@
     "realInput": {
       "command": "python tools/run_e2e.py --all --json",
       "schema": "fdir/e2e-report",
-      "requiredFieldsPerCase": ["sourceFeatureIds", "dispositions", "queryParity"],
+      "requiredFieldsPerCase": ["sourceFeatureIds", "sourceFeatureInventory", "featureInventory", "dispositions", "residuals", "queryParity"],
       "requiredFormats": ["docx", "xlsx", "pdf", "markdown"]
     }
   },

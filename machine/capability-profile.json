@@ -15,7 +15,7 @@
       "format": "xlsx",
       "version": "Office Open XML",
       "supportedFeatures": ["package-parts", "relationships", "workbook", "worksheets", "cells", "formulas", "values", "styles", "tables", "conditional-formatting", "grids", "source-maps"],
-      "exactnessLanes": ["stored-value", "formula", "cached-value", "displayed-value", "date-system", "relationship-graph"],
+      "exactnessLanes": ["stored-value", "formula", "cached-value", "computed-value", "displayed-value", "date-system", "relationship-graph"],
       "disposition": "preserve-or-diagnose",
       "unknownConstructPolicy": "partial-with-diagnostic"
     },

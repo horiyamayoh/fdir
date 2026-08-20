@@ -57,6 +57,11 @@ def run() -> dict[str, Any]:
         covered = set(mutation.get("coverage", {}).keys()) if isinstance(mutation.get("coverage"), dict) else set()
         _require(set(specification["requiredMutationClasses"]).issubset(covered), "MUTATION_CLASSES_INCOMPLETE", "required mutation classes are missing: " + ", ".join(sorted(set(specification["requiredMutationClasses"]) - covered)), blockers)
         _require(mutation.get("survivors") == [], "MUTATION_SURVIVORS", "strict completion requires zero surviving mutations", blockers)
+        for field in specification.get("requiredFields", []):
+            _require(field in mutation, "MUTATION_FIELD_MISSING", f"mutation report lacks {field}", blockers)
+        _require(isinstance(mutation.get("killed"), int) and isinstance(mutation.get("total"), int) and mutation.get("total", 0) > 0, "MUTATION_COUNTS", "mutation report killed/total counts are invalid", blockers)
+        _require(mutation.get("killed") == mutation.get("total"), "MUTATION_SCORE", "mutation report is not fully killed", blockers)
+        _require(len(mutation.get("survivors", [])) <= specification.get("maximumSurvivors", 0), "MUTATION_SURVIVOR_LIMIT", "mutation survivor limit exceeded", blockers)
 
     corpus = _json_report(["tools/independent_corpus.py", "--json"], blockers)
     if corpus is not None:
@@ -70,6 +75,13 @@ def run() -> dict[str, Any]:
             if isinstance(case, dict):
                 for field in specification["requiredFieldsPerCase"]:
                     _require(field in case, "CORPUS_CASE_EVIDENCE", f"{case.get('id', '<unknown>')} lacks {field}", blockers)
+                _require(isinstance(case.get("sourceFeatureIds"), list) and bool(case.get("sourceFeatureIds")), "CORPUS_SOURCE_EVIDENCE", f"{case.get('id', '<unknown>')} source inventory is empty", blockers)
+                _require(case.get("queryParity", {}).get("status") == "passed", "CORPUS_QUERY_PARITY", f"{case.get('id', '<unknown>')} query parity is not passed", blockers)
+                _require(isinstance(case.get("dispositions"), list) and isinstance(case.get("featureInventory"), list), "CORPUS_DISPOSITIONS", f"{case.get('id', '<unknown>')} disposition evidence is malformed", blockers)
+        for negative in corpus.get("negativeChecks", []):
+            if isinstance(negative, dict):
+                _require(isinstance(negative.get("dispositions"), list) and isinstance(negative.get("featureInventory"), list), "CORPUS_NEGATIVE_EVIDENCE", f"{negative.get('id', '<unknown>')} negative evidence is malformed", blockers)
+                _require(isinstance(negative.get("sourceFeatureIds"), list) and bool(negative.get("sourceFeatureIds")), "CORPUS_NEGATIVE_SOURCE_EVIDENCE", f"{negative.get('id', '<unknown>')} source inventory is empty", blockers)
 
     query = _json_report(["tools/query_qualification.py"], blockers)
     if query is not None:
@@ -78,6 +90,9 @@ def run() -> dict[str, Any]:
         _require(set(specification["requiredSources"]).issubset(set(query.get("sources", []))), "QUERY_SOURCES_INCOMPLETE", "query qualification must include examples, real-input E2E, and independent corpus", blockers)
         _require(query.get("unqueryableFacts") == [], "QUERY_UNQUERYABLE_FACTS", "strict completion forbids unqueryable authoritative facts", blockers)
         _require(query.get("parity", {}).get("status") == "passed", "QUERY_PARITY", "direct/index parity must be reported as passed", blockers)
+        for field in specification.get("requiredFields", []):
+            _require(field in query, "QUERY_FIELD_MISSING", f"query report lacks {field}", blockers)
+        _require(isinstance(query.get("operations"), list) and query.get("operations"), "QUERY_OPERATIONS", "query report has no executed operations", blockers)
 
     real_input = _json_report(["tools/run_e2e.py", "--all", "--json"], blockers)
     if real_input is not None:
@@ -86,12 +101,17 @@ def run() -> dict[str, Any]:
         formats = set(real_input.get("formats", []))
         _require(formats == set(specification["requiredFormats"]), "E2E_FORMAT_MATRIX", "real-input E2E does not cover exactly the required formats", blockers)
         for case in real_input.get("cases", []):
-            if isinstance(case, dict) and case.get("case", "") not in {"malformed", "resource-limit", "unsupported-partial"}:
+            if isinstance(case, dict):
                 for field in specification["requiredFieldsPerCase"]:
                     _require(field in case, "E2E_CASE_EVIDENCE", f"{case.get('format', '<unknown>')} case lacks {field}", blockers)
+                _require(case.get("queryParity", {}).get("status") == "passed", "E2E_QUERY_PARITY", f"{case.get('format', '<unknown>')} query parity is not passed", blockers)
+                _require(isinstance(case.get("sourceFeatureIds"), list) and bool(case.get("sourceFeatureIds")), "E2E_SOURCE_EVIDENCE", f"{case.get('format', '<unknown>')} source evidence is empty", blockers)
+                _require(isinstance(case.get("dispositions"), list) and isinstance(case.get("residuals"), list), "E2E_DISPOSITIONS", f"{case.get('format', '<unknown>')} disposition evidence is malformed", blockers)
 
     issue_evidence = contract.get("issueEvidence", {})
     _require(set(issue_evidence) == {str(number) for number in contract["scope"]["phase2Issues"]}, "ISSUE_EVIDENCE_MATRIX", "strict contract must define evidence for every phase-2 issue", blockers)
+    for issue_number, evidence_ids in issue_evidence.items():
+        _require(isinstance(evidence_ids, list) and all(isinstance(item, str) and item for item in evidence_ids), "ISSUE_EVIDENCE_EMPTY", f"issue {issue_number} has empty evidence binding", blockers)
     _require(contract["closurePolicy"].get("closedStateIsNotEvidence") is True, "CLOSURE_POLICY", "closed issue state must never be sufficient evidence", blockers)
 
     return {

@@ -19,9 +19,11 @@ from typing import Any
 try:
     from generate_e2e_fixtures import write_fixtures
     from ir_validation import validate_document
+    from qualification_evidence import case_evidence
 except ImportError:  # pragma: no cover
     from tools.generate_e2e_fixtures import write_fixtures
     from tools.ir_validation import validate_document
+    from tools.qualification_evidence import case_evidence
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -134,6 +136,18 @@ def check_case(format_name: str, input_path: Path, work: Path, expected: tuple[s
             raise E2EFailure(f"{format_name} output lacks source-derived token {token!r}")
     if len(document.get("nodes", [])) < 2:
         raise E2EFailure(f"{format_name} output has no parsed child nodes")
+    feature_evidence = case_evidence(input_path, format_name, document)
+    if not feature_evidence["sourceFeatureIds"]:
+        raise E2EFailure(f"{format_name} source feature inventory is empty")
+    if feature_evidence["queryParity"].get("status") != "passed":
+        raise E2EFailure(f"{format_name} direct/index query parity did not pass")
+    if feature_evidence["queryParity"].get("unqueryableFacts") != []:
+        raise E2EFailure(f"{format_name} has unqueryable authoritative facts")
+    if len(feature_evidence["dispositions"]) != len(document.get("conversion", {}).get("features", [])):
+        raise E2EFailure(f"{format_name} feature disposition count does not match conversion features")
+    for disposition in feature_evidence["dispositions"]:
+        if disposition["status"] in {"approximated", "ambiguous", "unsupported", "omitted-by-policy", "failed"} and not disposition["diagnosticIds"]:
+            raise E2EFailure(f"{format_name} non-preserved feature lacks a diagnostic: {disposition['featureId']}")
     return {
         "format": format_name,
         "input": str(input_path),
@@ -150,6 +164,7 @@ def check_case(format_name: str, input_path: Path, work: Path, expected: tuple[s
         "texts": len(document.get("texts", [])),
         "diagnostics": len(document.get("diagnostics", [])),
         "warnings": warnings,
+        **feature_evidence,
     }
 
 
@@ -171,6 +186,9 @@ def check_malformed(format_name: str, input_path: Path, work: Path) -> dict[str,
         raise E2EFailure(f"{format_name} malformed input was not marked failed/partial")
     if not document.get("diagnostics"):
         raise E2EFailure(f"{format_name} malformed input has no diagnostic")
+    evidence = case_evidence(input_path, format_name, document)
+    if not evidence["sourceFeatureIds"] or evidence["queryParity"].get("status") != "passed":
+        raise E2EFailure(f"{format_name} malformed evidence lacks source/query parity")
     return {
         "format": format_name,
         "input": str(input_path),
@@ -178,6 +196,7 @@ def check_malformed(format_name: str, input_path: Path, work: Path) -> dict[str,
         "commandExitCode": result.returncode,
         "conversionStatus": document["conversion"]["status"],
         "diagnostics": [item.get("code") for item in document.get("diagnostics", [])],
+        **evidence,
     }
 
 
@@ -197,7 +216,10 @@ def check_resource_limit(format_name: str, input_path: Path, work: Path) -> dict
         raise E2EFailure(f"{format_name} resource-limit evidence does not prove input consumption")
     if document.get("conversion", {}).get("status") != "failed":
         raise E2EFailure(f"{format_name} resource limit did not produce failed status")
-    return {"format": format_name, "case": "resource-limit", "commandExitCode": result.returncode, "diagnostics": len(document.get("diagnostics", []))}
+    evidence = case_evidence(input_path, format_name, document)
+    if not evidence["sourceFeatureIds"] or evidence["queryParity"].get("status") != "passed":
+        raise E2EFailure(f"{format_name} resource-limit evidence lacks source/query parity")
+    return {"format": format_name, "case": "resource-limit", "commandExitCode": result.returncode, "diagnostics": len(document.get("diagnostics", [])), **evidence}
 
 
 def check_unsupported(format_name: str, input_path: Path, work: Path) -> dict[str, Any]:
@@ -221,6 +243,11 @@ def check_unsupported(format_name: str, input_path: Path, work: Path) -> dict[st
         raise E2EFailure(f"{format_name} unsupported feature was not represented in conversion features")
     if not document.get("diagnostics"):
         raise E2EFailure(f"{format_name} unsupported feature has no diagnostic")
+    evidence = case_evidence(input_path, format_name, document)
+    if not evidence["sourceFeatureIds"]:
+        raise E2EFailure(f"{format_name} unsupported evidence has no source feature inventory")
+    if evidence["queryParity"].get("status") != "passed":
+        raise E2EFailure(f"{format_name} unsupported case direct/index query parity did not pass")
     return {
         "format": format_name,
         "input": str(input_path),
@@ -228,6 +255,7 @@ def check_unsupported(format_name: str, input_path: Path, work: Path) -> dict[st
         "commandExitCode": result.returncode,
         "conversionStatus": document["conversion"]["status"],
         "diagnostics": [item.get("code") for item in document.get("diagnostics", [])],
+        **evidence,
     }
 
 

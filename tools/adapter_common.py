@@ -277,6 +277,8 @@ class DocumentBuilder:
         representation: str = "source",
         provenance: str = "authored",
         source_text_id: str | None = None,
+        source_range: dict[str, int] | None = None,
+        transformations: Iterable[dict[str, Any]] = (),
         status: str = "preserved",
     ) -> dict[str, Any]:
         text = text_value(value, max_chars=self.limits.max_text_chars - self._text_chars)
@@ -292,6 +294,11 @@ class DocumentBuilder:
         }
         if source_text_id:
             item["sourceTextId"] = source_text_id
+        if source_range is not None:
+            item["sourceRange"] = dict(source_range)
+        transformation_list = list(transformations)
+        if transformation_list:
+            item["transformations"] = transformation_list
         self.document["texts"].append(item)
         return item
 

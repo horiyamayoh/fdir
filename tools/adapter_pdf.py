@@ -26,12 +26,120 @@ NUMBER = r"-?(?:\d+(?:\.\d*)?|\.\d+)"
 PATH_RE = re.compile(rf"(?P<x>{NUMBER})\s+(?P<y>{NUMBER})\s+(?P<op>m|l)\s*")
 
 
+OBJECT_HEADER_RE = re.compile(rb"(?m)(\d+)\s+(\d+)\s+obj\b")
+STREAM_MARKER_RE = re.compile(rb">>\s*stream\r?\n")
+
+
 def _pdf_objects(data: bytes) -> dict[tuple[int, int], bytes]:
-    return {(int(match.group(1)), int(match.group(2))): match.group(3) for match in re.finditer(rb"(?m)(\d+)\s+(\d+)\s+obj\b(.*?)\bendobj\b", data, flags=re.S)}
+    """Extract indirect objects without treating stream data as structure.
+
+    A plain ``.*?endobj`` regex is unsafe: literal stream bytes can contain
+    the marker and truncate the object graph.  Direct ``/Length`` is honored
+    when present; otherwise ``endstream`` is used as the bounded fallback.
+    """
+
+    objects: dict[tuple[int, int], bytes] = {}
+    cursor = 0
+    while cursor < len(data):
+        match = OBJECT_HEADER_RE.search(data, cursor)
+        if match is None:
+            break
+        object_start = match.end()
+        prefix = data[object_start:]
+        stream_marker = STREAM_MARKER_RE.search(prefix)
+        first_endobj = data.find(b"endobj", object_start)
+        is_stream = stream_marker is not None and (first_endobj < 0 or object_start + stream_marker.start() < first_endobj)
+        endobj = -1
+        if not is_stream:
+            endobj = first_endobj
+        else:
+            assert stream_marker is not None
+            stream_start = object_start + stream_marker.end()
+            dictionary = data[object_start:object_start + stream_marker.start()]
+            length_match = re.search(rb"/Length\s+(\d+)\b", dictionary)
+            if length_match is not None:
+                expected_end = stream_start + int(length_match.group(1))
+                endstream = data.find(b"endstream", expected_end)
+            else:
+                endstream = data.find(b"endstream", stream_start)
+            search_from = (endstream + len(b"endstream")) if endstream >= 0 else stream_start
+            endobj = data.find(b"endobj", search_from)
+        end = len(data) if endobj < 0 else endobj
+        identifier = (int(match.group(1)), int(match.group(2)))
+        objects[identifier] = data[object_start:end]
+        cursor = len(data) if endobj < 0 else endobj + len(b"endobj")
+    return objects
+
+
+def _pdf_references(object_data: bytes) -> list[tuple[int, int]]:
+    dictionary = object_data
+    stream_marker = STREAM_MARKER_RE.search(dictionary)
+    if stream_marker is not None:
+        dictionary = dictionary[:stream_marker.start()]
+    return list(dict.fromkeys((int(number), int(generation)) for number, generation in re.findall(rb"(\d+)\s+(\d+)\s+R\b", dictionary)))
+
+
+def _cmap_unicode(raw: str) -> str:
+    token = raw.strip().strip("<>")
+    try:
+        data = bytes.fromhex(token)
+    except ValueError:
+        return ""
+    if not data:
+        return ""
+    try:
+        return data.decode("utf-16-be" if len(data) % 2 == 0 else "latin-1", errors="replace")
+    except UnicodeDecodeError:
+        return data.decode("latin-1", errors="replace")
+
+
+def _parse_cmap(data: bytes) -> list[dict[str, str]]:
+    """Parse the portable bfchar/bfrange subset of a ToUnicode CMap."""
+
+    text = data.decode("latin-1", errors="replace")
+    mappings: dict[str, str] = {}
+    for block in re.findall(r"beginbfchar(.*?)endbfchar", text, flags=re.S):
+        for source, target in re.findall(r"(<[0-9A-Fa-f]+>)\s+(<[0-9A-Fa-f]+>)", block):
+            source_code = source[1:-1].upper()
+            value = _cmap_unicode(target)
+            if value:
+                mappings[source_code] = value
+    for block in re.findall(r"beginbfrange(.*?)endbfrange", text, flags=re.S):
+        for start, end, target in re.findall(r"(<[0-9A-Fa-f]+>)\s+(<[0-9A-Fa-f]+>)\s+(<[^>]+>)", block):
+            try:
+                start_code = int(start[1:-1], 16)
+                end_code = int(end[1:-1], 16)
+                target_code = int(target[1:-1], 16)
+            except ValueError:
+                continue
+            for offset, code in enumerate(range(start_code, end_code + 1)):
+                value = _cmap_unicode(f"<{target_code + offset:0{len(target) - 2}X}>")
+                if value:
+                    mappings[f"{code:0{len(start) - 2}X}"] = value
+    return [{"sourceCode": source, "unicode": mappings[source]} for source in sorted(mappings)]
+
+
+def _pdf_font_mappings(objects: dict[tuple[int, int], bytes]) -> list[dict[str, Any]]:
+    fonts: list[dict[str, Any]] = []
+    for font_object, object_data in sorted(objects.items()):
+        if not re.search(rb"/Type\s*/Font\b", object_data):
+            continue
+        has_to_unicode = re.search(rb"/ToUnicode\s+(\d+)\s+(\d+)\s+R\b", object_data)
+        mapping: list[dict[str, str]] = []
+        status = "unavailable"
+        cmap_object: tuple[int, int] | None = None
+        if has_to_unicode:
+            cmap_object = (int(has_to_unicode.group(1)), int(has_to_unicode.group(2)))
+            cmap_data = objects.get(cmap_object)
+            if cmap_data is not None:
+                mapping = _parse_cmap(_decode_stream(cmap_data))
+                status = "preserved" if mapping else "unavailable"
+        fonts.append({"object": font_object, "toUnicodeObject": cmap_object, "mappingStatus": status, "mapping": mapping})
+    return fonts
 
 
 def _decode_stream(object_data: bytes) -> bytes:
-    marker = re.search(rb"\bstream\r?\n", object_data)
+    marker = STREAM_MARKER_RE.search(object_data)
     if marker is None:
         return b""
     end = object_data.find(b"endstream", marker.end())
@@ -338,11 +446,11 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
             builder.add_feature("header", "failed", diagnostic_ids=[diagnostic])
             return builder.finish(status="failed")
         content = raw.decode("latin-1", errors="replace")
-        if content.count("obj") > limits.max_pdf_objects:
+        objects = _pdf_objects(raw)
+        if len(objects) > limits.max_pdf_objects:
             diagnostic = builder.add_diagnostic("DFIR-PDF-OBJECT-LIMIT", "PDF object limit exceeded", severity="error", phase="parse")
             builder.add_feature("package-validation", "failed", diagnostic_ids=[diagnostic])
             return builder.finish(status="failed")
-        objects = _pdf_objects(raw)
         page_objects = [(key, value) for key, value in sorted(objects.items()) if re.search(rb"/Type\s*/Page\b", value)]
         page_count = len(page_objects) or len(re.findall(r"/Type\s*/Page\b", content))
         if page_count == 0:
@@ -350,7 +458,93 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
             builder.add_feature("pages", "failed", diagnostic_ids=[diagnostic])
             return builder.finish(status="failed")
         document_part = safe_id("part", "pdf-document")
-        builder.add_item("parts", {"partId": document_part, "kind": "document", "name": "PDF document", "rootNodeIds": [builder.root_id], "status": "preserved"}, "partId")
+        builder.add_item("parts", {"partId": document_part, "kind": "document", "name": "PDF document", "rootNodeIds": [builder.root_id], "relationshipIds": [], "status": "preserved"}, "partId")
+        object_part_ids: dict[tuple[int, int], str] = {}
+        for object_number, generation in sorted(objects):
+            object_part_id = safe_id("part", f"pdf-object-{object_number}-{generation}")
+            object_part_ids[(object_number, generation)] = object_part_id
+            builder.add_item(
+                "parts",
+                {
+                    "partId": object_part_id,
+                    "kind": "object",
+                    "name": f"{object_number} {generation} obj",
+                    "contentType": "application/pdf-object",
+                    "parentPartId": document_part,
+                    "rootNodeIds": [],
+                    "relationshipIds": [],
+                    "status": "preserved",
+                },
+                "partId",
+            )
+        unresolved_objects: list[tuple[int, int]] = []
+        for source_object, object_data in sorted(objects.items()):
+            source_part_id = object_part_ids[source_object]
+            source_part = builder.find("parts", "partId", source_part_id)
+            for target_object in _pdf_references(object_data):
+                target_id = object_part_ids.get(target_object)
+                relation_status = "preserved"
+                if target_id is None:
+                    unresolved_objects.append(target_object)
+                    target_id = safe_id("resource", f"pdf-missing-object-{target_object[0]}-{target_object[1]}")
+                    if builder.find("resources", "resourceId", target_id) is None:
+                        builder.add_item(
+                            "resources",
+                            {
+                                "resourceId": target_id,
+                                "kind": "embeddedObject",
+                                "mediaType": "application/pdf-object",
+                                "availability": "unavailable",
+                                "derivedHandle": f"{target_object[0]} {target_object[1]} R",
+                            },
+                            "resourceId",
+                        )
+                    relation_status = "unavailable"
+                relation_id = safe_id("relation", f"pdf-object-{source_object[0]}-{source_object[1]}-{target_object[0]}-{target_object[1]}")
+                builder.add_item("relations", {"relationId": relation_id, "kind": "references", "fromId": source_part_id, "toId": target_id, "status": relation_status}, "relationId")
+                if source_part is not None:
+                    source_part.setdefault("relationshipIds", []).append(relation_id)
+        if unresolved_objects:
+            diagnostic = builder.add_diagnostic(
+                "DFIR-PDF-OBJECT-REFERENCE-MISSING",
+                "One or more indirect PDF references target an unavailable object.",
+                phase="parse",
+                target_id=document_part,
+            )
+            builder.add_feature("pdf-object-graph", "ambiguous", target_id=document_part, diagnostic_ids=[diagnostic])
+        else:
+            builder.add_feature("pdf-object-graph", "preserved", target_id=document_part)
+        font_mappings = _pdf_font_mappings(objects)
+        for font in font_mappings:
+            object_number, generation = font["object"]
+            font_object_name = f"{object_number} {generation}"
+            resource_id = safe_id("resource", f"pdf-font-{object_number}-{generation}")
+            builder.add_item("resources", {"resourceId": resource_id, "kind": "font", "mediaType": "application/x-font", "availability": "available", "derivedHandle": f"object:{font_object_name}"}, "resourceId")
+            extension_id = safe_id("extension", f"pdf-font-cmap-{object_number}-{generation}")
+            builder.add_item(
+                "extensions",
+                {
+                    "extensionId": extension_id,
+                    "targetId": builder.root_id,
+                    "namespace": "urn:fdir:format:pdf",
+                    "type": "font-cmap",
+                    "schemaVersion": "1.0.0",
+                    "schemaId": "urn:fdir:schema:pdf-font-cmap",
+                    "payload": {"fontObject": font_object_name, "mappingStatus": font["mappingStatus"], "mappings": font["mapping"]},
+                    "criticality": "non-critical",
+                },
+                "extensionId",
+            )
+            if font["mappingStatus"] == "preserved":
+                builder.add_feature("font-mapping", "preserved", target_id=builder.root_id)
+            else:
+                diagnostic = builder.add_diagnostic(
+                    "DFIR-PDF-FONT-CMAP-UNAVAILABLE",
+                    f"PDF font object {font_object_name} has no usable ToUnicode CMap; glyph mapping is not fabricated.",
+                    phase="normalize",
+                    target_id=builder.root_id,
+                )
+                builder.add_feature("font-mapping", "unavailable", target_id=builder.root_id, diagnostic_ids=[diagnostic])
         streams = _page_content_streams(objects, raw)
         pages_seen = 0
         for page_index in range(page_count):
@@ -396,8 +590,11 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
             builder.add_feature("ocr-observation", "unavailable", target_id=page_id, diagnostic_ids=[ocr_diagnostic])
         builder.add_item("orders", {"orderId": safe_id("order", "pdf-paint"), "kind": "draw", "ownerId": builder.root_id, "items": [{"id": node["nodeId"], "ordinal": index} for index, node in enumerate(builder.document["nodes"][1:])], "status": "preserved"}, "orderId")
         builder.add_item("orders", {"orderId": safe_id("order", "pdf-reading"), "kind": "reading", "ownerId": builder.root_id, "items": [{"id": node["nodeId"], "ordinal": index} for index, node in enumerate(builder.document["nodes"][1:]) if node["kind"] in {"glyph", "path"}], "status": "ambiguous"}, "orderId")
-        if "/Font" in content:
-            builder.add_item("resources", {"resourceId": safe_id("resource", "pdf-font"), "kind": "font", "mediaType": "application/x-font", "availability": "unavailable", "derivedHandle": "font-resource"}, "resourceId")
+        if "/Font" in content and not font_mappings:
+            resource_id = safe_id("resource", "pdf-font-unresolved")
+            builder.add_item("resources", {"resourceId": resource_id, "kind": "font", "mediaType": "application/x-font", "availability": "unavailable", "derivedHandle": "font-resource"}, "resourceId")
+            diagnostic = builder.add_diagnostic("DFIR-PDF-FONT-RESOURCE-UNAVAILABLE", "PDF font references could not be resolved to an indirect font object.", phase="parse", target_id=builder.root_id)
+            builder.add_feature("font-mapping", "unavailable", target_id=builder.root_id, diagnostic_ids=[diagnostic])
         builder.add_feature("pages", "preserved", target_id=builder.root_id)
         return builder.finish()
     except (OSError, ValueError, AdapterError) as exc:

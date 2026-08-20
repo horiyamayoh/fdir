@@ -375,13 +375,19 @@ def check_release_claims() -> dict[str, int]:
     require(corpus.get("independent") is True and len(corpus.get("cases", [])) >= 4, "independent corpus is incomplete")
     required_formats = {"docx", "xlsx", "pdf", "markdown"}
     require({case.get("format") for case in corpus.get("cases", []) if isinstance(case, dict)} == required_formats, "independent corpus format matrix is incomplete")
+    all_corpus_cases = [case for case in corpus.get("cases", []) + corpus.get("negativeCases", []) if isinstance(case, dict)]
+    require({case.get("caseClass") for case in all_corpus_cases} >= {"positive", "malformed", "unsupported"}, "independent corpus lacks a positive/malformed/unsupported matrix")
+    require({case.get("format") for case in all_corpus_cases} == required_formats, "independent negative corpus format matrix is incomplete")
+    require(isinstance(corpus.get("negativeChecks"), list) and any(item.get("id") == "resource-limit" for item in corpus["negativeChecks"] if isinstance(item, dict)), "independent resource-limit evidence is missing")
     require(manifest.get("independentEvidence", {}).get("runner") == "tools/independent_corpus.py", "independent corpus runner is not claimed")
     strict_contract = load_json(STRICT_COMPLETION_CONTRACT_PATH)
     require(strict_contract.get("schema") == "fdir/document-form-strict-completion-contract", "strict completion contract is missing")
     require(strict_contract.get("closurePolicy", {}).get("closedStateIsNotEvidence") is True and strict_contract.get("closurePolicy", {}).get("fileExistenceIsNotEvidence") is True, "strict completion closure policy is weak")
     strict_claim = manifest.get("strictCompletionContract")
     require(isinstance(strict_claim, dict) and strict_claim.get("path") == "machine/strict-completion-contract.json" and strict_claim.get("gate") == "tools/strict_completion_gate.py" and strict_claim.get("requiredReportStatus") == "passed", "release claim does not bind the strict completion gate")
-    return {"child_claims": len(claims), "capability_claims": len(capability_claims), "independent_cases": len(corpus["cases"])}
+    strict_issue_evidence = strict_contract.get("issueEvidence", {})
+    require(set(strict_issue_evidence) == {str(number) for number in strict_contract.get("scope", {}).get("phase2Issues", [])}, "strict issue evidence does not cover the declared phase2 scope")
+    return {"child_claims": len(claims), "capability_claims": len(capability_claims), "independent_positive_cases": len(corpus["cases"]), "independent_negative_cases": len(corpus.get("negativeCases", [])), "strict_issue_bindings": len(strict_issue_evidence)}
 
 
 def check_schema() -> dict[str, int]:
@@ -564,6 +570,41 @@ def run_command(name: str, display_command: str, argv: list[str]) -> dict[str, A
     return result
 
 
+def check_runtime_evidence(commands: list[dict[str, Any]]) -> dict[str, int]:
+    """Validate the content of the qualification reports produced this run."""
+
+    by_name = {item.get("name"): item for item in commands if isinstance(item, dict)}
+
+    def report(name: str) -> dict[str, Any]:
+        item = by_name.get(name)
+        require(isinstance(item, dict) and item.get("return_code") == 0, f"runtime command did not pass: {name}")
+        try:
+            value = json.loads(str(item.get("stdout", "")))
+        except json.JSONDecodeError as exc:
+            raise GateError(f"runtime report is not JSON: {name}: {exc}") from exc
+        require(isinstance(value, dict), f"runtime report is not an object: {name}")
+        return value
+
+    mutation = report("mutation_qualification")
+    corpus = report("independent_corpus")
+    query = report("query_qualification")
+    e2e = report("real_input_e2e")
+    strict = report("strict_completion")
+    require(mutation.get("status") == "passed" and mutation.get("survivors") == [] and mutation.get("killed") == mutation.get("total"), "mutation report is not fully green")
+    require(corpus.get("status") == "passed" and len(corpus.get("cases", [])) >= 4, "independent corpus report is incomplete")
+    require(query.get("status") == "passed" and query.get("parity", {}).get("status") == "passed" and query.get("unqueryableFacts") == [], "query report is not fully green")
+    require(e2e.get("status") == "passed" and set(e2e.get("formats", [])) == {"docx", "xlsx", "pdf", "markdown"}, "real-input E2E report is not fully green")
+    require(strict.get("status") == "passed" and strict.get("blockers") == [], "strict completion report is not fully green")
+    return {
+        "mutation_cases": int(mutation.get("total", 0)),
+        "independent_cases": len(corpus.get("cases", [])),
+        "independent_negative_checks": len(corpus.get("negativeChecks", [])),
+        "query_sources": len(query.get("sources", [])),
+        "e2e_cases": len(e2e.get("cases", [])),
+        "strict_issues": len(strict.get("issues", [])),
+    }
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the FDIR design and acceptance release gate.")
     parser.add_argument(
@@ -583,7 +624,7 @@ def main(argv: list[str] | None = None) -> int:
     for name, display, command in (
         ("design_validation", "python tools/validate_design.py", ["tools/validate_design.py"]),
         ("acceptance_all", "python tools/run_acceptance.py --all", ["tools/run_acceptance.py", "--all"]),
-        ("real_input_e2e", "python tools/run_e2e.py --all", ["tools/run_e2e.py", "--all"]),
+        ("real_input_e2e", "python tools/run_e2e.py --all --json", ["tools/run_e2e.py", "--all", "--json"]),
         ("mutation_qualification", "python tools/mutation_qualification.py --json", ["tools/mutation_qualification.py", "--json"]),
         ("query_qualification", "python tools/query_qualification.py", ["tools/query_qualification.py"]),
         ("independent_corpus", "python tools/independent_corpus.py --json", ["tools/independent_corpus.py", "--json"]),
@@ -602,6 +643,14 @@ def main(argv: list[str] | None = None) -> int:
                 },
             }
         )
+
+    try:
+        runtime_details = check_runtime_evidence(commands)
+    except GateError as exc:
+        checks.append({"name": "runtime_evidence", "status": "failed", "error": str(exc)})
+        runtime_details = {"mutation_cases": 0, "independent_cases": 0, "independent_negative_checks": 0, "query_sources": 0, "e2e_cases": 0, "strict_issues": 0}
+    else:
+        checks.append({"name": "runtime_evidence", "status": "passed", "details": runtime_details})
 
     check_functions: tuple[tuple[str, Callable[[], dict[str, int]]], ...] = (
         ("design_catalog", check_design_catalog),
@@ -644,6 +693,11 @@ def main(argv: list[str] | None = None) -> int:
             "leaf_issue_first": min(EXPECTED_LEAF_ISSUE_RANGE),
             "leaf_issue_last": max(EXPECTED_LEAF_ISSUE_RANGE),
             "e2e_issue": EXPECTED_E2E_ISSUE,
+            "phase2_issues": len(list(range(69, 85)) + [85, 86]),
+            "phase2_issue_first": 69,
+            "phase2_issue_last": 86,
+            "phase2_duplicate_issue": 85,
+            **runtime_details,
         },
         "checks": checks,
         "commands": commands,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
+from copy import deepcopy
 from pathlib import Path
 import posixpath
 import re
@@ -438,15 +439,23 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
                         cell_ids.append(cell_id)
                         if formula_source is not None:
                             formula_id = safe_id("formula", f"xlsx-{sheet_ordinal}-{reference}")
+                            computed_diagnostic = builder.add_diagnostic(
+                                "DFIR-XLSX-COMPUTED-VALUE-UNAVAILABLE",
+                                "The adapter preserves the authored formula and stored/cache lanes but does not execute workbook calculation.",
+                                phase="observe",
+                                target_id=cell_id,
+                            )
                             values: dict[str, Any] = {
                                 "raw": _typed(formula_source, "str"),
-                                "stored": typed_value,
-                                "cached": typed_value,
+                                "stored": deepcopy(typed_value),
+                                "cached": deepcopy(typed_value),
+                                "computed": {"type": "blank", "value": None, "status": "unavailable"},
                                 "displayed": {"text": displayed, "status": "preserved"},
                             }
                             builder.add_item("formulas", {"formulaId": formula_id, "ownerCellId": cell_id, "kind": "spreadsheetFormula", "expression": {"source": formula_source, "language": "excel-a1", "status": "preserved"}, "values": values, "numberFormat": {"code": number_formats.get(style_index, "General"), "locale": "unknown"}, "calculationContext": context, "status": "preserved"}, "formulaId")
                             builder.find("nodes", "nodeId", cell_id)["formulaId"] = formula_id
                             builder.add_feature("formula", "preserved", target_id=cell_id)
+                            builder.add_feature("computed-value", "unavailable", target_id=cell_id, diagnostic_ids=[computed_diagnostic])
                 merged_ranges = [_cell_range(_attr(item, "ref"), surface_id) for item in _children(sheet_root, "mergeCell")]
                 merged_ranges = [item for item in merged_ranges if item is not None]
                 builder.add_item("tables", {"tableId": safe_id("table", f"xlsx-grid-{sheet_ordinal}"), "nodeId": table_node_id, "rowIds": row_ids, "columnIds": column_ids, "cellIds": cell_ids, "mergedRanges": merged_ranges, "status": "preserved"}, "tableId")

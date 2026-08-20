@@ -238,7 +238,15 @@ def _extension(builder: DocumentBuilder, target_id: str, extension_type: str, pa
     builder.add_item("extensions", {"extensionId": extension_id, "targetId": target_id, "namespace": "urn:fdir:format:docx", "type": extension_type, "schemaVersion": "1.0.0", "schemaId": f"urn:fdir:schema:docx-{extension_type}", "payload": payload, "criticality": criticality}, "extensionId")
 
 
-def _add_text_run(builder: DocumentBuilder, parent_id: str, run: ET.Element, line_index: int, styles: dict[str, tuple[str, str]]) -> str:
+def _add_text_run(
+    builder: DocumentBuilder,
+    parent_id: str,
+    run: ET.Element,
+    line_index: int,
+    styles: dict[str, tuple[str, str]],
+    *,
+    part_name: str = "word/document.xml",
+) -> str:
     run_id = safe_id("node", f"docx-run-{line_index}-{len(builder.document['nodes'])}")
     style_ref: dict[str, Any] = {}
     rpr = next(iter(_children(run, "rPr")), None)
@@ -259,7 +267,7 @@ def _add_text_run(builder: DocumentBuilder, parent_id: str, run: ET.Element, lin
     text_id = safe_id("text", f"docx-text-{line_index}-{len(builder.document['texts'])}")
     builder.add_text(text_id, value, representation="source", provenance="authored")
     builder.link_text(run_id, text_id)
-    builder.add_source_map(run_id, {"part": "word/document.xml", "path": f"paragraph[{line_index}]", "lineStart": max(1, line_index), "columnStart": 1, "lineEnd": max(1, line_index), "columnEnd": len(value) + 1})
+    builder.add_source_map(run_id, {"part": part_name, "path": f"paragraph[{line_index}]", "lineStart": max(1, line_index), "columnStart": 1, "lineEnd": max(1, line_index), "columnEnd": len(value) + 1})
     return run_id
 
 
@@ -311,6 +319,94 @@ def _drawing(builder: DocumentBuilder, parent_id: str, drawing: ET.Element, line
             for run in _descendants(paragraph, "r"):
                 _add_text_run(builder, node_id, run, line_index, {})
     _extension(builder, node_id, "drawing", {"kind": kind, "anchor": "inline", "extentEmu": {"cx": _attr(extent, "cx") if extent is not None else "0", "cy": _attr(extent, "cy") if extent is not None else "0"}})
+
+
+def _parse_story_part(
+    builder: DocumentBuilder,
+    archive: zipfile.ZipFile,
+    part_name: str,
+    part_id: str,
+    styles: dict[str, tuple[str, str]],
+) -> bool:
+    """Parse header/footer story roots into the same typed node graph.
+
+    A story is a real OOXML text surface, not merely package metadata.  The
+    bounded parser accepts paragraphs and runs (including revision wrappers)
+    and records any other element as an explicit residual on the story part.
+    """
+
+    root = _read_xml(archive, part_name)
+    story_candidates = _children(root, "hdr") or _children(root, "ftr")
+    story_root = story_candidates[0] if story_candidates else root
+    story_part = builder.find("parts", "partId", part_id)
+    if story_part is None:
+        raise AdapterError(f"story part was not registered: {part_name}")
+    root_node_ids: list[str] = []
+    unsupported = False
+    paragraph_number = 0
+    for child in list(story_root):
+        local = _local(child.tag)
+        if local != "p":
+            if local == "tbl":
+                diagnostic = builder.add_diagnostic(
+                    "DFIR-DOCX-STORY-TABLE-UNSUPPORTED",
+                    f"DOCX story table is retained only as a package part: {part_name}",
+                    target_id=part_id,
+                    phase="normalize",
+                )
+                builder.add_feature("story-table", "unsupported", target_id=part_id, diagnostic_ids=[diagnostic])
+            else:
+                diagnostic = builder.add_diagnostic(
+                    "DFIR-DOCX-STORY-ELEMENT-UNSUPPORTED",
+                    f"unsupported story element {local} in {part_name}",
+                    target_id=part_id,
+                    phase="normalize",
+                )
+                builder.add_feature("story-element", "unsupported", target_id=part_id, diagnostic_ids=[diagnostic])
+            unsupported = True
+            continue
+        paragraph_number += 1
+        paragraph_id = safe_id("node", f"docx-story-paragraph-{part_name}-{paragraph_number}")
+        builder.add_node("paragraph", paragraph_id, parent_id=builder.root_id, part_id=part_id, status="preserved")
+        builder.add_source_map(paragraph_id, {"part": part_name, "path": f"story/p[{paragraph_number}]"})
+        root_node_ids.append(paragraph_id)
+        for item in list(child):
+            item_local = _local(item.tag)
+            if item_local in {"r", "ins", "del"}:
+                runs = [item] if item_local == "r" else _children(item, "r")
+                for run in runs:
+                    run_id = _add_text_run(builder, paragraph_id, run, paragraph_number, styles, part_name=part_name)
+                    if item_local in {"ins", "del"}:
+                        revision_kind = "insert" if item_local == "ins" else "delete"
+                        _extension(builder, run_id, "revision", {"kind": revision_kind, "author": _wattr(item, "author"), "revisionId": _wattr(item, "id")})
+                        builder.add_feature("revision", "preserved", target_id=run_id)
+            elif item_local == "hyperlink":
+                annotation_id = safe_id("annotation", f"docx-story-hyperlink-{part_name}-{paragraph_number}-{len(builder.document['annotations'])}")
+                builder.add_item("annotations", {"annotationId": annotation_id, "kind": "hyperlink", "targetIds": [paragraph_id], "body": _wattr(item, "anchor") or _wattr(item, "id", ""), "status": "preserved"}, "annotationId")
+            elif item_local != "pPr":
+                diagnostic = builder.add_diagnostic(
+                    "DFIR-DOCX-STORY-CHILD-UNSUPPORTED",
+                    f"unsupported story paragraph child {item_local} in {part_name}",
+                    target_id=paragraph_id,
+                    phase="normalize",
+                )
+                builder.add_feature("story-child", "unsupported", target_id=paragraph_id, diagnostic_ids=[diagnostic])
+                unsupported = True
+        builder.add_feature("story-paragraph", "preserved", target_id=paragraph_id)
+    story_part["rootNodeIds"] = root_node_ids
+    if unsupported:
+        story_part["status"] = "ambiguous"
+        diagnostic = builder.add_diagnostic(
+            "DFIR-DOCX-STORY-PART-PARTIAL",
+            f"DOCX story part contains explicitly unsupported constructs: {part_name}",
+            target_id=part_id,
+            phase="normalize",
+        )
+        builder.add_feature("story-part", "ambiguous", target_id=part_id, diagnostic_ids=[diagnostic])
+    else:
+        story_part["status"] = "preserved"
+        builder.add_feature("story-part", "preserved", target_id=part_id)
+    return not unsupported
 
 
 def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any]:
@@ -399,17 +495,10 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
                         source_part.setdefault("relationshipIds", []).append(relation_id)
             if not relationship_loss:
                 builder.add_feature("package-relationships", "preserved", target_id=builder.root_id)
-            for package_part in builder.document.get("parts", []):
+            for package_part in list(builder.document.get("parts", [])):
                 part_name = str(package_part.get("name", ""))
                 if re.fullmatch(r"word/(header|footer)\d+\.xml", part_name):
-                    package_part["status"] = "ambiguous"
-                    diagnostic = builder.add_diagnostic(
-                        "DFIR-DOCX-STORY-PART-UNPARSED",
-                        f"DOCX story part is retained as a typed package part but its body is outside the main-story parser: {part_name}",
-                        target_id=package_part["partId"],
-                        phase="normalize",
-                    )
-                    builder.add_feature("story-part", "ambiguous", target_id=package_part["partId"], diagnostic_ids=[diagnostic])
+                    _parse_story_part(builder, archive, part_name, str(package_part["partId"]), styles)
             builder.add_item("surfaces", {"surfaceId": surface_id, "partId": part_id, "kind": "page", "ordinal": 0, "status": "preserved"}, "surfaceId")
             body = next(iter(_children(root, "body")), root)
             table_entities: list[dict[str, Any]] = []
@@ -441,9 +530,10 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
                                 run_id = _add_text_run(builder, paragraph_id, run, paragraph_number, styles)
                                 if item_local == "ins":
                                     _extension(builder, run_id, "revision", {"kind": "insert", "author": _wattr(item, "author"), "revisionId": _wattr(item, "id")})
+                                    builder.add_feature("revision", "preserved", target_id=run_id)
                                 elif item_local == "del":
-                                    builder.find("nodes", "nodeId", run_id)["status"] = "unsupported"
                                     _extension(builder, run_id, "revision", {"kind": "delete", "author": _wattr(item, "author"), "revisionId": _wattr(item, "id")})
+                                    builder.add_feature("revision", "preserved", target_id=run_id)
                         elif item_local == "fldSimple":
                             field_id = safe_id("field", f"docx-field-{paragraph_number}-{len(builder.document['fields'])}")
                             instruction = _wattr(item, "instr") or _attr(item, "instr")

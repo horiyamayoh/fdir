@@ -331,13 +331,14 @@ def _is_table_separator(line: str) -> bool:
 def _add_inline(builder: DocumentBuilder, parent_id: str, raw: str, line: int, column: int) -> tuple[str, str]:
     run_id = safe_id("node", f"markdown-run-{line}-{column}-{len(builder.document['nodes'])}")
     builder.add_node("run", run_id, parent_id=parent_id, status="preserved")
+    source_range = {"start": max(0, column - 1), "end": max(0, column - 1) + len(raw)}
     source_id = safe_id("text", f"markdown-source-{line}-{column}-{len(builder.document['texts'])}")
-    builder.add_text(source_id, raw, representation="source", provenance="authored")
+    builder.add_text(source_id, raw, representation="source", provenance="authored", source_range=source_range, transformations=[{"kind": "identity", "sourceStart": 0, "sourceEnd": len(raw), "targetStart": 0, "targetEnd": len(raw)}])
     builder.link_text(run_id, source_id)
     normalized = _strip_inline(raw)
     if normalized != raw:
         normalized_id = safe_id("text", f"markdown-normalized-{line}-{column}-{len(builder.document['texts'])}")
-        builder.add_text(normalized_id, normalized, representation="normalized", provenance="decoded", source_text_id=source_id, status="normalized")
+        builder.add_text(normalized_id, normalized, representation="normalized", provenance="decoded", source_text_id=source_id, source_range=source_range, transformations=[{"kind": "normalize", "sourceStart": 0, "sourceEnd": len(raw), "targetStart": 0, "targetEnd": len(normalized)}], status="normalized")
         builder.link_text(run_id, normalized_id)
     builder.add_source_map(run_id, {"lineStart": line, "columnStart": column, "lineEnd": line, "columnEnd": column + len(raw), "tokenStart": 0, "tokenEnd": len(raw)})
     delimiters: list[str] = []
@@ -530,8 +531,8 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
             while index < len(lines) and "|" in lines[index] and lines[index].strip():
                 table_lines.append(lines[index])
                 index += 1
-            _table(builder, builder.root_id, table_lines, number)
-            builder.add_feature("table", "preserved")
+            table_node = _table(builder, builder.root_id, table_lines, number)
+            builder.add_feature("table", "preserved", target_id=table_node)
             paragraph_start = index + 1
             continue
         if line.lstrip().startswith(">"):

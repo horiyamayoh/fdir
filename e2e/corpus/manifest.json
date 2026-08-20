@@ -10,7 +10,17 @@
       "kind": "ooxml-parts",
       "path": "docx-independent",
       "expected": ["Independent DOCX", "relationship"],
-      "status": "preserved-or-diagnosed"
+      "caseClass": "positive",
+      "expectedStatus": "partial"
+    },
+    {
+      "id": "docx-story-independent",
+      "format": "docx",
+      "kind": "ooxml-parts",
+      "path": "docx-story-independent",
+      "expected": ["Story Header"],
+      "caseClass": "positive",
+      "expectedStatus": "complete"
     },
     {
       "id": "xlsx-independent",
@@ -18,7 +28,8 @@
       "kind": "ooxml-parts",
       "path": "xlsx-independent",
       "expected": ["Independent XLSX", "SUM(A1:A2)"],
-      "status": "preserved-or-diagnosed"
+      "caseClass": "positive",
+      "expectedStatus": "complete"
     },
     {
       "id": "pdf-independent",
@@ -26,7 +37,17 @@
       "kind": "file",
       "path": "pdf-independent.pdf",
       "expected": ["Independent PDF"],
-      "status": "preserved-or-diagnosed"
+      "caseClass": "positive",
+      "expectedStatus": "partial"
+    },
+    {
+      "id": "pdf-cmap-independent",
+      "format": "pdf",
+      "kind": "file",
+      "path": "pdf-cmap.pdf",
+      "expected": ["A"],
+      "caseClass": "positive",
+      "expectedStatus": "partial"
     },
     {
       "id": "markdown-independent",
@@ -34,8 +55,19 @@
       "kind": "file",
       "path": "markdown-independent.md",
       "expected": ["Independent Markdown", "escaped | pipe"],
-      "status": "preserved-or-diagnosed"
+      "caseClass": "positive",
+      "expectedStatus": "partial"
     }
+  ],
+  "negativeCases": [
+    {"id":"docx-malformed-independent","format":"docx","kind":"file","path":"docx-malformed.docx","caseClass":"malformed","expectedStatus":"failed"},
+    {"id":"xlsx-malformed-independent","format":"xlsx","kind":"file","path":"xlsx-malformed.xlsx","caseClass":"malformed","expectedStatus":"failed"},
+    {"id":"pdf-malformed-independent","format":"pdf","kind":"file","path":"pdf-malformed.pdf","caseClass":"malformed","expectedStatus":"failed"},
+    {"id":"markdown-malformed-independent","format":"markdown","kind":"file","path":"markdown-malformed.md","caseClass":"malformed","expectedStatus":"failed"},
+    {"id":"docx-unsupported-independent","format":"docx","kind":"ooxml-parts","path":"docx-unsupported","caseClass":"unsupported","expectedStatus":"partial"},
+    {"id":"xlsx-unsupported-independent","format":"xlsx","kind":"ooxml-parts","path":"xlsx-unsupported","caseClass":"unsupported","expectedStatus":"partial"},
+    {"id":"pdf-unsupported-independent","format":"pdf","kind":"file","path":"pdf-unsupported.pdf","caseClass":"unsupported","expectedStatus":"partial"},
+    {"id":"markdown-unsupported-independent","format":"markdown","kind":"file","path":"markdown-unsupported.md","caseClass":"unsupported","expectedStatus":"partial"}
   ],
   "negativeChecks": [
     {
