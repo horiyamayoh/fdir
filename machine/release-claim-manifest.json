@@ -7,6 +7,15 @@
     "claimBoundary": "typed source-form facts, provenance, relationships, and explicit unavailable or unsupported states",
     "forbiddenClaims": ["semantic equivalence", "source-byte archival", "silent-loss completeness"]
   },
+  "strictCompletionContract": {
+    "path": "machine/strict-completion-contract.json",
+    "gate": "tools/strict_completion_gate.py",
+    "closedStateIsNotEvidence": true,
+    "requiredReportStatus": "passed"
+  },
+  "duplicateIssueClaims": {
+    "85": {"duplicateOf": 84, "noIndependentClaim": true}
+  },
   "capabilityClaims": [
     {"id":"claim-docx","profileId":"format:docx:ECMA-376:1","issueNumbers":[80],"requiredStates":["complete","complete-with-warnings","partial","failed"],"noFabricationRule":"missing or external OOXML targets become relationships, diagnostics, and truthful status"},
     {"id":"claim-xlsx","profileId":"format:xlsx:Office Open XML:1","issueNumbers":[81],"requiredStates":["complete","complete-with-warnings","partial","failed"],"noFabricationRule":"stored, formula, cached, displayed, and computed lanes remain distinct; unsupported workbook facts are not invented"},

@@ -5,8 +5,9 @@
   "policy": {
     "activeIssueNumbers": [69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 86],
     "closeOnlyWhen": ["implementation is present", "positive and negative evidence is green", "loss is represented by status and diagnostics", "release gate is green"],
+    "strictClosureGate": "python tools/strict_completion_gate.py",
     "forbiddenScope": ["semantic interpretation", "semantic equivalence", "source-byte archive", "content-addressed source store", "byte census", "accounting closure", "lineage certificate"],
-    "requiredCommands": ["python tools/validate_design.py", "python tools/run_acceptance.py --all", "python tools/run_e2e.py --all", "python tools/mutation_qualification.py --json", "python tools/query_qualification.py", "python tools/release_gate.py"]
+    "requiredCommands": ["python tools/validate_design.py", "python tools/run_acceptance.py --all", "python tools/run_e2e.py --all", "python tools/mutation_qualification.py --json", "python tools/query_qualification.py", "python tools/independent_corpus.py --json", "python tools/strict_completion_gate.py", "python tools/release_gate.py"]
   },
   "issues": [
     {"key":"DFIR2-I-000","issueNumber":69,"title":"Establish the ultimate Document Form IR fidelity program","kind":"umbrella","dependsOn":[70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,86],"paths":["schemas","machine","tools","examples","e2e","docs"],"completionEvidence":["all child issues verified","all required commands green","no semantic IR or source-byte archive"]},

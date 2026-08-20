@@ -32,6 +32,7 @@ CANONICALIZATION_PATH = ROOT / "machine" / "canonicalization.json"
 QUERY_CONTRACT_PATH = ROOT / "machine" / "query-contract.json"
 RELEASE_CLAIM_MANIFEST_PATH = ROOT / "machine" / "release-claim-manifest.json"
 INDEPENDENT_CORPUS_MANIFEST_PATH = ROOT / "e2e" / "corpus" / "manifest.json"
+STRICT_COMPLETION_CONTRACT_PATH = ROOT / "machine" / "strict-completion-contract.json"
 TRACEABILITY_PATH = ROOT / "machine" / "traceability.json"
 SCHEMA_PATH = ROOT / "schemas" / "document-form-ir.schema.json"
 EXAMPLES_PATH = ROOT / "examples"
@@ -314,7 +315,7 @@ def check_phase2_contracts() -> dict[str, int]:
     require(numbers == expected_numbers, "phase2 issue plan must cover issues #69 through #84 and #86 in order")
     require(policy.get("activeIssueNumbers") == expected_numbers, "phase2 active issue numbers are incomplete")
     required_commands = policy.get("requiredCommands")
-    require(isinstance(required_commands, list) and "python tools/mutation_qualification.py --json" in required_commands and "python tools/query_qualification.py" in required_commands and "python tools/release_gate.py" in required_commands, "phase2 qualification commands are incomplete")
+    require(isinstance(required_commands, list) and "python tools/mutation_qualification.py --json" in required_commands and "python tools/query_qualification.py" in required_commands and "python tools/independent_corpus.py --json" in required_commands and "python tools/strict_completion_gate.py" in required_commands and "python tools/release_gate.py" in required_commands, "phase2 qualification commands are incomplete")
 
     capability = load_json(CAPABILITY_PROFILE_PATH)
     profiles = capability.get("profiles") if isinstance(capability, dict) else None
@@ -375,6 +376,11 @@ def check_release_claims() -> dict[str, int]:
     required_formats = {"docx", "xlsx", "pdf", "markdown"}
     require({case.get("format") for case in corpus.get("cases", []) if isinstance(case, dict)} == required_formats, "independent corpus format matrix is incomplete")
     require(manifest.get("independentEvidence", {}).get("runner") == "tools/independent_corpus.py", "independent corpus runner is not claimed")
+    strict_contract = load_json(STRICT_COMPLETION_CONTRACT_PATH)
+    require(strict_contract.get("schema") == "fdir/document-form-strict-completion-contract", "strict completion contract is missing")
+    require(strict_contract.get("closurePolicy", {}).get("closedStateIsNotEvidence") is True and strict_contract.get("closurePolicy", {}).get("fileExistenceIsNotEvidence") is True, "strict completion closure policy is weak")
+    strict_claim = manifest.get("strictCompletionContract")
+    require(isinstance(strict_claim, dict) and strict_claim.get("path") == "machine/strict-completion-contract.json" and strict_claim.get("gate") == "tools/strict_completion_gate.py" and strict_claim.get("requiredReportStatus") == "passed", "release claim does not bind the strict completion gate")
     return {"child_claims": len(claims), "capability_claims": len(capability_claims), "independent_cases": len(corpus["cases"])}
 
 
@@ -581,6 +587,7 @@ def main(argv: list[str] | None = None) -> int:
         ("mutation_qualification", "python tools/mutation_qualification.py --json", ["tools/mutation_qualification.py", "--json"]),
         ("query_qualification", "python tools/query_qualification.py", ["tools/query_qualification.py"]),
         ("independent_corpus", "python tools/independent_corpus.py --json", ["tools/independent_corpus.py", "--json"]),
+        ("strict_completion", "python tools/strict_completion_gate.py", ["tools/strict_completion_gate.py"]),
     ):
         command_result = run_command(name, display, command)
         commands.append(command_result)

@@ -1,0 +1,68 @@
+{
+  "schema": "fdir/document-form-strict-completion-contract",
+  "version": "1.0.0",
+  "scope": {
+    "repository": "horiyamayoh/fdir",
+    "phase2Issues": [69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86],
+    "duplicateIssues": {"85": 84}
+  },
+  "closurePolicy": {
+    "closedStateIsNotEvidence": true,
+    "fileExistenceIsNotEvidence": true,
+    "fieldOrEnumPresenceIsNotEvidence": true,
+    "positiveEvidenceMustNameSourceFacts": true,
+    "negativeEvidenceMustDemonstrateGateFailure": true,
+    "partialClaimsMustListResiduals": true,
+    "generatedReportsMustBeReproducible": true
+  },
+  "reports": {
+    "mutation": {
+      "command": "python tools/mutation_qualification.py --json",
+      "schema": "fdir/mutation-qualification-report",
+      "requiredMutationClasses": ["schema", "graph", "status", "exact-value", "adapter-omission", "extension", "canonical", "query-index", "release-claim"],
+      "requiredFields": ["coverage", "survivors", "killed", "total"],
+      "maximumSurvivors": 0
+    },
+    "independentCorpus": {
+      "command": "python tools/independent_corpus.py --json",
+      "schema": "fdir/independent-fidelity-corpus-report",
+      "requiredFormats": ["docx", "xlsx", "pdf", "markdown"],
+      "requiredCaseClasses": ["positive", "malformed", "unsupported", "resource-limit"],
+      "requiredFieldsPerCase": ["sourceDigest", "featureInventory", "queryParity", "dispositions"]
+    },
+    "query": {
+      "command": "python tools/query_qualification.py",
+      "schema": "fdir/query-qualification-report",
+      "requiredSources": ["examples", "real-input-e2e", "independent-corpus"],
+      "requiredFields": ["operations", "parity", "sources", "unqueryableFacts"],
+      "maximumUnqueryableFacts": 0
+    },
+    "realInput": {
+      "command": "python tools/run_e2e.py --all --json",
+      "schema": "fdir/e2e-report",
+      "requiredFieldsPerCase": ["sourceFeatureIds", "dispositions", "queryParity"],
+      "requiredFormats": ["docx", "xlsx", "pdf", "markdown"]
+    }
+  },
+  "issueEvidence": {
+    "69": ["all-child-issues", "release-claim-report", "zero-unqualified-claims"],
+    "70": ["mutation-report", "adapter-omission", "negative-conformance", "survivor-zero"],
+    "71": ["schema-branch-report", "graph-invariant-report", "wrong-type-reference-negative"],
+    "72": ["profile-matrix", "feature-aggregation-report", "fail-closed-negative"],
+    "73": ["exact-value-vectors", "date-system-vectors", "formula-lane-report", "glyph-provenance-report"],
+    "74": ["style-cascade-vectors", "property-provenance-report", "color-paint-negative"],
+    "75": ["coordinate-vectors", "geometry-primitive-report", "clip-anchor-order-report"],
+    "76": ["part-surface-report", "containment-report", "table-grid-corpus"],
+    "77": ["relationship-closure-report", "resource-availability-negative", "annotation-field-report"],
+    "78": ["registry-schema-report", "critical-extension-negative", "opaque-extension-report"],
+    "79": ["canonical-vector-report", "identity-stability-report", "migration-negative"],
+    "80": ["docx-part-matrix", "docx-story-corpus", "docx-relationship-negative"],
+    "81": ["xlsx-value-lane-matrix", "xlsx-date-formula-corpus", "xlsx-relationship-negative"],
+    "82": ["pdf-object-graph-report", "pdf-graphics-state-corpus", "pdf-font-cmap-report"],
+    "83": ["query-completeness-matrix", "direct-index-parity", "unqueryable-fact-zero"],
+    "84": ["dialect-conformance-report", "markdown-source-span-corpus", "markdown-unsupported-negative"],
+    "85": ["duplicate-of-84", "no-independent-claim"],
+    "86": ["all-child-evidence", "independent-corpus-report", "mutation-report", "cross-layer-report", "reproducible-release-report"]
+  },
+  "forbiddenCompletionEvidence": ["issue-closed", "command-exit-only", "path-exists", "enum-count", "token-search", "hand-authored-IR-only"]
+}

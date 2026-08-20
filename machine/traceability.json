@@ -10,13 +10,15 @@
     "machine/release-gate.json",
     "machine/phase2-issue-plan.json",
     "machine/release-claim-manifest.json",
+    "machine/strict-completion-contract.json",
     "schemas/document-form-ir.schema.json",
     "tools/convert_document.py",
     "tools/run_e2e.py",
     "e2e/README.md",
     "e2e/fixtures/README.md",
     "e2e/corpus/manifest.json",
-    "tools/independent_corpus.py"
+    "tools/independent_corpus.py",
+    "tools/strict_completion_gate.py"
   ],
   "derivation": {
     "requirementToIssue": "requirements.ownerIssue",
