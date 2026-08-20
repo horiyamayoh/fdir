@@ -14,6 +14,7 @@ PROTOCOL_VERSION = "1.0.0"
 BUILD_DIGEST = "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
 CONFIG_DIGEST = "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
 EVIDENCE_DIGEST = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+MAX_REQUEST_BYTES = 1_048_576
 
 
 def emit(value: Any, *, newline: bool = True) -> None:
@@ -24,7 +25,9 @@ def emit(value: Any, *, newline: bool = True) -> None:
     sys.stdout.flush()
 
 
-def envelope(request: dict[str, Any], kind: str, sequence: int, body: dict[str, Any]) -> dict[str, Any]:
+def envelope(
+    request: dict[str, Any], kind: str, sequence: int, body: dict[str, Any]
+) -> dict[str, Any]:
     return {
         "schema": PROTOCOL_SCHEMA,
         "protocolVersion": PROTOCOL_VERSION,
@@ -64,7 +67,9 @@ def provenance() -> dict[str, Any]:
 
 
 def terminal_body(
-    request: dict[str, Any], outcome: str = "complete", diagnostic: str = "FDIR-WORKER-COMPLETE"
+    request: dict[str, Any],
+    outcome: str = "complete",
+    diagnostic: str = "FDIR-WORKER-COMPLETE",
 ) -> dict[str, Any]:
     return {
         "outcome": outcome,
@@ -78,6 +83,23 @@ def terminal_body(
     }
 
 
+def read_request() -> dict[str, Any] | None:
+    """Read one bounded request; the conformance worker is one-shot by design."""
+    raw = sys.stdin.buffer.read(MAX_REQUEST_BYTES + 1)
+    if not raw or len(raw) > MAX_REQUEST_BYTES:
+        print("request is empty or exceeds the conformance limit", file=sys.stderr)
+        return None
+    try:
+        request = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        print(f"request is not valid UTF-8 JSON: {error}", file=sys.stderr)
+        return None
+    if not isinstance(request, dict):
+        print("request must be a JSON object", file=sys.stderr)
+        return None
+    return request
+
+
 def run(scenario: str) -> int:
     if scenario == "environment":
         emit(
@@ -88,7 +110,10 @@ def run(scenario: str) -> int:
                 "credentialKeys": sorted(
                     key
                     for key in os.environ
-                    if any(token in key.upper() for token in ("TOKEN", "SECRET", "PASSWORD"))
+                    if any(
+                        token in key.upper()
+                        for token in ("TOKEN", "SECRET", "PASSWORD")
+                    )
                 ),
             }
         )
@@ -98,8 +123,9 @@ def run(scenario: str) -> int:
         return 0
     if scenario == "crash":
         return 23
-    raw = sys.stdin.buffer.readline()
-    request = json.loads(raw.decode("utf-8"))
+    request = read_request()
+    if request is None:
+        return 2
     if scenario == "resource":
         sys.stdout.write("x" * 65_536)
         sys.stdout.flush()
