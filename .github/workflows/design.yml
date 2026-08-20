@@ -18,7 +18,53 @@ jobs:
           python-version: "3.12"
       - name: Validate design authority
         run: python tools/validate_design.py
+      - name: Run evidence tamper self-tests
+        run: python tools/evidence_bundle.py self-test
+      - name: Run bounded executable defect campaign
+        run: python tools/run_defect_injection_campaign.py --json
       - name: Run final release gate
+        if: always()
         run: python tools/release_gate.py
       - name: Run real-input adapter E2E
-        run: python tools/run_e2e.py --all
+        if: always()
+        run: python tools/run_e2e.py --all --json
+      - name: Collect commit-bound qualification bundle
+        if: always()
+        run: python tools/evidence_bundle.py collect --output reports/evidence-bundle.json --index reports/evidence-index.json --allow-blocked-report
+      - name: Verify release barrier against candidate bundle
+        if: always()
+        run: python tools/release_gate.py --evidence-bundle reports/evidence-bundle.json
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fdir-qualification-evidence-${{ github.sha }}
+          path: reports/
+          if-no-files-found: error
+          retention-days: 14
+
+  clean-room:
+    needs: design
+    if: always()
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Collect fresh clean-room evidence
+        run: python tools/evidence_bundle.py collect --output reports/evidence-bundle.json --index reports/evidence-index.json --allow-blocked-report
+      - name: Upload clean-room evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fdir-clean-room-${{ matrix.os }}-${{ github.sha }}
+          path: reports/
+          if-no-files-found: error
+          retention-days: 14

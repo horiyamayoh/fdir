@@ -1,0 +1,12 @@
+{
+  "schema": "fdir/document-form-authority-qualification",
+  "version": "1.0.0",
+  "command": "python tools/authority_qualification.py",
+  "normativeContract": "machine/model-contract.json",
+  "negativeCorpus": "machine/authority-negative-corpus.json",
+  "canonicalVectors": "machine/canonical-cross-language-vectors.json",
+  "reportFields": ["contractDigest","realInputFormats","caseCount","passedCases","failedCases","schemaDifferential","referenceCensus","extensionCensus"],
+  "singleDefectPolicy": "one mutation and one expected diagnostic per case",
+  "boundedScope": ["shared IR schema/runtime graph/status/extension/canonical contracts", "generated fixture input derivation", "schema differential with jsonschema Draft 2020-12"],
+  "outOfScope": ["format adapter completeness", "renderer/OCR oracle equality", "full graph semantics in external validator", "GitHub/release issue state"]
+}

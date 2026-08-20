@@ -1,0 +1,42 @@
+{
+  "schema": "fdir/audit-recovery-plan",
+  "version": "1.0.0",
+  "repository": "horiyamayoh/fdir",
+  "auditBaseSha": "1fd948402500e088c7453aee0743c5e10521a14c",
+  "releaseBlocked": true,
+  "claimMode": "experimental-bounded-subset",
+  "liveState": {
+    "source": "github-issue-api",
+    "requiredAtGate": true,
+    "closedStateIsNotEvidence": true,
+    "staleAfterSourceChange": true
+  },
+  "auditedClosedIssues": [47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,71,74,75,76,77,78,79,83,85],
+  "auditedOpenProgramIssues": [69,70,72,73,80,81,82,84,86],
+  "children": [
+    {"issueNumber":88,"parent":87,"dependsOn":[],"requiredEvidenceIds":["bundle.source","bundle.command-digests","bundle.artifact-digests","bundle.index-integrity"]},
+    {"issueNumber":89,"parent":87,"dependsOn":[88],"requiredEvidenceIds":["defect.campaign","defect.negative-self-test","defect.no-undetected-must"]},
+    {"issueNumber":90,"parent":87,"dependsOn":[],"requiredEvidenceIds":["normative-model"]},
+    {"issueNumber":91,"parent":87,"dependsOn":[],"requiredEvidenceIds":["source-accounting"]},
+    {"issueNumber":92,"parent":87,"dependsOn":[],"requiredEvidenceIds":["exact-value-provenance"]},
+    {"issueNumber":93,"parent":87,"dependsOn":[],"requiredEvidenceIds":["style-provenance"]},
+    {"issueNumber":94,"parent":87,"dependsOn":[],"requiredEvidenceIds":["geometry-provenance"]},
+    {"issueNumber":95,"parent":87,"dependsOn":[],"requiredEvidenceIds":["structure-topology"]},
+    {"issueNumber":96,"parent":87,"dependsOn":[],"requiredEvidenceIds":["relationship-resource-closure"]},
+    {"issueNumber":97,"parent":87,"dependsOn":[],"requiredEvidenceIds":["extension-registry-closure"]},
+    {"issueNumber":98,"parent":87,"dependsOn":[],"requiredEvidenceIds":["canonical-migration"]},
+    {"issueNumber":99,"parent":87,"dependsOn":[90,91,92,93,94,95,96,97,98],"requiredEvidenceIds":["docx-qualified-profile"]},
+    {"issueNumber":100,"parent":87,"dependsOn":[90,91,92,93,94,95,96,97,98],"requiredEvidenceIds":["xlsx-qualified-profile"]},
+    {"issueNumber":101,"parent":87,"dependsOn":[90,91,92,93,94,95,96,97,98],"requiredEvidenceIds":["pdf-qualified-profile"]},
+    {"issueNumber":102,"parent":87,"dependsOn":[90,91,92,93,94,95,96,97,98],"requiredEvidenceIds":["markdown-qualified-profile"]},
+    {"issueNumber":103,"parent":87,"dependsOn":[90,91,92,98],"requiredEvidenceIds":["query-completeness"]},
+    {"issueNumber":104,"parent":87,"dependsOn":[88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103],"requiredEvidenceIds":["independent-corpus","differential","metamorphic","hostile"]},
+    {"issueNumber":105,"parent":87,"dependsOn":[88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104],"requiredEvidenceIds":["release-barrier","clean-room","claim-conformance"]}
+  ],
+  "recoveryRules": [
+    "A child is not complete from issue state, a path, a count, or an evidence label.",
+    "A report is stale when its source head SHA or tracked source digest differs from the candidate.",
+    "Release publication remains blocked while any required child is open or lacks a resolvable bundle entry.",
+    "The bounded subset may be reported only with explicit unsupported scope and residual blockers."
+  ]
+}

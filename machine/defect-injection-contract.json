@@ -1,0 +1,22 @@
+{
+  "schema": "fdir/defect-injection-contract",
+  "version": "1.0.0",
+  "runner": "tools/run_defect_injection_campaign.py",
+  "baseSuite": ["python tools/validate_design.py", "python tools/run_acceptance.py --all", "python tools/run_e2e.py --all --json", "python tools/query_qualification.py", "python tools/independent_corpus.py --json", "python tools/metamorphic_qualification.py", "python tools/release_contract_qualification.py"],
+  "classification": ["generated", "invalid", "equivalent", "detected", "undetected", "timeout", "infrastructure-error"],
+  "policy": {"mustUndetected": 0, "timeoutIsDetection": false, "infrastructureErrorIsDetection": false, "unappliedPatchIsDetection": false, "countOnlyOracle": false, "baseSuiteMustPass": true},
+  "minimumNonEquivalentCases": {"adapter:docx": 20, "adapter:xlsx": 20, "adapter:pdf": 20, "adapter:markdown": 20, "validator": 10, "query": 10, "canonical": 10, "release": 10},
+  "mustInvariants": {
+    "validator": ["required-constraint", "discriminator-branch", "closed-object", "wrong-type-reference", "containment-reciprocity", "containment-cycle-or-orphan", "complete-status-loss", "extension-payload"],
+    "adapter:common": ["finish-loss-status", "diagnostic-emission", "feature-inventory", "unknown-construct", "source-map-target", "stable-identity-source-seed"],
+    "adapter:docx": ["hyperlink-text-run", "drawing-handler", "story-header-footer", "missing-relationship-target", "style-inheritance"],
+    "adapter:xlsx": ["shared-string", "exact-decimal", "date-system", "formula-lanes", "sheet-table-relationship", "displayed-lane"],
+    "adapter:pdf": ["page-tree-order", "tounicode", "graphics-state-restore", "unknown-operator", "annotation-target", "paint-order"],
+    "adapter:markdown": ["source-span", "delimiter-resolution", "reference-definition", "table-separator", "unsupported-dialect-status"],
+    "query": ["collection-field-mapping", "source-digest", "profile-validation", "stale-version", "partial-write", "atomic-replacement", "all-authoritative-fields", "negative-corruption"],
+    "canonical": ["entity-sorting", "key-order", "number-exactness", "projection-boundary", "duplicate-key", "migration-receipt", "cross-language-vector", "stable-id"],
+    "release": ["source-sha", "evidence-digest", "artifact-presence", "claim-drift", "issue-state", "ci-required-check", "clean-room", "unsupported-scope"]
+  },
+  "requiredReportFields": ["baseSha", "configDigest", "counts", "cases", "survivors", "waivers", "coverage", "durationMilliseconds", "resourceUsage"],
+  "selfTests": ["patch-application-infrastructure-error", "detector-disabled-undetected", "base-suite-failure-blocks", "parallel-output-isolation", "deterministic-case-order"]
+}

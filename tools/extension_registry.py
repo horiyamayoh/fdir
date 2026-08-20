@@ -14,6 +14,8 @@ REGISTRY_PATH = ROOT / "machine" / "extension-registry.json"
 class ExtensionValidationError(ValueError):
     """Raised when an extension violates the registry contract."""
 
+    code = "DFIR-EXTENSION-INVALID"
+
 
 def _load_json(path: Path) -> dict[str, Any]:
     try:
@@ -100,8 +102,20 @@ def validate_extension(extension: dict[str, Any], document: dict[str, Any], ids:
         if document.get("conversion", {}).get("status") == "complete":
             raise ExtensionValidationError(f"unknown non-critical extension cannot be complete: {extension['extensionId']}")
         return "opaque"
+    if extension["criticality"] != entry.get("criticality"):
+        raise ExtensionValidationError(
+            f"extension {extension['extensionId']} criticality does not match registry policy",
+        )
     if extension["schemaId"] != entry["schemaId"]:
         raise ExtensionValidationError(f"extension {extension['extensionId']} schemaId does not match registry")
+    allowed_collections = entry.get("targetCollections")
+    if not isinstance(allowed_collections, list):
+        # Current registry entries target node variants; keeping this default
+        # explicit preserves compatibility while the contract census reports
+        # the collection-level target policy.
+        allowed_collections = ["nodes"] if entry.get("targetKinds") else []
+    if allowed_collections and ids.get(target_id) not in allowed_collections:
+        raise ExtensionValidationError(f"extension {extension['extensionId']} target collection {ids.get(target_id)} is not allowed")
     allowed = entry.get("targetKinds", [])
     target_kind = node_kinds.get(target_id)
     if allowed and target_kind not in allowed and target_id in node_kinds:

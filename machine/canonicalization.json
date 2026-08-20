@@ -1,7 +1,7 @@
 {
   "schema": "fdir/document-form-canonicalization",
   "version": "1.0.0",
-  "encoding": {"charset":"UTF-8","bom":false,"terminalLineFeed":true,"lineEnding":"LF","objectKeyOrder":"UTF-16 code-unit lexical order","stringNormalization":"none","duplicateObjectKeys":"reject"},
+  "encoding": {"charset":"UTF-8","bom":false,"terminalLineFeed":false,"lineEnding":"LF","objectKeyOrder":"UTF-16 code-unit lexical order","stringNormalization":"none","duplicateObjectKeys":"reject","transportLineEnding":"caller-defined; never part of canonical bytes"},
   "numberPolicy": {"jsonNumbers":"finite integers only","decimal":"canonical fixed-point string","negativeZero":"0","exponents":"reject in authoritative decimal strings and floating JSON values"},
   "projections": [
     {"name":"full","includes":["all IR fields"],"excludes":[]},

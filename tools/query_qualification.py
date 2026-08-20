@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import sys
+import tempfile
 import zipfile
 from typing import Any
 
@@ -35,6 +36,9 @@ try:
         index_parity,
         list_entities,
         list_nodes,
+        load_persistent_index,
+        persist_index,
+        query_index_facts,
         rebuild_index,
         validate_index,
     )
@@ -53,6 +57,9 @@ except ImportError:  # pragma: no cover
         index_parity,
         list_entities,
         list_nodes,
+        load_persistent_index,
+        persist_index,
+        query_index_facts,
         rebuild_index,
         validate_index,
     )
@@ -85,10 +92,17 @@ def _package_case(case: dict[str, Any], workspace: Path) -> Path:
     return destination
 
 
-def _direct_query_check(document: dict[str, Any], label: str) -> dict[str, Any]:
+def _direct_query_check(
+    document: dict[str, Any],
+    label: str,
+    *,
+    source_digest: str | None = None,
+    index_path: Path | None = None,
+) -> dict[str, Any]:
     """Exercise all typed collection and relationship queries on one document."""
 
-    index = rebuild_index(document)
+    profile_id = document["conversion"]["capabilityProfile"]
+    index = rebuild_index(document, source_digest=source_digest, profile_id=profile_id)
     parity = index_parity(document, index)
     direct_counts: dict[str, int] = {}
     operations = set(parity["operations"])
@@ -146,6 +160,33 @@ def _direct_query_check(document: dict[str, Any], label: str) -> dict[str, Any]:
         raise AssertionError(f"observation query mismatch: {label}")
     operations.update({"find-relations", "find-extensions", "find-observations"})
 
+    persistent = {"status": "not-run"}
+    if source_digest is not None:
+        if index_path is None:
+            raise AssertionError(f"source-bound query qualification requires an index path: {label}")
+        persist_index(document, index_path, source_digest=source_digest, profile_id=profile_id)
+        loaded = load_persistent_index(document, index_path, source_digest=source_digest, profile_id=profile_id)
+        indexed_facts = query_index_facts(document, loaded, source_digest=source_digest, profile_id=profile_id)
+        direct_facts = [
+            item
+            for collection in COLLECTION_KEYS
+            for item in sorted(document.get(collection, []), key=lambda value: value[COLLECTION_KEYS[collection]])
+        ]
+        if indexed_facts != sorted(direct_facts, key=lambda value: json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))):
+            raise AssertionError(f"persistent index fact mismatch: {label}")
+        if list(index_path.parent.glob(f".{index_path.name}.*.tmp")):
+            raise AssertionError(f"atomic index temporary file leaked: {label}")
+        persistent = {
+            "status": "passed",
+            "sourceDigest": source_digest,
+            "profileId": profile_id,
+            "path": str(index_path),
+            "factCount": len(indexed_facts),
+            "atomicReplacement": True,
+            "standaloneFactQuery": True,
+        }
+        operations.update({"persist-index", "load-persistent-index", "query-index-facts"})
+
     return {
         "fixture": label,
         "status": "passed",
@@ -155,6 +196,7 @@ def _direct_query_check(document: dict[str, Any], label: str) -> dict[str, Any]:
         "directCounts": direct_counts,
         "operations": sorted(operations),
         "queryParity": parity,
+        "persistentIndex": persistent,
     }
 
 
@@ -178,8 +220,14 @@ def _expect_rejection(label: str, callback: Any) -> dict[str, str]:
     raise AssertionError(f"surviving negative query/index case: {label}")
 
 
-def _negative_index_cases(document: dict[str, Any], label: str) -> list[dict[str, str]]:
-    index = rebuild_index(document)
+def _negative_index_cases(
+    document: dict[str, Any],
+    label: str,
+    *,
+    source_digest: str | None = None,
+) -> list[dict[str, str]]:
+    profile_id = document["conversion"]["capabilityProfile"]
+    index = rebuild_index(document, source_digest=source_digest, profile_id=profile_id)
     cases: list[dict[str, str]] = []
 
     stale_document = copy.deepcopy(document)
@@ -210,6 +258,21 @@ def _negative_index_cases(document: dict[str, Any], label: str) -> list[dict[str
     extra = copy.deepcopy(index)
     extra["unexpected"] = True
     cases.append(_expect_rejection(f"{label}:unexpected-index-field", lambda: validate_index(document, extra)))
+    if source_digest is not None:
+        cases.append(_expect_rejection(
+            f"{label}:stale-source-digest",
+            lambda: validate_index(document, index, source_digest="0" * 64, profile_id=profile_id),
+        ))
+        cases.append(_expect_rejection(
+            f"{label}:wrong-profile",
+            lambda: validate_index(document, index, source_digest=source_digest, profile_id=f"{profile_id}:stale"),
+        ))
+        wrong_version = copy.deepcopy(index)
+        wrong_version["version"] = "0.0.0"
+        cases.append(_expect_rejection(f"{label}:wrong-index-version", lambda: validate_index(document, wrong_version, source_digest=source_digest, profile_id=profile_id)))
+        unqueryable_value = copy.deepcopy(index)
+        unqueryable_value["facts"][0].pop("value", None)
+        cases.append(_expect_rejection(f"{label}:missing-fact-value", lambda: query_index_facts(document, unqueryable_value, source_digest=source_digest, profile_id=profile_id)))
     return cases
 
 
@@ -258,23 +321,31 @@ def main() -> int:
     corpus_cases = list(manifest.get("cases", [])) + list(manifest.get("negativeCases", []))
     for case in corpus_cases:
         document, evidence = _convert_corpus_case(case, workspace)
-        report = _direct_query_check(document, f"corpus:{case['id']}")
+        source_digest = evidence.get("input", {}).get("sha256")
+        index_path = workspace / f"{case['id']}.index.json" if isinstance(source_digest, str) else None
+        report = _direct_query_check(
+            document,
+            f"corpus:{case['id']}",
+            source_digest=source_digest if isinstance(source_digest, str) else None,
+            index_path=index_path,
+        )
         report.update({"id": case["id"], "format": case["format"], "caseClass": case.get("caseClass", "positive"), "conversionStatus": document["conversion"]["status"], "conversionOutcome": evidence.get("outcome")})
         cases.append(report)
-        negative_cases.extend(_negative_index_cases(document, str(case["id"])))
+        negative_cases.extend(_negative_index_cases(document, str(case["id"]), source_digest=source_digest if isinstance(source_digest, str) else None))
 
     all_reports = examples + cases
     operations = sorted({operation for report in all_reports for operation in report.get("operations", [])})
     parity_checks = [report["queryParity"] for report in all_reports]
     output = {
         "schema": "fdir/query-qualification-report",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "status": "passed",
         "sources": ["examples", "real-input-e2e", "independent-corpus"],
         "sourceExecution": {
             "real-input-e2e": "convert_document.convert_path on independent corpus inputs",
             "independent-corpus": "convert_document.convert_path on positive, malformed, and unsupported source cases",
             "handAuthoredIR": "supplemental examples only; not the acceptance authority",
+            "persistent-index": "source-bound atomic index round-trip over every real-input case",
         },
         "operations": operations,
         "parity": {
@@ -293,6 +364,7 @@ def main() -> int:
         "realInputCaseCount": len(cases),
         "independentCaseCount": len(cases),
         "actualConversionCases": len(cases),
+        "persistentIndexCases": sum(1 for report in cases if report.get("persistentIndex", {}).get("status") == "passed"),
     }
     json.dump(output, sys.stdout, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     sys.stdout.write("\n")
@@ -303,5 +375,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except Exception as exc:
-        print(json.dumps({"schema": "fdir/query-qualification-report", "version": "1.1.0", "status": "failed", "error": f"{type(exc).__name__}: {exc}", "unqueryableFacts": []}, ensure_ascii=False, sort_keys=True), file=sys.stdout)
+        print(json.dumps({"schema": "fdir/query-qualification-report", "version": "1.2.0", "status": "failed", "error": f"{type(exc).__name__}: {exc}", "unqueryableFacts": []}, ensure_ascii=False, sort_keys=True), file=sys.stdout)
         raise SystemExit(1)

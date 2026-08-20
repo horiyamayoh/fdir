@@ -1,0 +1,12 @@
+{
+  "schema": "fdir/document-form-canonical-vectors",
+  "version": "1.0.0",
+  "algorithm": "FDIR-C14N-1",
+  "canonicalBytes": {"charset":"UTF-8","bom":false,"terminalLineFeed":false},
+  "vectors": [
+    {"id":"utf16-code-unit-order","value":{"\ue000":"bmp","𐀀":"supplementary"},"canonicalUtf8Hex":"7b22f0908080223a22737570706c656d656e74617279222c22ee8080223a22626d70227d","sha256":"54e85161e2d6b6cf9d28fe69dc97632a62f8b83e650fe54959e2f504f3dd5d41"},
+    {"id":"exact-decimal-strings","value":{"zero":"0","amount":"1.25"},"canonicalUtf8Hex":"7b22616d6f756e74223a22312e3235222c227a65726f223a2230227d","sha256":"6a9be92f7601efa429b579c9e58a1569cf63bc5c11312bd50ffebdffb89c1eb7"},
+    {"id":"entity-collection-id-order","value":{"nodes":[{"nodeId":"node-b","status":"preserved"},{"nodeId":"node-a","status":"preserved"}]},"canonicalUtf8Hex":"7b226e6f646573223a5b7b226e6f64654964223a226e6f64652d61222c22737461747573223a22707265736572766564227d2c7b226e6f64654964223a226e6f64652d62222c22737461747573223a22707265736572766564227d5d7d","sha256":"f6c221e863d977b94c368284341f374329bcfc06cad70595e4aa2f60af913aa4"}
+  ],
+  "independentImplementation": {"language":"JavaScript", "qualification":"same vectors must be reproduced with UTF-16 key comparison, UTF-8 encoding, and no terminal LF"}
+}

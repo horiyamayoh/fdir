@@ -10,13 +10,16 @@ import shutil
 import subprocess
 import sys
 import zipfile
+import xml.etree.ElementTree as ET
 from typing import Any
 
 try:
     from ir_validation import validate_document
+    from independent_oracle import OracleFailure, compare_source_to_document, source_oracle
     from qualification_evidence import case_evidence, source_digest, validate_source_feature_closure
 except ImportError:  # pragma: no cover
     from tools.ir_validation import validate_document
+    from tools.independent_oracle import OracleFailure, compare_source_to_document, source_oracle
     from tools.qualification_evidence import case_evidence, source_digest, validate_source_feature_closure
 
 
@@ -106,6 +109,14 @@ def _convert(case: dict[str, Any], input_path: Path, workspace: Path) -> dict[st
     report_evidence["sourceClosure"] = closure
     if closure.get("status") != "passed":
         raise CorpusFailure(f"{case['id']} source occurrence closure failed: {json.dumps(closure.get('mismatches', []), ensure_ascii=False)}")
+    oracle_report: dict[str, Any] | None = None
+    if case.get("caseClass") != "malformed":
+        try:
+            oracle = source_oracle(input_path, str(case["format"]))
+            oracle_report = compare_source_to_document(oracle, document, tuple(case.get("expected", [])))
+        except (OracleFailure, OSError, ValueError, zipfile.BadZipFile, ET.ParseError) as exc:
+            raise CorpusFailure(f"{case['id']} independent source oracle failed: {exc}") from exc
+        report_evidence["independentOracle"] = oracle_report
     return {
         "id": case["id"],
         "format": case["format"],
@@ -159,12 +170,19 @@ def run() -> dict[str, Any]:
     negative = _check_resource_limit(first_case, packaged[first_case["id"]], workspace)
     return {
         "schema": "fdir/independent-fidelity-corpus-report",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "status": "passed",
         "independent": True,
+        "producers": [
+            {"id": "adapter", "entrypoint": "tools/convert_document.py", "authority": "candidate"},
+            {"id": "independent-source-oracle", "entrypoint": "tools/independent_oracle.py", "authority": "expected-source-facts"},
+        ],
+        "oraclePolicy": "source parser is independent from adapters, IR builder, canonicalizer, and query index; it checks literals and structure and does not claim standards completeness",
         "cases": cases,
         "negativeChecks": [negative],
         "caseClasses": sorted({case.get("caseClass", "positive") for case in cases} | {"resource-limit"}),
+        "oracleCases": sum(1 for case in cases if case.get("independentOracle", {}).get("status") == "passed"),
+        "differential": {"status": "passed", "comparedCases": sum(1 for case in cases if case.get("independentOracle", {}).get("status") == "passed"), "mismatches": []},
         "residuals": [residual for case in cases + [negative] for residual in case.get("residuals", []) if isinstance(residual, dict)],
     }
 

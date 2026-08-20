@@ -23,6 +23,11 @@ try:
 except ImportError:  # pragma: no cover
     from tools.qualification_evidence import validate_source_feature_closure
 
+try:
+    from evidence_bundle import EvidenceError, verify_bundle
+except ImportError:  # pragma: no cover
+    from tools.evidence_bundle import EvidenceError, verify_bundle
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -41,6 +46,10 @@ INDEPENDENT_CORPUS_MANIFEST_PATH = ROOT / "e2e" / "corpus" / "manifest.json"
 STRICT_COMPLETION_CONTRACT_PATH = ROOT / "machine" / "strict-completion-contract.json"
 TRACEABILITY_PATH = ROOT / "machine" / "traceability.json"
 SCHEMA_PATH = ROOT / "schemas" / "document-form-ir.schema.json"
+QUALIFICATION_EVIDENCE_SCHEMA_PATH = ROOT / "schemas" / "qualification-evidence.schema.json"
+AUDIT_RECOVERY_PLAN_PATH = ROOT / "machine" / "audit-recovery-plan.json"
+RELEASE_REQUIREMENTS_PATH = ROOT / "machine" / "release-requirements.json"
+FALSE_COMPLETION_REGRESSIONS_PATH = ROOT / "machine" / "false-completion-regressions.json"
 EXAMPLES_PATH = ROOT / "examples"
 
 EXPECTED_REQUIREMENTS = 134
@@ -413,6 +422,114 @@ def check_release_claims() -> dict[str, int]:
     return {"child_claims": len(claims), "capability_claims": len(capability_claims), "independent_positive_cases": len(corpus["cases"]), "independent_negative_cases": len(corpus.get("negativeCases", [])), "strict_issue_bindings": len(strict_issue_evidence)}
 
 
+def _check_dependency_dag(entries: list[dict[str, Any]]) -> None:
+    numbers = {item.get("issueNumber") for item in entries}
+    require(len(numbers) == len(entries), "audit recovery child issue numbers are duplicated")
+    for item in entries:
+        require(item.get("parent") == 87, f"audit recovery child has the wrong parent: {item.get('issueNumber')}")
+        for dependency in item.get("dependsOn", []):
+            require(dependency in numbers, f"audit recovery dependency is not a child: {item.get('issueNumber')} -> {dependency}")
+    visiting: set[int] = set()
+    visited: set[int] = set()
+    graph = {item["issueNumber"]: set(item.get("dependsOn", [])) for item in entries}
+
+    def visit(number: int) -> None:
+        if number in visiting:
+            raise GateError(f"audit recovery dependency cycle includes #{number}")
+        if number in visited:
+            return
+        visiting.add(number)
+        for dependency in graph[number]:
+            visit(dependency)
+        visiting.remove(number)
+        visited.add(number)
+
+    for number in sorted(graph):
+        visit(number)
+
+
+def check_evidence_release_track(bundle_path: Path | None, commands: list[dict[str, Any]]) -> dict[str, Any]:
+    """Validate the evidence control plane and fail closed for a missing final bundle."""
+
+    evidence_schema = load_json(QUALIFICATION_EVIDENCE_SCHEMA_PATH)
+    require(evidence_schema.get("$id", "").endswith("/qualification-evidence/1.0.0"), "qualification evidence schema version is not pinned")
+    require(evidence_schema.get("$defs", {}).get("sha256", {}).get("pattern") == "^[0-9a-f]{64}$", "qualification evidence schema does not require full SHA-256")
+
+    plan = load_json(AUDIT_RECOVERY_PLAN_PATH)
+    require(plan.get("schema") == "fdir/audit-recovery-plan" and plan.get("releaseBlocked") is True, "audit recovery plan must keep the release barrier active")
+    children = plan.get("children")
+    require(isinstance(children, list), "audit recovery child list is missing")
+    _check_dependency_dag(children)
+    require({item.get("issueNumber") for item in children} == set(range(88, 106)), "audit recovery child set must cover #88-#105")
+    require(plan.get("liveState", {}).get("source") == "github-issue-api" and plan.get("liveState", {}).get("requiredAtGate") is True, "audit recovery does not require live GitHub state")
+
+    requirements = load_json(RELEASE_REQUIREMENTS_PATH)
+    barrier = requirements.get("releaseBarrier", {})
+    require(requirements.get("claimMode") == "experimental-bounded-subset" and requirements.get("releaseEligible") is False, "release requirements overclaim an eligible release")
+    require(set(barrier.get("requiredIssues", [])) == set(range(87, 106)), "release barrier issue set is incomplete")
+    require(barrier.get("requiredBinding") == "exact-commit" and barrier.get("requiredCleanRoomRuns") == 2, "release barrier binding policy is weak")
+    reqs = requirements.get("requirements")
+    require(isinstance(reqs, list) and {item.get("ownerIssue") for item in reqs} == {88, 89, 105}, "scoped release requirements are not owned by #88/#89/#105")
+    require(all(isinstance(item.get("positiveCommand"), str) and isinstance(item.get("negativeCommand"), str) for item in reqs), "release requirements lack executable positive/negative commands")
+
+    claim_manifest = load_json(RELEASE_CLAIM_MANIFEST_PATH)
+    claim_release = claim_manifest.get("release", {})
+    require(claim_release.get("claimMode") == "experimental-bounded-subset" and claim_release.get("releaseEligible") is False, "release claim manifest is broader than the bounded release policy")
+    require(claim_manifest.get("evidenceTrack", {}).get("bundleSchema") == "fdir/qualification-evidence-bundle", "release claims are not bound to the evidence bundle schema")
+
+    regressions = load_json(FALSE_COMPLETION_REGRESSIONS_PATH)
+    regression_cases = regressions.get("cases")
+    require(isinstance(regression_cases, list) and len(regression_cases) >= 10, "false-completion regression matrix is incomplete")
+    regression_ids = {item.get("id") for item in regression_cases if isinstance(item, dict)}
+    require(len(regression_ids) == len(regression_cases) and all(item.get("test") for item in regression_cases), "false-completion regression entries are not executable")
+
+    self_test = next((item for item in commands if item.get("name") == "evidence_bundle_self_test"), None)
+    require(isinstance(self_test, dict) and self_test.get("return_code") == 0, "evidence bundle negative self-test did not pass")
+    try:
+        self_report = json.loads(self_test.get("stdout", ""))
+    except json.JSONDecodeError as exc:
+        raise GateError(f"evidence bundle self-test is not JSON: {exc}") from exc
+    require(self_report.get("status") == "passed" and int(self_report.get("negativeCount", 0)) >= 5, "evidence bundle self-test has insufficient negative assertions")
+
+    campaign = next((item for item in commands if item.get("name") == "defect_injection_bounded"), None)
+    require(isinstance(campaign, dict) and campaign.get("return_code") == 0, "bounded defect-injection campaign did not pass")
+    try:
+        campaign_report = json.loads(campaign.get("stdout", ""))
+    except json.JSONDecodeError as exc:
+        raise GateError(f"defect-injection report is not JSON: {exc}") from exc
+    require(campaign_report.get("campaignStatus") == "passed" and campaign_report.get("survivors") == [], "defect-injection campaign has an undetected survivor")
+    require(campaign_report.get("counts", {}).get("infrastructure-error", 0) == 0 and campaign_report.get("counts", {}).get("timeout", 0) == 0, "defect-injection infrastructure failures were hidden")
+    require(campaign_report.get("coverage", {}).get("coverageStatus") == "passed", "defect campaign has incomplete declared coverage")
+
+    if bundle_path is None:
+        raise GateError("EVIDENCE_BUNDLE_REQUIRED: final release gate requires --evidence-bundle from the same clean candidate SHA")
+    try:
+        verified = verify_bundle(bundle_path, require_clean=True)
+    except EvidenceError as exc:
+        raise GateError(f"evidence bundle verification failed: {exc}") from exc
+    bundle = load_json(bundle_path)
+    require(bundle.get("status") == "passed" and bundle.get("barrier", {}).get("releaseEligible") is True, "evidence bundle is not an eligible release candidate")
+    require(not bundle.get("barrier", {}).get("blockers"), "evidence bundle contains release blockers")
+    issue_state = bundle.get("issueState", {})
+    require(issue_state.get("status") == "passed" and issue_state.get("source") == "github-issue-api" and set(issue_state.get("issueNumbers", [])) == set(range(87, 106)), "live GitHub issue state is missing or incomplete")
+    clean_room = check_clean_room_claim(bundle)
+    return {"child_issues": len(children), "regression_cases": len(regression_cases), "self_test_negatives": self_report.get("negativeCount"), "defect_cases": campaign_report.get("total"), "bundle_digest": verified["bundleDigest"], "index_digest": verified["indexDigest"], "clean_room_runs": clean_room.get("runs")}
+
+
+def check_clean_room_claim(bundle: dict[str, Any]) -> dict[str, Any]:
+    """Require two identical, successful clean-room replay results."""
+
+    clean_room = bundle.get("cleanRoom", {}) if isinstance(bundle, dict) else {}
+    require(
+        isinstance(clean_room, dict)
+        and clean_room.get("status") == "passed"
+        and clean_room.get("runs", 0) >= 2
+        and clean_room.get("diffCount") == 0,
+        "clean-room replay evidence is missing or differs",
+    )
+    return clean_room
+
+
 def check_schema() -> dict[str, int]:
     schema = load_json(SCHEMA_PATH)
     require(isinstance(schema, dict), "IR schema root must be an object")
@@ -620,6 +737,9 @@ def check_runtime_evidence(commands: list[dict[str, Any]]) -> dict[str, int]:
     query = report("query_qualification")
     e2e = report("real_input_e2e")
     strict = report("strict_completion")
+    format_report = report("format_qualification")
+    metamorphic = report("metamorphic_qualification")
+    release_contract = report("release_contract_qualification")
     require(mutation.get("status") == "passed" and mutation.get("survivors") == [] and mutation.get("killed") == mutation.get("total"), "mutation report is not fully green")
     require(corpus.get("status") == "passed" and len(corpus.get("cases", [])) >= 4, "independent corpus report is incomplete")
     check_source_closure_report(corpus, "independent corpus")
@@ -627,6 +747,9 @@ def check_runtime_evidence(commands: list[dict[str, Any]]) -> dict[str, int]:
     require(e2e.get("status") == "passed" and set(e2e.get("formats", [])) == {"docx", "xlsx", "pdf", "markdown"}, "real-input E2E report is not fully green")
     check_source_closure_report(e2e, "real-input E2E")
     require(strict.get("status") == "passed" and strict.get("blockers") == [], "strict completion report is not fully green")
+    require(format_report.get("status") == "passed" and format_report.get("claimMode") == "bounded-qualified-profile" and {item.get("format") for item in format_report.get("profiles", []) if isinstance(item, dict)} == {"docx", "xlsx", "pdf", "markdown"}, "format qualification report is incomplete")
+    require(metamorphic.get("status") == "passed" and metamorphic.get("survivors") == [] and metamorphic.get("differential", {}).get("status") == "passed", "metamorphic qualification report is incomplete")
+    require(release_contract.get("status") == "passed" and release_contract.get("survivors") == [] and release_contract.get("negativeCount", 0) >= 4, "release contract negative qualification is incomplete")
     return {
         "mutation_cases": int(mutation.get("total", 0)),
         "independent_cases": len(corpus.get("cases", [])),
@@ -634,6 +757,9 @@ def check_runtime_evidence(commands: list[dict[str, Any]]) -> dict[str, int]:
         "query_sources": len(query.get("sources", [])),
         "e2e_cases": len(e2e.get("cases", [])),
         "strict_issues": len(strict.get("issues", [])),
+        "format_profiles": len(format_report.get("profiles", [])),
+        "metamorphic_cases": len(metamorphic.get("cases", [])),
+        "release_contract_negatives": int(release_contract.get("negativeCount", 0)),
     }
 
 
@@ -644,6 +770,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=Path,
         metavar="PATH",
         help="also write the deterministic JSON summary to PATH (relative to the repository root)",
+    )
+    parser.add_argument(
+        "--evidence-bundle",
+        type=Path,
+        metavar="PATH",
+        help="verify a commit-bound qualification evidence bundle before allowing release",
     )
     return parser.parse_args(argv)
 
@@ -660,7 +792,12 @@ def main(argv: list[str] | None = None) -> int:
         ("mutation_qualification", "python tools/mutation_qualification.py --json", ["tools/mutation_qualification.py", "--json"]),
         ("query_qualification", "python tools/query_qualification.py", ["tools/query_qualification.py"]),
         ("independent_corpus", "python tools/independent_corpus.py --json", ["tools/independent_corpus.py", "--json"]),
+        ("format_qualification", "python tools/format_qualification.py", ["tools/format_qualification.py"]),
+        ("metamorphic_qualification", "python tools/metamorphic_qualification.py", ["tools/metamorphic_qualification.py"]),
         ("strict_completion", "python tools/strict_completion_gate.py", ["tools/strict_completion_gate.py"]),
+        ("evidence_bundle_self_test", "python tools/evidence_bundle.py self-test", ["tools/evidence_bundle.py", "self-test"]),
+        ("release_contract_qualification", "python tools/release_contract_qualification.py", ["tools/release_contract_qualification.py"]),
+        ("defect_injection_bounded", "python tools/run_defect_injection_campaign.py --json", ["tools/run_defect_injection_campaign.py", "--json"]),
     ):
         command_result = run_command(name, display, command)
         commands.append(command_result)
@@ -705,6 +842,20 @@ def main(argv: list[str] | None = None) -> int:
         else:
             checks.append({"name": name, "status": "passed", "details": details})
 
+    try:
+        evidence_details = check_evidence_release_track(
+            args.evidence_bundle if args.evidence_bundle is None or args.evidence_bundle.is_absolute() else ROOT / args.evidence_bundle,
+            commands,
+        )
+    except GateError as exc:
+        checks.append({"name": "evidence_release_track", "status": "failed", "error": str(exc)})
+        evidence_details = {}
+    except Exception as exc:  # pragma: no cover - defensive fail-closed path
+        checks.append({"name": "evidence_release_track", "status": "failed", "error": f"unexpected {type(exc).__name__}: {exc}"})
+        evidence_details = {}
+    else:
+        checks.append({"name": "evidence_release_track", "status": "passed", "details": evidence_details})
+
     passed = all(check["status"] == "passed" for check in checks)
     summary: dict[str, Any] = {
         "schema": "fdir/release-gate-summary",
@@ -729,6 +880,7 @@ def main(argv: list[str] | None = None) -> int:
             "phase2_issue_first": 69,
             "phase2_issue_last": 86,
             "phase2_duplicate_issue": 85,
+            "evidence_track_issues": len(list(range(87, 106))),
             **runtime_details,
         },
         "checks": checks,

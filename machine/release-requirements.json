@@ -1,0 +1,56 @@
+{
+  "schema": "fdir/release-requirements",
+  "version": "1.0.0",
+  "repository": "horiyamayoh/fdir",
+  "scope": "evidence-release-track",
+  "claimMode": "experimental-bounded-subset",
+  "releaseEligible": false,
+  "releaseBarrier": {
+    "policy": "fail-closed",
+    "requiredIssues": [87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105],
+    "requiredEvidenceSchema": "fdir/qualification-evidence-bundle",
+    "requiredBinding": "exact-commit",
+    "requiredCleanRoomRuns": 2,
+    "requiredDefectSurvivors": 0,
+    "requiredClaimDrift": 0,
+    "requiredUnaccountedOccurrences": 0
+  },
+  "requirements": [
+    {
+      "id": "EVID-088-001",
+      "ownerIssue": 88,
+      "statement": "Every qualification report resolves to an exact source commit, executed command, input digest, output digest, and indexed artifact.",
+      "component": "tools/evidence_bundle.py",
+      "positiveCommand": "python tools/evidence_bundle.py self-test --json",
+      "negativeCommand": "python tools/evidence_bundle.py self-test --json",
+      "requiredEvidenceIds": ["bundle.source","bundle.command-digests","bundle.artifact-digests","bundle.index-integrity"],
+      "status": "implemented-bounded"
+    },
+    {
+      "id": "EVID-089-001",
+      "ownerIssue": 89,
+      "statement": "A defect patch is applied in a disposable checkout and the real public verification command classifies its observable result.",
+      "component": "tools/run_defect_injection_campaign.py",
+      "positiveCommand": "python tools/run_defect_injection_campaign.py --json",
+      "negativeCommand": "python tools/run_defect_injection_campaign.py --self-test --json",
+      "requiredEvidenceIds": ["defect.campaign","defect.negative-self-test","defect.no-undetected-must"],
+      "status": "implemented-bounded"
+    },
+    {
+      "id": "EVID-105-001",
+      "ownerIssue": 105,
+      "statement": "The release barrier rejects dirty sources, stale evidence, missing artifacts, claim drift, defect survivors, and incomplete clean-room evidence.",
+      "component": "tools/release_gate.py",
+      "positiveCommand": "python tools/release_gate.py --evidence-bundle PATH",
+      "negativeCommand": "python tools/evidence_bundle.py self-test --json",
+      "requiredEvidenceIds": ["barrier.dirty-source","barrier.stale-evidence","barrier.claim-drift","barrier.clean-room","format-qualified-profiles","metamorphic-hostile"],
+      "status": "implemented-bounded"
+    }
+  ],
+  "knownUnqualifiedScope": [
+    "live GitHub issue state has not been embedded into a final candidate bundle",
+    "the current working tree is not an exact release candidate until committed",
+    "format-specific qualification owned by #90-#104 is not claimed by this track",
+    "CI artifact URLs and retention are created only by the workflow run"
+  ]
+}

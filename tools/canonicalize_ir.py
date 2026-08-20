@@ -206,7 +206,13 @@ def migrate_document(document: dict[str, Any], target_version: str) -> tuple[dic
     _validate_authority(document)
     if target_version != document.get("schema", {}).get("version"):
         raise CanonicalizationError(f"no registered migration to {target_version}")
-    return copy.deepcopy(document), []
+    return copy.deepcopy(document), [{
+        "ruleId": "FDIR-MIGRATE-1.0.0-NOOP",
+        "sourceVersion": str(document.get("schema", {}).get("version")),
+        "targetVersion": target_version,
+        "status": "preserved",
+        "loss": "none",
+    }]
 
 
 def load_document(path: Path) -> dict[str, Any]:

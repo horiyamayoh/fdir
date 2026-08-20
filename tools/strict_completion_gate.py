@@ -22,6 +22,7 @@ except ImportError:  # pragma: no cover
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = ROOT / "machine" / "strict-completion-contract.json"
+COMMAND_TIMEOUT_SECONDS = 900
 
 
 def _run(command: list[str]) -> tuple[int, str, str]:
@@ -35,7 +36,7 @@ def _run(command: list[str]) -> tuple[int, str, str]:
         errors="replace",
         env=child_environment,
         capture_output=True,
-        timeout=120,
+        timeout=COMMAND_TIMEOUT_SECONDS,
         check=False,
     )
     return completed.returncode, completed.stdout, completed.stderr
@@ -148,6 +149,40 @@ def run() -> dict[str, Any]:
                 _require(isinstance(case.get("dispositions"), list) and isinstance(case.get("residuals"), list), "E2E_DISPOSITIONS", f"{case.get('format', '<unknown>')} disposition evidence is malformed", blockers)
         _check_source_closure(real_input, "real-input-e2e", blockers)
 
+    evidence_test = _json_report(["tools/evidence_bundle.py", "self-test"], blockers)
+    evidence_spec = contract.get("evidenceTrack", {})
+    if evidence_test is not None:
+        _require(evidence_test.get("schema") == "fdir/evidence-bundle-self-test-report", "EVIDENCE_SELF_TEST_SCHEMA", "evidence bundle self-test schema is invalid", blockers)
+        _require(evidence_test.get("status") == "passed", "EVIDENCE_SELF_TEST", "evidence bundle tamper self-test did not pass", blockers)
+        _require(isinstance(evidence_test.get("negativeCount"), int) and evidence_test.get("negativeCount", 0) >= evidence_spec.get("requiredNegativeSelfTests", 5), "EVIDENCE_NEGATIVE_MATRIX", "evidence bundle has too few executable negative assertions", blockers)
+    campaign = _json_report(["tools/run_defect_injection_campaign.py", "--json"], blockers)
+    if campaign is not None:
+        _require(campaign.get("schema") == "fdir/defect-injection-campaign-report", "DEFECT_CAMPAIGN_SCHEMA", "defect campaign schema is invalid", blockers)
+        _require(campaign.get("campaignStatus") == "passed", "DEFECT_CAMPAIGN_STATUS", "defect campaign did not complete successfully", blockers)
+        _require(campaign.get("survivors") == [] and campaign.get("counts", {}).get("undetected", 0) == evidence_spec.get("requiredUndetected", 0), "DEFECT_CAMPAIGN_SURVIVOR", "defect campaign contains undetected mutations", blockers)
+        _require(campaign.get("coverage", {}).get("coverageStatus") == "passed", "DEFECT_CAMPAIGN_COVERAGE", "defect campaign must pass every declared mutation and invariant coverage requirement", blockers)
+        _require(campaign.get("releaseEligible") is False, "DEFECT_CAMPAIGN_RELEASE_CLAIM", "bounded defect campaign cannot claim release eligibility", blockers)
+
+    format_report = _json_report(["tools/format_qualification.py"], blockers)
+    if format_report is not None:
+        _require(format_report.get("schema") == "fdir/format-qualification-report", "FORMAT_QUALIFICATION_SCHEMA", "format qualification report schema is invalid", blockers)
+        _require(format_report.get("status") == "passed" and format_report.get("claimMode") == "bounded-qualified-profile", "FORMAT_QUALIFICATION_STATUS", "format qualification did not pass as a bounded profile", blockers)
+        _require({item.get("format") for item in format_report.get("profiles", []) if isinstance(item, dict)} == {"docx", "xlsx", "pdf", "markdown"}, "FORMAT_QUALIFICATION_MATRIX", "format qualification matrix is incomplete", blockers)
+
+    metamorphic = _json_report(["tools/metamorphic_qualification.py"], blockers)
+    if metamorphic is not None:
+        _require(metamorphic.get("schema") == "fdir/metamorphic-qualification-report", "METAMORPHIC_SCHEMA", "metamorphic qualification report schema is invalid", blockers)
+        _require(metamorphic.get("status") == "passed" and metamorphic.get("survivors") == [] and metamorphic.get("differential", {}).get("status") == "passed", "METAMORPHIC_STATUS", "metamorphic or hostile qualification did not pass", blockers)
+
+    if evidence_spec.get("releaseBarrierMustRemainExplicit"):
+        requirements_path = CONTRACT_PATH.parents[0] / "release-requirements.json"
+        try:
+            requirements = json.loads(requirements_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            _require(False, "RELEASE_REQUIREMENTS_UNREADABLE", str(exc), blockers)
+        else:
+            _require(requirements.get("releaseEligible") is False and requirements.get("claimMode") == "experimental-bounded-subset", "RELEASE_BARRIER_HIDDEN", "release requirements do not expose the active bounded-subset barrier", blockers)
+
     issue_evidence = contract.get("issueEvidence", {})
     _require(set(issue_evidence) == {str(number) for number in contract["scope"]["phase2Issues"]}, "ISSUE_EVIDENCE_MATRIX", "strict contract must define evidence for every phase-2 issue", blockers)
     for issue_number, evidence_ids in issue_evidence.items():
@@ -161,6 +196,7 @@ def run() -> dict[str, Any]:
         "issues": contract["scope"]["phase2Issues"],
         "blockers": blockers,
         "reportsChecked": ["mutation", "independentCorpus", "query", "realInput"],
+        "evidenceTrack": {"selfTest": evidence_test.get("status") if isinstance(evidence_test, dict) else "blocked", "campaign": campaign.get("campaignStatus") if isinstance(campaign, dict) else "blocked", "formatQualification": format_report.get("status") if isinstance(format_report, dict) else "blocked", "metamorphic": metamorphic.get("status") if isinstance(metamorphic, dict) else "blocked", "releaseBarrier": True},
     }
 
 

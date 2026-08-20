@@ -13,9 +13,11 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 import hashlib
 import json
+import posixpath
 import re
 from pathlib import Path
 from typing import Any, Iterable
+import zipfile
 
 
 SCHEMA = {"name": "fdir/document-form", "version": "1.0.0"}
@@ -50,6 +52,30 @@ class AdapterLimits:
     max_text_chars: int = 2_000_000
     max_xml_parts: int = 500
     max_pdf_objects: int = 100_000
+
+
+def validate_zip_members(archive: zipfile.ZipFile, limits: AdapterLimits | None = None) -> list[str]:
+    """Reject unsafe OOXML member names before any part is opened."""
+
+    limits = limits or AdapterLimits()
+    infos = archive.infolist()
+    names: list[str] = []
+    seen: set[str] = set()
+    total_uncompressed = 0
+    for info in infos:
+        name = info.filename.replace("\\", "/")
+        normalized = posixpath.normpath(name)
+        if not name or "\x00" in name or name.startswith("/") or normalized == ".." or normalized.startswith("../"):
+            raise AdapterError(f"unsafe ZIP member path: {info.filename!r}")
+        if normalized in seen:
+            raise AdapterError(f"duplicate ZIP member path: {normalized}")
+        seen.add(normalized)
+        names.append(normalized)
+        total_uncompressed += max(0, int(info.file_size))
+    uncompressed_limit = max(limits.max_input_bytes * 64, limits.max_text_chars * 16)
+    if total_uncompressed > uncompressed_limit:
+        raise AdapterError(f"ZIP uncompressed size limit exceeded: {total_uncompressed} > {uncompressed_limit}")
+    return names
 
 
 def safe_id(prefix: str, value: str, *, limit: int = 96) -> str:

@@ -93,6 +93,24 @@ def _table_containment_mutation(document: dict[str, Any]) -> None:
     document["nodes"][-3]["parentId"] = "node-callout"
 
 
+def _invalid_known_extension_payload(document: dict[str, Any]) -> None:
+    """Make a registered extension payload violate its closed schema."""
+
+    extension = next((item for item in document.get("extensions", []) if item.get("type") == "drawingml-callout"), None)
+    if extension is None:
+        raise QualificationError("fixture has no registered extension payload")
+    extension.setdefault("payload", {})["unexpectedMutationField"] = True
+
+
+def _feature_inventory_mutation(document: dict[str, Any]) -> None:
+    """Change an inventory occurrence while keeping its JSON shape valid."""
+
+    inventory = document.get("conversion", {}).get("featureInventory", [])
+    if not inventory:
+        raise QualificationError("fixture has no feature inventory")
+    inventory[0]["occurrences"] = int(inventory[0].get("occurrences", 0)) + 1
+
+
 def _mutations() -> list[tuple[str, str, str, Callable[[dict[str, Any]], None]]]:
     return [
         ("required-root-field", "schema", "callout.json", lambda d: d.pop("rootNodeId")),
@@ -111,6 +129,8 @@ def _mutations() -> list[tuple[str, str, str, Callable[[dict[str, Any]], None]]]
         ("color-variant-forbidden", "schema", "style-resolution.json", lambda d: next(style for style in d["styles"] if style["styleId"] == "style-direct")["direct"]["foreground"].update({"slot": "bodyText"})),
         ("geometry-variant-forbidden", "schema", "callout.json", lambda d: next(primitive for geometry in d["geometries"] for primitive in geometry.get("primitives", []) if primitive.get("kind") == "rectangle").update({"rotation": {"value": "0", "unit": "deg"}})),
         ("path-segment-variant-forbidden", "schema", "pdf-observation.json", lambda d: next(segment for geometry in d["geometries"] for primitive in geometry.get("primitives", []) for segment in primitive.get("segments", []) if segment.get("kind") == "line").update({"points": []})),
+        ("extension-payload-schema", "extension", "callout.json", _invalid_known_extension_payload),
+        ("feature-inventory-accounting", "status", "callout.json", _feature_inventory_mutation),
         ("table-containment", "graph", "callout.json", _table_containment_mutation),
     ]
 
@@ -127,17 +147,29 @@ def _custom_mutations(base: dict[str, Any]) -> list[dict[str, Any]]:
     index_mutant["entities"].pop()
 
     from strict_completion_gate import CONTRACT_PATH  # type: ignore
+    from canonicalize_ir import migrate_document  # type: ignore
 
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
     claim_mutant = copy.deepcopy(contract)
     claim_mutant["issueEvidence"].pop("70", None)
     expected_issues = {str(number) for number in contract["scope"]["phase2Issues"]}
 
+    migrated, receipt = migrate_document(base, base["schema"]["version"])
+    migration_ok = (
+        migrated == base
+        and isinstance(receipt, list)
+        and len(receipt) == 1
+        and receipt[0].get("ruleId") == "FDIR-MIGRATE-1.0.0-NOOP"
+        and receipt[0].get("status") == "preserved"
+        and receipt[0].get("loss") == "none"
+    )
+
     return [
         {"mutation": "canonical-collection-order", "class": "canonical", "status": "killed" if canonical_digest(shuffled) == canonical_digest(base) else "survived", "oracle": "entity collection order is identity-invariant"},
         {"mutation": "canonical-source-fact-change", "class": "canonical", "status": "killed" if canonical_digest(source_changed) != canonical_digest(base) else "survived", "oracle": "source-declared fact changes identity"},
         {"mutation": "query-index-entity-drop", "class": "query-index", "status": "killed" if index_mutant["entities"] != index["entities"] else "survived", "oracle": "index parity detects a dropped entity"},
         {"mutation": "release-claim-missing-issue-evidence", "class": "release-claim", "status": "killed" if set(claim_mutant.get("issueEvidence", {})) != expected_issues else "survived", "oracle": "claim manifest must bind every scoped issue"},
+        {"mutation": "canonical-migration-receipt", "class": "canonical", "status": "killed" if migration_ok else "survived", "oracle": "a supported migration returns a preserved no-loss receipt"},
     ]
 
 

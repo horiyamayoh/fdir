@@ -1,0 +1,52 @@
+{
+  "schema": "fdir/format-qualified-profiles",
+  "version": "1.0.0",
+  "claimMode": "bounded-qualified-profile",
+  "rule": "A profile proves only the listed source facts and diagnostic behavior. It does not claim complete support for the external format standard.",
+  "profiles": [
+    {
+      "issueNumber": 99,
+      "id": "format:docx:ecma376-bounded:1",
+      "format": "docx",
+      "sourceFixture": "sample.docx",
+      "unsupportedFixture": "unsupported.docx",
+      "expectedTokens": ["FDIR DOCX E2E", "bold", "Footnote text", "Shape text"],
+      "requiredNodeKinds": ["paragraph", "run", "table", "row", "cell", "column", "field", "textBox"],
+      "requiredLanes": ["package-parts", "relationship-endpoints", "authored-text", "styles", "fields", "revisions", "annotations", "geometry-order"],
+      "residualPolicy": "unparsed or unsupported parts remain package facts, diagnostics, and partial status"
+    },
+    {
+      "issueNumber": 100,
+      "id": "format:xlsx:ooxml-bounded:1",
+      "format": "xlsx",
+      "sourceFixture": "sample.xlsx",
+      "unsupportedFixture": "unsupported.xlsx",
+      "expectedTokens": ["Alpha", "SUM(B2:B3)", "45292", "DataTable"],
+      "requiredNodeKinds": ["section", "table", "row", "column", "cell"],
+      "requiredLanes": ["package-parts", "relationship-endpoints", "stored-value", "formula", "cached-value", "computed-value", "displayed-value", "date-system", "styles", "grid"],
+      "residualPolicy": "calculation-engine absence, unsupported workbook parts, and unknown extensions remain unavailable or partial"
+    },
+    {
+      "issueNumber": 101,
+      "id": "format:pdf:17-bounded:1",
+      "format": "pdf",
+      "sourceFixture": "sample.pdf",
+      "unsupportedFixture": "unsupported.pdf",
+      "expectedTokens": ["FDIR PDF E2E"],
+      "requiredNodeKinds": ["section", "glyph", "path"],
+      "requiredLanes": ["indirect-objects", "page-tree", "content-operators", "graphics-state", "glyph-codes", "geometry", "font-status", "observations"],
+      "residualPolicy": "uninterpreted operators, unavailable font maps, renderer, and OCR remain diagnostic or observation facts"
+    },
+    {
+      "issueNumber": 102,
+      "id": "format:markdown:commonmark-bounded:1",
+      "format": "markdown",
+      "sourceFixture": "sample.md",
+      "unsupportedFixture": "unsupported.md",
+      "expectedTokens": ["FDIR Markdown E2E", "bold", "authoring-facts", "raw HTML"],
+      "requiredNodeKinds": ["heading", "paragraph", "list", "table", "row", "column", "cell", "run"],
+      "requiredLanes": ["block-state", "inline-source", "authoring-delimiters", "links", "images", "tables", "source-spans", "raw-html"],
+      "residualPolicy": "GFM task lists, directives, and constructs outside the declared bounded dialect remain unsupported with source spans and diagnostics"
+    }
+  ]
+}

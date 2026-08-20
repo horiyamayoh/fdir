@@ -42,7 +42,28 @@
       "schema": "fdir/e2e-report",
       "requiredFieldsPerCase": ["sourceFeatureIds", "sourceFeatureInventory", "featureInventory", "dispositions", "residuals", "queryParity", "sourceClosure", "documentPath"],
       "requiredFormats": ["docx", "xlsx", "pdf", "markdown"]
+    },
+    "formatQualification": {
+      "command": "python tools/format_qualification.py",
+      "schema": "fdir/format-qualification-report",
+      "requiredFormats": ["docx", "xlsx", "pdf", "markdown"],
+      "claimMode": "bounded-qualified-profile"
+    },
+    "metamorphicQualification": {
+      "command": "python tools/metamorphic_qualification.py",
+      "schema": "fdir/metamorphic-qualification-report",
+      "requiredFields": ["cases", "hostileCases", "survivors", "differential"]
     }
+  },
+  "evidenceTrack": {
+    "requiredIssues": [87, 88, 89, 105],
+    "bundleSchema": "fdir/qualification-evidence-bundle",
+    "bundleCommand": "python tools/evidence_bundle.py self-test",
+    "campaignCommand": "python tools/run_defect_injection_campaign.py --json",
+    "requiredNegativeSelfTests": 5,
+    "requiredUndetected": 0,
+    "releaseBarrierMustRemainExplicit": true,
+    "boundedCoverageIsNotReleaseEvidence": true
   },
   "issueEvidence": {
     "69": ["all-child-issues", "release-claim-report", "zero-unqualified-claims"],

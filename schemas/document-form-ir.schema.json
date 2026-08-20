@@ -3,6 +3,7 @@
   "$id": "https://github.com/horiyamayoh/fdir/schema/document-form-ir/1.0.0",
   "title": "Document Form IR",
   "description": "Typed common document-form facts with namespaced format extensions. It is not a semantic IR and does not contain source-byte archives.",
+  "$comment": "Normative shared authority is machine/model-contract.json; this schema is a checked derived artifact.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -46,7 +47,7 @@
     },
     "decimal": {
       "type": "string",
-      "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+      "pattern": "^(?:0|[1-9][0-9]*|-[1-9][0-9]*)(?:\\.[0-9]*[1-9])?$"
     },
     "schemaRef": {
       "type": "object",
@@ -608,15 +609,23 @@
       "additionalProperties": false,
       "required": ["type", "value", "status"],
       "properties": {
-        "type": {"type": "string", "enum": ["blank", "boolean", "integer", "number", "decimal", "string", "date", "datetime", "error"]},
-        "value": {"type": ["string", "boolean", "number", "null"]},
-        "status": {"$ref": "#/$defs/status"}
+        "type": {"type": "string", "enum": ["blank", "boolean", "integer", "number", "decimal", "string", "date", "datetime", "duration", "error"]},
+        "value": {"type": ["string", "boolean", "null"]},
+        "status": {"$ref": "#/$defs/status"},
+        "sourceRepresentation": {"type": "string"},
+        "logicalValue": {"type": "string"},
+        "normalizationRuleId": {"$ref": "#/$defs/id"},
+        "provenance": {"type": "string"},
+        "exactness": {"type": "string", "enum": ["exact", "normalized", "approximated", "unavailable"]}
       },
       "oneOf": [
         {"properties": {"type": {"const": "blank"}}, "required": ["value"], "properties": {"type":{"const":"blank"},"value":{"type":"null"},"status":{"$ref":"#/$defs/status"}}},
         {"properties": {"type": {"const": "boolean"}}, "required": ["value"], "properties": {"type":{"const":"boolean"},"value":{"type":"boolean"},"status":{"$ref":"#/$defs/status"}}},
-        {"properties": {"type": {"enum": ["integer", "number", "decimal"]}}, "required": ["value"], "properties": {"type":{"enum":["integer","number","decimal"]},"value":{"type":["string","number","integer"]},"status":{"$ref":"#/$defs/status"}}},
-        {"properties": {"type": {"enum": ["string", "date", "datetime", "error"]}}, "required": ["value"], "properties": {"type":{"enum":["string","date","datetime","error"]},"value":{"type":["string","null"]},"status":{"$ref":"#/$defs/status"}}}
+        {"properties": {"type": {"enum": ["integer", "number", "decimal"]}}, "required": ["value"], "properties": {"type":{"enum":["integer","number","decimal"]},"value":{"type":"string","pattern":"^(?:0|[1-9][0-9]*|-[1-9][0-9]*)(?:\\.[0-9]*[1-9])?$"},"status":{"$ref":"#/$defs/status"}}},
+        {"properties": {"type": {"enum": ["string"]}}, "required": ["value"], "properties": {"type":{"const":"string"},"value":{"type":"string"},"status":{"$ref":"#/$defs/status"}}},
+        {"properties": {"type": {"enum": ["date", "datetime"]}}, "required": ["value"], "properties": {"type":{"enum":["date","datetime"]},"value":{"type":"string","pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}(?:T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?)?$"},"status":{"$ref":"#/$defs/status"}}},
+        {"properties": {"type": {"const": "duration"}}, "required": ["value"], "properties": {"type":{"const":"duration"},"value":{"type":"string","pattern":"^P(?!$)(?:[0-9]+Y)?(?:[0-9]+M)?(?:[0-9]+D)?(?:T(?=[0-9])(?:[0-9]+H)?(?:[0-9]+M)?(?:[0-9]+(?:\\.[0-9]+)?S)?)?$"},"status":{"$ref":"#/$defs/status"}}},
+        {"properties": {"type": {"const": "error"}}, "required": ["value"], "properties": {"type":{"const":"error"},"value":{"type":"string"},"status":{"$ref":"#/$defs/status"}}}
       ]
     },
     "calculationContext": {

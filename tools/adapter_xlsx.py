@@ -13,9 +13,9 @@ import zipfile
 import xml.etree.ElementTree as ET
 
 try:
-    from adapter_common import AdapterError, AdapterLimits, DocumentBuilder, decimal, input_limit_check, safe_id
+    from adapter_common import AdapterError, AdapterLimits, DocumentBuilder, decimal, input_limit_check, safe_id, validate_zip_members
 except ImportError:  # pragma: no cover
-    from tools.adapter_common import AdapterError, AdapterLimits, DocumentBuilder, decimal, input_limit_check, safe_id
+    from tools.adapter_common import AdapterError, AdapterLimits, DocumentBuilder, decimal, input_limit_check, safe_id, validate_zip_members
 
 
 NS_MAIN = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -143,7 +143,7 @@ def _calc_context(workbook: ET.Element) -> dict[str, str]:
 def inspect(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any]:
     limits = input_limit_check(Path(path), limits)
     with zipfile.ZipFile(path) as archive:
-        names = archive.namelist()
+        names = validate_zip_members(archive, limits)
         if "xl/workbook.xml" not in names:
             raise AdapterError("XLSX package lacks xl/workbook.xml")
         workbook = _read_xml(archive, "xl/workbook.xml")
@@ -300,7 +300,7 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
     builder = DocumentBuilder(path, "xlsx", "Office Open XML", limits=limits)
     try:
         with zipfile.ZipFile(path) as archive:
-            names = archive.namelist()
+            names = validate_zip_members(archive, limits)
             if len(names) > limits.max_xml_parts:
                 diagnostic = builder.add_diagnostic("DFIR-XLSX-PACKAGE-LIMIT", f"package has {len(names)} parts; limit is {limits.max_xml_parts}", severity="error", phase="parse")
                 builder.add_feature("package-validation", "failed", diagnostic_ids=[diagnostic])

@@ -1,0 +1,17 @@
+{
+  "schema": "fdir/false-completion-regressions",
+  "version": "1.0.0",
+  "policy": "every case must fail closed; no count-only oracle",
+  "cases": [
+    {"id":"FC-001","failure":"evidence-id-only","oracle":"bundle verifier rejects an entry without a resolvable artifact and digest","test":"bundle-tamper-missing-artifact"},
+    {"id":"FC-002","failure":"old-source-report-copy","oracle":"source head SHA and tracked digest mismatch blocks verification","test":"bundle-tamper-source"},
+    {"id":"FC-003","failure":"output-digest-replacement","oracle":"artifact bytes are hashed again and mismatch blocks verification","test":"bundle-tamper-artifact"},
+    {"id":"FC-004","failure":"command-count-only","oracle":"stdout/stderr digest and exit status are verified","test":"bundle-tamper-command"},
+    {"id":"FC-005","failure":"claim-drift","oracle":"release claim is limited to qualified bounded profile","test":"barrier-claim-mode"},
+    {"id":"FC-006","failure":"dirty-candidate","oracle":"dirty working tree cannot bind an exact release commit","test":"barrier-dirty-source"},
+    {"id":"FC-007","failure":"missing-artifact-upload","oracle":"missing required index/artifact is a hard blocker","test":"bundle-tamper-index"},
+    {"id":"FC-008","failure":"clean-room-exit-only","oracle":"two replay digests are compared field-by-field","test":"barrier-clean-room"},
+    {"id":"FC-009","failure":"surviving-defect-hidden","oracle":"undetected and infrastructure-error are separate non-passing classes","test":"defect-meta-self-test"},
+    {"id":"FC-010","failure":"unsupported-as-complete","oracle":"unsupported scope remains an explicit residual and cannot release","test":"barrier-unsupported-scope"}
+  ]
+}

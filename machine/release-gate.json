@@ -15,7 +15,13 @@
     "python tools/mutation_qualification.py --json",
     "python tools/query_qualification.py",
     "python tools/independent_corpus.py --json",
-    "python tools/strict_completion_gate.py"
+    "python tools/strict_completion_gate.py",
+    "python tools/evidence_bundle.py self-test",
+    "python tools/run_defect_injection_campaign.py --json",
+    "python tools/release_contract_qualification.py",
+    "python tools/format_qualification.py",
+    "python tools/metamorphic_qualification.py",
+    "python tools/release_gate.py --evidence-bundle PATH"
   ],
   "requiredAdapters": [
     "tools/adapter_docx.py",
@@ -49,6 +55,16 @@
     "machine/query-contract.json",
     "machine/release-claim-manifest.json",
     "machine/strict-completion-contract.json",
+    "schemas/qualification-evidence.schema.json",
+    "machine/audit-recovery-plan.json",
+    "machine/release-requirements.json",
+    "machine/false-completion-regressions.json",
+    "machine/format-qualified-profiles.json",
+    "tools/evidence_bundle.py",
+    "tools/run_defect_injection_campaign.py",
+    "tools/format_qualification.py",
+    "tools/metamorphic_qualification.py",
+    "tools/independent_oracle.py",
     "e2e/corpus/manifest.json",
     "e2e/corpus/README.md",
     "tools/query_qualification.py",
@@ -80,6 +96,10 @@
     "mutation-qualification",
     "query-qualification",
     "independent-corpus",
-    "strict-completion"
+    "strict-completion",
+    "commit-bound-evidence",
+    "defect-injection",
+    "release-barrier",
+    "clean-room-replay"
   ]
 }

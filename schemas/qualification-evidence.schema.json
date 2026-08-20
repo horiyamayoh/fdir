@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/horiyamayoh/fdir/schema/qualification-evidence/1.0.0",
+  "title": "FDIR qualification evidence bundle",
+  "description": "Commit-bound execution evidence. A report is not completion evidence unless its source, commands, inputs, outputs, and index are all verifiable.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "repository", "source", "commands", "artifacts", "index", "barrier", "status"],
+  "properties": {
+    "schema": {"const": "fdir/qualification-evidence-bundle"},
+    "version": {"type": "string", "const": "1.0.0"},
+    "repository": {"type": "string", "minLength": 1},
+    "source": {"$ref": "#/$defs/source"},
+    "commands": {"type": "array", "items": {"$ref": "#/$defs/command"}},
+    "artifacts": {"type": "array", "items": {"$ref": "#/$defs/artifact"}},
+    "index": {"$ref": "#/$defs/index"},
+    "barrier": {"$ref": "#/$defs/barrier"},
+    "issueState": {"$ref": "#/$defs/issueState"},
+    "cleanRoom": {"$ref": "#/$defs/cleanRoom"},
+    "status": {"enum": ["passed", "blocked", "failed"]},
+    "environment": {"type": "object", "additionalProperties": false, "properties": {"python": {"type": "string"}, "platform": {"type": "string"}}},
+    "integrity": {"$ref": "#/$defs/integrity"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "sha40": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "path": {"type": "string", "minLength": 1},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["headSha", "treeSha", "trackedDigest", "workingTreeClean", "binding"],
+      "properties": {
+        "headSha": {"$ref": "#/$defs/sha40"},
+        "treeSha": {"$ref": "#/$defs/sha40"},
+        "trackedDigest": {"$ref": "#/$defs/sha256"},
+        "workingTreeClean": {"type": "boolean"},
+        "binding": {"enum": ["exact-commit", "dirty-working-tree"]}
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "argv", "cwd", "exitCode", "status", "stdoutDigest", "stderrDigest", "durationMilliseconds", "inputDigests", "outputDigests"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[A-Za-z0-9_.:-]+$"},
+        "argv": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "cwd": {"type": "string", "minLength": 1},
+        "exitCode": {"type": "integer"},
+        "status": {"enum": ["passed", "failed", "timeout", "infrastructure-error"]},
+        "stdoutDigest": {"$ref": "#/$defs/sha256"},
+        "stderrDigest": {"$ref": "#/$defs/sha256"},
+        "durationMilliseconds": {"type": "number", "minimum": 0},
+        "inputDigests": {"type": "array", "items": {"$ref": "#/$defs/digestRef"}},
+        "outputDigests": {"type": "array", "items": {"$ref": "#/$defs/digestRef"}}
+      }
+    },
+    "digestRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "bytes"],
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "bytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "kind", "sha256", "bytes"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[A-Za-z0-9_.:-]+$"},
+        "path": {"$ref": "#/$defs/path"},
+        "kind": {"enum": ["report", "index", "input", "output", "log", "configuration"]},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "bytes": {"type": "integer", "minimum": 0},
+        "commandId": {"type": "string"}
+      }
+    },
+    "index": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "version", "path", "entries", "digest"],
+      "properties": {
+        "schema": {"const": "fdir/qualification-evidence-index"},
+        "version": {"type": "string", "const": "1.0.0"},
+        "path": {"$ref": "#/$defs/path"},
+        "entries": {"type": "array", "items": {"$ref": "#/$defs/indexEntry"}},
+        "digest": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "indexEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidenceId", "artifactId", "sha256", "sourceHeadSha", "commandIds"],
+      "properties": {
+        "evidenceId": {"type": "string", "minLength": 1},
+        "artifactId": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "sourceHeadSha": {"$ref": "#/$defs/sha40"},
+        "commandIds": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "barrier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["releaseEligible", "claimMode", "blockers"],
+      "properties": {
+        "releaseEligible": {"type": "boolean"},
+        "claimMode": {"enum": ["experimental-bounded-subset", "release-candidate"]},
+        "blockers": {"type": "array", "items": {"$ref": "#/$defs/blocker"}}
+      }
+    },
+    "issueState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "source", "issueNumbers", "closedCompleted", "path", "sha256", "bytes", "artifactId"],
+      "properties": {
+        "status": {"const": "passed"},
+        "source": {"const": "github-issue-api"},
+        "issueNumbers": {"type": "array", "const": [87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105]},
+        "closedCompleted": {"type": "integer", "const": 19},
+        "path": {"$ref": "#/$defs/path"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "bytes": {"type": "integer", "minimum": 1},
+        "artifactId": {"type": "string", "const": "live-issue-state"}
+      }
+    },
+    "cleanRoom": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "runs", "volatileFields", "diffCount", "diffDigest"],
+      "properties": {
+        "status": {"enum": ["passed", "failed", "blocked"]},
+        "runs": {"type": "integer", "minimum": 2},
+        "volatileFields": {"type": "array", "items": {"type": "string"}},
+        "diffCount": {"type": "integer", "minimum": 0},
+        "diffDigest": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "blocker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "detail"],
+      "properties": {
+        "code": {"type": "string", "minLength": 1},
+        "detail": {"type": "string", "minLength": 1},
+        "issueNumbers": {"type": "array", "items": {"type": "integer"}}
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bundleDigest", "indexDigest", "algorithm"],
+      "properties": {
+        "bundleDigest": {"$ref": "#/$defs/sha256"},
+        "indexDigest": {"$ref": "#/$defs/sha256"},
+        "algorithm": {"const": "sha256"}
+      }
+    }
+  }
+}

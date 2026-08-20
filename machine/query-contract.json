@@ -1,20 +1,22 @@
 {
   "schema": "fdir/document-form-query-contract",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "acceptedSchema": {"name": "fdir/document-form", "version": "1.0.0"},
   "canonicalAlgorithm": "FDIR-C14N-1",
   "validation": "authority IR validation is mandatory before query",
-  "operations": ["list-entities", "get-entity", "list-nodes", "get-text", "ancestors", "descendants", "find-relations", "find-extensions", "find-observations", "rebuild-index", "validate-index"],
+  "operations": ["list-entities", "get-entity", "list-nodes", "get-text", "ancestors", "descendants", "find-relations", "find-extensions", "find-observations", "rebuild-index", "validate-index", "persist-index", "query-index-facts"],
   "representations": ["source", "normalized", "stored", "computed", "displayed", "rendered", "observed"],
   "ordering": "entity IDs are lexical; authored child/order arrays retain source ordinal",
   "pagination": {"offset": "zero-based integer", "limit": "non-negative integer"},
   "index": {
     "schema": "fdir/document-form-index",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "authority": "non-authoritative deterministic projection",
     "requiredFields": ["schema", "version", "authority", "entities", "facts", "reverseReferences"],
     "factParity": "every entity collection item is represented by a canonical entity digest",
-    "authorityFingerprint": "documentId, schema, and source-map-excluded canonicalDigest",
-    "validation": "stale, corrupt, incomplete, and extra index rows fail closed"
+    "authorityFingerprint": "documentId, schema, sourceFormat, capability profile, source SHA-256, full digest, and source-map-excluded canonicalDigest",
+    "factQuery": "facts contain the complete typed entity value plus its canonical digest",
+    "persistence": "same-directory temporary file, fsync, and atomic replace",
+    "validation": "stale, corrupt, incomplete, unqueryable, wrong-version, wrong-profile, and extra index rows fail closed"
   }
 }

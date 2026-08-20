@@ -26,6 +26,7 @@ STATUS_VALUES = {
 PARTIAL_STATUSES = {"approximated", "ambiguous", "unsupported", "omitted-by-policy", "failed"}
 NODE_KINDS = {"document", "section", "paragraph", "run", "heading", "list", "table", "row", "column", "cell", "shape", "textBox", "connector", "image", "chart", "glyph", "path", "field", "annotation", "resource"}
 VISUAL_NODE_KINDS = {"shape", "textBox", "connector", "image", "chart", "glyph", "path"}
+_AUTHORITY_ARTIFACTS_CHECKED = False
 
 
 class IRValidationError(ValueError):
@@ -429,6 +430,18 @@ def validate_document(document: dict[str, Any]) -> list[str]:
     if not isinstance(document, dict):
         raise IRValidationError("IR root must be an object", "DFIR-IR-ROOT")
     _walk(document)
+    try:
+        from authority_contract import validate_authority_artifacts, validate_runtime_contract
+    except ImportError:  # pragma: no cover - package-style import
+        from tools.authority_contract import validate_authority_artifacts, validate_runtime_contract
+    global _AUTHORITY_ARTIFACTS_CHECKED
+    if not _AUTHORITY_ARTIFACTS_CHECKED:
+        try:
+            validate_authority_artifacts()
+        except Exception as exc:
+            code = getattr(exc, "code", "DFIR-AUTHORITY-CONTRACT")
+            raise IRValidationError(str(exc), code) from exc
+        _AUTHORITY_ARTIFACTS_CHECKED = True
     validate_normative_schema(document)
     _validate_discriminated_variants(document)
     if document.get("schema") != {"name": "fdir/document-form", "version": "1.0.0"}:
@@ -467,6 +480,11 @@ def validate_document(document: dict[str, Any]) -> list[str]:
         raise IRValidationError("document root cannot have a parent", "DFIR-GRAPH-ROOT-PARENT")
 
     kind_by_id = {identifier: item.get("kind") for identifier, item in nodes.items() if isinstance(item.get("kind"), str)}
+    try:
+        validate_runtime_contract(document, ids)
+    except Exception as exc:
+        code = getattr(exc, "code", "DFIR-AUTHORITY-CONTRACT")
+        raise IRValidationError(str(exc), code) from exc
     parent_of: dict[str, str] = {}
     for node_id, node in nodes.items():
         kind = node.get("kind")
@@ -556,6 +574,10 @@ def validate_document(document: dict[str, Any]) -> list[str]:
             relation = items_by_collection["relations"].get(relationship_id)
             if relation is not None and relation.get("fromId") != part_id:
                 raise IRValidationError(f"part {part_id} relationship {relationship_id} has a different fromId", "DFIR-PART-RELATION-RECIPROCITY")
+        for surface_id in part.get("surfaceIds", []):
+            surface = items_by_collection["surfaces"].get(surface_id)
+            if surface is not None and surface.get("partId") != part_id:
+                raise IRValidationError(f"part {part_id} surface {surface_id} has a different partId", "DFIR-PART-SURFACE-RECIPROCITY")
     _check_cycle({identifier: item.get("parentPartId") for identifier, item in items_by_collection["parts"].items()}, "DFIR-PART-CYCLE", "part")
 
     for surface_id, surface in items_by_collection["surfaces"].items():

@@ -2,8 +2,10 @@
   "schema": "fdir/document-form-release-claim-manifest",
   "version": "1.0.0",
   "release": {
-    "id": "fdir-document-form-ir-1.0.0",
+    "id": "fdir-document-form-ir-experimental-bounded-subset",
     "policy": "fail-closed",
+    "claimMode": "experimental-bounded-subset",
+    "releaseEligible": false,
     "claimBoundary": "typed source-form facts, provenance, relationships, and explicit unavailable or unsupported states",
     "forbiddenClaims": ["semantic equivalence", "source-byte archival", "silent-loss completeness"]
   },
@@ -33,13 +35,21 @@
     {"issueNumber":77,"claim":"resources, relationships, links, annotations, revisions, and fields","evidenceCommands":["python tools/run_e2e.py --all","python tools/independent_corpus.py --json"],"evidencePaths":["machine/reference-registry.json","tools/adapter_docx.py","tools/adapter_xlsx.py"]},
     {"issueNumber":78,"claim":"typed extension registry and critical compatibility","evidenceCommands":["python tools/validate_design.py","python tools/mutation_qualification.py --json"],"evidencePaths":["machine/extension-registry.json","schemas/extensions/format-extensions.schema.json","tools/extension_registry.py"]},
     {"issueNumber":79,"claim":"canonical identity and migration boundary","evidenceCommands":["python tools/run_e2e.py --all","python tools/query_qualification.py"],"evidencePaths":["machine/canonicalization.json","tools/canonicalize_ir.py","tools/adapter_common.py"]},
-    {"issueNumber":80,"claim":"relationship-complete DOCX adapter","evidenceCommands":["python tools/run_e2e.py --all","python tools/independent_corpus.py --json"],"evidencePaths":["tools/adapter_docx.py","machine/capability-profile.json"]},
-    {"issueNumber":81,"claim":"exact-value relationship-complete XLSX workbook and grid","evidenceCommands":["python tools/run_e2e.py --all","python tools/independent_corpus.py --json"],"evidencePaths":["tools/adapter_xlsx.py","schemas/extensions/format-extensions.schema.json"]},
-    {"issueNumber":82,"claim":"stateful PDF object, graphics, and font-aware adapter","evidenceCommands":["python tools/run_e2e.py --all","python tools/independent_corpus.py --json"],"evidencePaths":["tools/adapter_pdf.py","schemas/extensions/format-extensions.schema.json"]},
-    {"issueNumber":83,"claim":"universal typed query and rebuildable index","evidenceCommands":["python tools/query_qualification.py","python tools/run_e2e.py --all"],"evidencePaths":["machine/query-contract.json","tools/query_ir.py","tools/query_qualification.py"]},
-    {"issueNumber":84,"claim":"dialect-declared source-faithful Markdown parser","evidenceCommands":["python tools/run_e2e.py --all","python tools/independent_corpus.py --json"],"evidencePaths":["tools/adapter_markdown.py","machine/capability-profile.json","machine/extension-registry.json"]},
-    {"issueNumber":86,"claim":"independent fail-closed release gate","evidenceCommands":["python tools/validate_design.py","python tools/run_acceptance.py --all","python tools/run_e2e.py --all","python tools/mutation_qualification.py --json","python tools/query_qualification.py","python tools/independent_corpus.py --json","python tools/release_gate.py"],"evidencePaths":["machine/release-claim-manifest.json","e2e/corpus/manifest.json","tools/release_gate.py"]}
+    {"issueNumber":80,"claim":"bounded DOCX profile with explicit unsupported and unavailable states","evidenceCommands":["python tools/run_e2e.py --all","python tools/independent_corpus.py --json"],"evidencePaths":["tools/adapter_docx.py","machine/capability-profile.json"]},
+    {"issueNumber":81,"claim":"bounded XLSX value-lane profile with explicit unsupported workbook facts","evidenceCommands":["python tools/run_e2e.py --all","python tools/independent_corpus.py --json"],"evidencePaths":["tools/adapter_xlsx.py","schemas/extensions/format-extensions.schema.json"]},
+    {"issueNumber":82,"claim":"bounded PDF object, graphics, and font-observation profile","evidenceCommands":["python tools/run_e2e.py --all","python tools/independent_corpus.py --json"],"evidencePaths":["tools/adapter_pdf.py","schemas/extensions/format-extensions.schema.json"]},
+    {"issueNumber":83,"claim":"rebuildable typed query projection for the qualified subset","evidenceCommands":["python tools/query_qualification.py","python tools/run_e2e.py --all"],"evidencePaths":["machine/query-contract.json","tools/query_ir.py","tools/query_qualification.py"]},
+    {"issueNumber":84,"claim":"dialect-declared bounded Markdown profile with explicit unsupported constructs","evidenceCommands":["python tools/run_e2e.py --all","python tools/independent_corpus.py --json"],"evidencePaths":["tools/adapter_markdown.py","machine/capability-profile.json","machine/extension-registry.json"]},
+    {"issueNumber":86,"claim":"bounded fail-closed qualification and release barrier","evidenceCommands":["python tools/validate_design.py","python tools/run_acceptance.py --all","python tools/run_e2e.py --all","python tools/mutation_qualification.py --json","python tools/query_qualification.py","python tools/independent_corpus.py --json","python tools/release_gate.py"],"evidencePaths":["machine/release-claim-manifest.json","e2e/corpus/manifest.json","tools/release_gate.py"]}
   ],
+  "evidenceTrack": {
+    "bundleSchema": "fdir/qualification-evidence-bundle",
+    "schemaPath": "schemas/qualification-evidence.schema.json",
+    "builder": "tools/evidence_bundle.py",
+    "defectCampaign": "tools/run_defect_injection_campaign.py",
+    "releaseRequirements": "machine/release-requirements.json",
+    "releaseEligible": false
+  },
   "independentEvidence": {
     "manifest": "e2e/corpus/manifest.json",
     "runner": "tools/independent_corpus.py",

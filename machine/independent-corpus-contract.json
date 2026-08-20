@@ -1,0 +1,17 @@
+{
+  "schema": "fdir/independent-corpus-contract",
+  "version": "1.0.0",
+  "authority": "source fixtures plus tools/independent_oracle.py; generated IR and adapter output are never the expected-value source",
+  "producers": [
+    {"id": "adapter", "entrypoint": "tools/convert_document.py", "role": "candidate"},
+    {"id": "independent-source-oracle", "entrypoint": "tools/independent_oracle.py", "role": "expected-source-facts", "importsAdapter": false, "importsIrBuilder": false, "importsCanonicalizer": false, "importsQuery": false}
+  ],
+  "requiredChecks": {
+    "literalAndStructureDifferential": true,
+    "metamorphic": {"command": "python tools/metamorphic_qualification.py", "properties": ["container-order-and-compression-invariance", "repeatability", "entity-array-order-invariance"]},
+    "hostile": {"properties": ["zip-path-traversal", "max-input-bytes", "malformed-input", "unsupported-construct"]},
+    "sourceDigestBinding": "the oracle and adapter evidence must hash the exact packaged input path"
+  },
+  "claimBoundary": "A-structure-literals independent oracle coverage for the bounded corpus; no official conformance or full external-format claim",
+  "negativePolicy": "malformed, unsupported, and resource-limit cases must fail or become explicit partial diagnostics; no silent success"
+}

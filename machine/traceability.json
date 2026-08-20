@@ -11,6 +11,10 @@
     "machine/phase2-issue-plan.json",
     "machine/release-claim-manifest.json",
     "machine/strict-completion-contract.json",
+    "machine/audit-recovery-plan.json",
+    "machine/release-requirements.json",
+    "machine/false-completion-regressions.json",
+    "schemas/qualification-evidence.schema.json",
     "schemas/document-form-ir.schema.json",
     "tools/convert_document.py",
     "tools/run_e2e.py",
@@ -24,6 +28,9 @@
     "requirementToIssue": "requirements.ownerIssue",
     "requirementToAcceptance": "requirements.acceptanceTests",
     "acceptanceFamilyExpansion": "acceptance-tests.families",
+    "evidenceRequirementBinding": "release-requirements.requiredEvidenceIds",
+    "evidenceArtifactIndex": "qualification-evidence-bundle.index",
+    "defectDetectionBinding": "defect-injection.results[*].detectingTestIds",
     "generatedViews": ["issue checklists", "review tables", "CI summaries"]
   },
   "rules": [

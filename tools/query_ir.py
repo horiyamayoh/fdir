@@ -4,16 +4,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any, Iterable
 
 try:
     from ir_validation import COLLECTION_KEYS, IRValidationError, validate_document
-    from canonicalize_ir import canonical_digest, canonical_value_digest
+    from canonicalize_ir import canonical_digest, canonical_value_digest, full_canonical_digest
 except ImportError:  # pragma: no cover
     from tools.ir_validation import COLLECTION_KEYS, IRValidationError, validate_document
-    from tools.canonicalize_ir import canonical_digest, canonical_value_digest
+    from tools.canonicalize_ir import canonical_digest, canonical_value_digest, full_canonical_digest
 
 
 class QueryError(ValueError):
@@ -21,7 +23,7 @@ class QueryError(ValueError):
 
 
 INDEX_SCHEMA = "fdir/document-form-index"
-INDEX_VERSION = "1.1.0"
+INDEX_VERSION = "1.2.0"
 REPRESENTATIONS = {"source", "normalized", "stored", "computed", "displayed", "rendered", "observed"}
 
 
@@ -66,6 +68,22 @@ def load_index(path: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise QueryError("index must be an object")
     return value
+
+
+def _validate_sha256(value: str | None, field: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or len(value) != 64 or any(character not in "0123456789abcdef" for character in value):
+        raise QueryError(f"{field} must be a lowercase SHA-256 digest")
+    return value
+
+
+def _profile_id(document: dict[str, Any]) -> str:
+    conversion = document.get("conversion")
+    profile = conversion.get("capabilityProfile") if isinstance(conversion, dict) else None
+    if not isinstance(profile, str) or not profile:
+        raise QueryError("IR conversion lacks capabilityProfile")
+    return profile
 
 
 def _items(document: dict[str, Any], key: str) -> list[dict[str, Any]]:
@@ -189,8 +207,18 @@ def _reference_pairs(item: dict[str, Any], identifier_key: str, known_ids: set[s
         yield from walk(value, field)
 
 
-def _build_index(document: dict[str, Any]) -> dict[str, Any]:
+def _build_index(
+    document: dict[str, Any],
+    *,
+    source_digest: str | None = None,
+    profile_id: str | None = None,
+) -> dict[str, Any]:
     """Build a deterministic, non-authoritative projection from validated IR."""
+
+    source_digest = _validate_sha256(source_digest, "sourceDigest")
+    profile_id = profile_id or _profile_id(document)
+    if not isinstance(profile_id, str) or not profile_id:
+        raise QueryError("profileId must be a non-empty string")
 
     entities: list[dict[str, Any]] = []
     facts: list[dict[str, Any]] = []
@@ -204,7 +232,9 @@ def _build_index(document: dict[str, Any]) -> dict[str, Any]:
         for item in sorted(_items(document, collection), key=lambda value: str(value.get(identifier_key, ""))):
             identifier = item[identifier_key]
             entities.append({"id": identifier, "collection": collection, "kind": item.get("kind"), "status": item.get("status")})
-            facts.append({"collection": collection, "id": identifier, "digest": canonical_value_digest(item)})
+            # The digest is the integrity check; retaining the complete typed
+            # value also makes a persistent index independently queryable.
+            facts.append({"collection": collection, "id": identifier, "digest": canonical_value_digest(item), "value": item})
             reverse.extend(
                 {"fromId": identifier, "field": field, "toId": target}
                 for field, target in _reference_pairs(item, identifier_key, known_ids)
@@ -218,6 +248,10 @@ def _build_index(document: dict[str, Any]) -> dict[str, Any]:
         "authority": {
             "documentId": document["documentId"],
             "canonicalDigest": canonical_digest(document),
+            "fullCanonicalDigest": full_canonical_digest(document),
+            "sourceDigest": source_digest,
+            "profileId": profile_id,
+            "sourceFormat": document["sourceFormat"],
             "projection": "source-map-excluded",
             "schema": document["schema"],
         },
@@ -227,17 +261,33 @@ def _build_index(document: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def rebuild_index(document: dict[str, Any]) -> dict[str, Any]:
-    return _build_index(_ensure_document(document))
+def rebuild_index(
+    document: dict[str, Any],
+    *,
+    source_digest: str | None = None,
+    profile_id: str | None = None,
+) -> dict[str, Any]:
+    return _build_index(_ensure_document(document), source_digest=source_digest, profile_id=profile_id)
 
 
-def validate_index(document: dict[str, Any], index: dict[str, Any]) -> dict[str, Any]:
+def validate_index(
+    document: dict[str, Any],
+    index: dict[str, Any],
+    *,
+    source_digest: str | None = None,
+    profile_id: str | None = None,
+) -> dict[str, Any]:
     """Fail closed when an index is stale, corrupt, incomplete, or unqueryable."""
 
     document = _ensure_document(document)
     if not isinstance(index, dict):
         raise QueryError("index must be an object")
-    expected = _build_index(document)
+    authority = index.get("authority")
+    if not isinstance(authority, dict):
+        raise QueryError("index is corrupt: authority is missing")
+    candidate_source_digest = source_digest if source_digest is not None else authority.get("sourceDigest")
+    candidate_profile_id = profile_id if profile_id is not None else authority.get("profileId")
+    expected = _build_index(document, source_digest=candidate_source_digest, profile_id=candidate_profile_id)
     if index.get("schema") != INDEX_SCHEMA or index.get("version") != INDEX_VERSION:
         raise QueryError("index is corrupt: schema or version is invalid")
     if index.get("authority") != expected["authority"]:
@@ -247,7 +297,112 @@ def validate_index(document: dict[str, Any], index: dict[str, Any]) -> dict[str,
             raise QueryError(f"index is stale or corrupt: {field} does not match authoritative IR")
     if set(index) != set(expected):
         raise QueryError("index is corrupt: unexpected or missing index fields")
-    return {"status": "passed", "validated": True}
+    if source_digest is not None and index["authority"].get("sourceDigest") != source_digest:
+        raise QueryError("index is stale: source digest does not match the supplied input")
+    if profile_id is not None and index["authority"].get("profileId") != profile_id:
+        raise QueryError("index is stale: capability profile does not match the supplied profile")
+    return {
+        "status": "passed",
+        "validated": True,
+        "sourceDigestBound": index["authority"].get("sourceDigest") is not None,
+        "profileId": index["authority"].get("profileId"),
+    }
+
+
+def write_index_atomic(path: Path, index: dict[str, Any]) -> None:
+    """Persist a complete index with an atomic same-directory replacement."""
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(index, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
+    temporary: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="\n",
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            dir=path.parent,
+            delete=False,
+        ) as stream:
+            temporary = stream.name
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+        temporary = None
+    except OSError as exc:
+        raise QueryError(f"cannot atomically write index: {exc}") from exc
+    finally:
+        if temporary is not None:
+            try:
+                os.unlink(temporary)
+            except OSError:
+                pass
+
+
+def persist_index(
+    document: dict[str, Any],
+    path: Path,
+    *,
+    source_digest: str,
+    profile_id: str | None = None,
+) -> dict[str, Any]:
+    """Build, validate, and atomically persist a source-bound index."""
+
+    index = rebuild_index(document, source_digest=source_digest, profile_id=profile_id)
+    validate_index(document, index, source_digest=source_digest, profile_id=profile_id or _profile_id(document))
+    write_index_atomic(path, index)
+    return index
+
+
+def load_persistent_index(
+    document: dict[str, Any],
+    path: Path,
+    *,
+    source_digest: str,
+    profile_id: str | None = None,
+) -> dict[str, Any]:
+    """Load and fail closed on a stale or corrupt persistent index."""
+
+    index = load_index(path)
+    validate_index(document, index, source_digest=source_digest, profile_id=profile_id or _profile_id(document))
+    return index
+
+
+def query_index_facts(
+    document: dict[str, Any],
+    index: dict[str, Any],
+    *,
+    source_digest: str,
+    collection: str | None = None,
+    kind: str | None = None,
+    status: str | None = None,
+    identifier: str | None = None,
+    profile_id: str | None = None,
+) -> list[dict[str, Any]]:
+    """Return complete typed facts from a validated standalone index."""
+
+    validate_index(document, index, source_digest=source_digest, profile_id=profile_id or _profile_id(document))
+    if collection is not None:
+        _collection_name(collection)
+    result: list[dict[str, Any]] = []
+    for fact in index["facts"]:
+        if collection is not None and fact["collection"] != collection:
+            continue
+        if identifier is not None and fact["id"] != identifier:
+            continue
+        value = fact.get("value")
+        if not isinstance(value, dict):
+            raise QueryError(f"index fact is unqueryable: {fact.get('collection')}/{fact.get('id')}")
+        if kind is not None and value.get("kind") != kind:
+            continue
+        if status is not None and value.get("status") != status:
+            continue
+        result.append(value)
+    result.sort(key=lambda item: json.dumps(item, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+    return result
 
 
 def index_parity(document: dict[str, Any], index: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -328,9 +483,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     index = sub.add_parser("rebuild-index")
     index.add_argument("--out", type=Path)
+    index.add_argument("--source-digest")
+    index.add_argument("--profile")
 
     validate_index_parser = sub.add_parser("validate-index")
     validate_index_parser.add_argument("index", type=Path)
+    validate_index_parser.add_argument("--source-digest")
+    validate_index_parser.add_argument("--profile")
 
     relation = sub.add_parser("find-relations")
     relation.add_argument("--kind")
@@ -376,11 +535,15 @@ def main(argv: list[str] | None = None) -> int:
         elif args.operation == "ancestors":
             result = ancestors(document, args.node_id)
         elif args.operation == "rebuild-index":
-            result = rebuild_index(document)
+            result = rebuild_index(document, source_digest=args.source_digest, profile_id=args.profile)
             if args.out:
-                args.out.write_text(json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8", newline="\n")
+                if args.source_digest is None:
+                    raise QueryError("--source-digest is required when persisting an index")
+                persist_index(document, args.out, source_digest=args.source_digest, profile_id=args.profile)
         elif args.operation == "validate-index":
-            result = index_parity(document, load_index(args.index))
+            candidate = load_index(args.index)
+            result = index_parity(document, candidate)
+            result["validation"] = validate_index(document, candidate, source_digest=args.source_digest, profile_id=args.profile)
         else:  # pragma: no cover - argparse enforces the operation
             raise QueryError(f"unknown operation: {args.operation}")
         json.dump(result, sys.stdout, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
