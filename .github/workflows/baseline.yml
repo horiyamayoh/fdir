@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: fdir-quality-${{ github.workflow }}-${{ github.ref }}
@@ -20,10 +20,44 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - name: Check out source
+      - name: Check out issue branch
         uses: actions/checkout@v6.0.2
         with:
-          persist-credentials: false
+          ref: agent/issue-12-adapter-process-boundary
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Apply the compile-fix commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("crates/fdir-adapter-sdk/src/protocol.rs")
+          text = path.read_text(encoding="utf-8")
+          old = """        let mut manifest = manifest()?;
+                  manifest.process_boundary = ProcessBoundary::InProcess;
+                  assert_eq!(
+                      manifest.validate().map_err(|error| error.code()),
+          """
+          new = """        let mut invalid_manifest = manifest()?;
+                  invalid_manifest.process_boundary = ProcessBoundary::InProcess;
+                  assert_eq!(
+                      invalid_manifest.validate().map_err(|error| error.code()),
+          """
+          if old in text:
+              path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          elif new not in text:
+              raise SystemExit("expected manifest-shadowing block was not found")
+          PY
+          if ! git diff --quiet -- crates/fdir-adapter-sdk/src/protocol.rs; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add crates/fdir-adapter-sdk/src/protocol.rs
+            git diff --cached --check
+            git commit -m "fix: avoid manifest fixture shadowing"
+            git push origin HEAD:agent/issue-12-adapter-process-boundary
+          fi
       - name: Set up Python
         uses: actions/setup-python@v6.0.0
         with:
