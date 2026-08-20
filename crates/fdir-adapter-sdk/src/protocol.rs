@@ -1238,13 +1238,13 @@ impl TerminalReceipt {
         )?;
         self.provenance.validate()?;
         validate_usage(request.budget, self.usage)?;
-        if self.outcome == WorkerOutcome::Complete {
-            if !self.output_complete || self.retryable || !tracker.stream_complete() {
-                return Err(ProtocolError::new(
-                    "FDIR-PROTOCOL-FALSE-COMPLETE",
-                    "complete outcome requires a complete acknowledged stream and cannot be retryable",
-                ));
-            }
+        if self.outcome == WorkerOutcome::Complete
+            && (!self.output_complete || self.retryable || !tracker.stream_complete())
+        {
+            return Err(ProtocolError::new(
+                "FDIR-PROTOCOL-FALSE-COMPLETE",
+                "complete outcome requires a complete acknowledged stream and cannot be retryable",
+            ));
         }
         if self.outcome == WorkerOutcome::TruncatedOutput && self.output_complete {
             return Err(ProtocolError::new(
@@ -1398,33 +1398,37 @@ impl ProtocolSession {
     }
 }
 
+/// Launcher and protocol facts used to classify a non-success worker result.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct WorkerFailureSignals {
+    pub timed_out: bool,
+    pub cancelled: bool,
+    pub sandbox_denied: bool,
+    pub protocol_mismatch: bool,
+    pub identity_mismatch: bool,
+    pub malformed_response: bool,
+    pub truncated_output: bool,
+    pub exit_success: bool,
+}
+
 /// Classify launcher and protocol failures without coercing them to success.
 #[must_use]
-pub const fn classify_worker_failure(
-    timed_out: bool,
-    cancelled: bool,
-    sandbox_denied: bool,
-    protocol_mismatch: bool,
-    identity_mismatch: bool,
-    malformed_response: bool,
-    truncated_output: bool,
-    exit_success: bool,
-) -> WorkerOutcome {
-    if cancelled {
+pub const fn classify_worker_failure(signals: WorkerFailureSignals) -> WorkerOutcome {
+    if signals.cancelled {
         WorkerOutcome::Cancelled
-    } else if timed_out {
+    } else if signals.timed_out {
         WorkerOutcome::TimedOut
-    } else if sandbox_denied {
+    } else if signals.sandbox_denied {
         WorkerOutcome::SandboxDenied
-    } else if protocol_mismatch {
+    } else if signals.protocol_mismatch {
         WorkerOutcome::ProtocolMismatch
-    } else if identity_mismatch {
+    } else if signals.identity_mismatch {
         WorkerOutcome::IdentityMismatch
-    } else if malformed_response {
+    } else if signals.malformed_response {
         WorkerOutcome::MalformedResponse
-    } else if truncated_output {
+    } else if signals.truncated_output {
         WorkerOutcome::TruncatedOutput
-    } else if exit_success {
+    } else if signals.exit_success {
         WorkerOutcome::Failed
     } else {
         WorkerOutcome::WorkerCrash
@@ -2050,15 +2054,14 @@ fn validate_usage(budget: ResourceBudget, usage: ResourceUsage) -> Result<(), Pr
             return Err(resource_error(dimension));
         }
     }
-    if usage.decompressed_bytes > 0 {
-        if usage.compressed_input_bytes == 0
+    if usage.decompressed_bytes > 0
+        && (usage.compressed_input_bytes == 0
             || usage.decompressed_bytes
                 > usage
                     .compressed_input_bytes
-                    .saturating_mul(u64::from(budget.max_decompression_ratio))
-        {
-            return Err(resource_error(BudgetDimension::Decompression));
-        }
+                    .saturating_mul(u64::from(budget.max_decompression_ratio)))
+    {
+        return Err(resource_error(BudgetDimension::Decompression));
     }
     Ok(())
 }
@@ -2383,8 +2386,9 @@ mod tests {
         ArtifactHandle, BudgetTracker, CapabilityDeclaration, DependencyDeclaration,
         ExecutionRequest, LaneOutput, NativeSubstrateReceipt, NegotiationRequest, NetworkPolicy,
         ProcessBoundary, ProtocolLane, ProtocolSession, QualificationState, ReplayIdentity,
-        ResourceBudget, ResourceUsage, SessionState, TerminalReceipt, WireEnvelope, WorkerManifest,
-        WorkerOutcome, WorkerProvenance, classify_worker_failure, negotiate,
+        ResourceBudget, ResourceUsage, SessionState, TerminalReceipt, WireEnvelope,
+        WorkerFailureSignals, WorkerManifest, WorkerOutcome, WorkerProvenance,
+        classify_worker_failure, negotiate,
     };
 
     const DIGEST_A: &str =
@@ -2645,15 +2649,21 @@ mod tests {
             .collect::<BTreeSet<_>>();
         assert_eq!(names.len(), WorkerOutcome::ALL.len());
         assert_eq!(
-            classify_worker_failure(false, false, false, false, false, false, false, false),
+            classify_worker_failure(WorkerFailureSignals::default()),
             WorkerOutcome::WorkerCrash
         );
         assert_eq!(
-            classify_worker_failure(true, false, false, false, false, false, false, false),
+            classify_worker_failure(WorkerFailureSignals {
+                timed_out: true,
+                ..WorkerFailureSignals::default()
+            }),
             WorkerOutcome::TimedOut
         );
         assert_eq!(
-            classify_worker_failure(false, true, false, false, false, false, false, false),
+            classify_worker_failure(WorkerFailureSignals {
+                cancelled: true,
+                ..WorkerFailureSignals::default()
+            }),
             WorkerOutcome::Cancelled
         );
     }

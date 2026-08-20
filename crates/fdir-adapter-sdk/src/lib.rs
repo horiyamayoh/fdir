@@ -19,8 +19,8 @@ pub use protocol::{
     NetworkPolicy, OcrInferenceReceipt, ProcessBoundary, ProtocolError, ProtocolLane,
     ProtocolSession, QualificationState, RendererObservationReceipt, ReplayIdentity,
     ResourceBudget, ResourceUsage, SemanticCandidateReceipt, SessionState, StorageCodecReceipt,
-    TerminalReceipt, WireEnvelope, WireMessageKind, WorkerManifest, WorkerOutcome,
-    WorkerProvenance, classify_worker_failure, negotiate,
+    TerminalReceipt, WireEnvelope, WireMessageKind, WorkerFailureSignals, WorkerManifest,
+    WorkerOutcome, WorkerProvenance, classify_worker_failure, negotiate,
 };
 pub use supervisor::{
     LaunchRequest, SandboxPolicy, SandboxReceipt, WorkerRegistration, WorkerRegistry,
@@ -50,8 +50,9 @@ mod tests {
     fn protocol_boundary_is_available_without_a_production_claim() {
         assert_eq!(PROTOCOL_SCHEMA, "fdir/adapter-protocol/1");
         assert_eq!(PROTOCOL_VERSION, "1.0.0");
-        assert!(CAPABILITY.available);
-        assert!(!CAPABILITY.production_ready);
+        let capability = std::hint::black_box(CAPABILITY);
+        assert!(capability.available);
+        assert!(!capability.production_ready);
     }
 
     #[test]
