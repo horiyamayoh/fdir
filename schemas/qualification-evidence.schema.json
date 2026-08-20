@@ -16,6 +16,7 @@
     "index": {"$ref": "#/$defs/index"},
     "barrier": {"$ref": "#/$defs/barrier"},
     "issueState": {"$ref": "#/$defs/issueState"},
+    "issueEvidence": {"$ref": "#/$defs/issueEvidence"},
     "cleanRoom": {"$ref": "#/$defs/cleanRoom"},
     "status": {"enum": ["passed", "blocked", "failed"]},
     "environment": {"type": "object", "additionalProperties": false, "properties": {"python": {"type": "string"}, "platform": {"type": "string"}}},
@@ -71,7 +72,7 @@
       "properties": {
         "id": {"type": "string", "pattern": "^[A-Za-z0-9_.:-]+$"},
         "path": {"$ref": "#/$defs/path"},
-        "kind": {"enum": ["report", "index", "input", "output", "log", "configuration"]},
+        "kind": {"enum": ["report", "index", "input", "output", "log", "configuration", "source"]},
         "sha256": {"$ref": "#/$defs/sha256"},
         "bytes": {"type": "integer", "minimum": 0},
         "commandId": {"type": "string"}
@@ -108,6 +109,8 @@
       "properties": {
         "releaseEligible": {"type": "boolean"},
         "claimMode": {"enum": ["experimental-bounded-subset", "release-candidate"]},
+        "productReleaseEligible": {"type": "boolean"},
+        "productClaimMode": {"enum": ["experimental-bounded-subset", "release-candidate"]},
         "blockers": {"type": "array", "items": {"$ref": "#/$defs/blocker"}}
       }
     },
@@ -129,13 +132,63 @@
     "cleanRoom": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status", "runs", "volatileFields", "diffCount", "diffDigest"],
+      "required": ["status", "runs", "sourceHeadSha", "sourceTrackedDigest", "inputs", "volatileFields", "diffCount", "diffDigest"],
       "properties": {
         "status": {"enum": ["passed", "failed", "blocked"]},
         "runs": {"type": "integer", "minimum": 2},
+        "sourceHeadSha": {"$ref": "#/$defs/sha40"},
+        "sourceTrackedDigest": {"$ref": "#/$defs/sha256"},
+        "inputs": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/cleanRoomInput"}},
         "volatileFields": {"type": "array", "items": {"type": "string"}},
         "diffCount": {"type": "integer", "minimum": 0},
         "diffDigest": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "cleanRoomInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "bytes", "indexPath", "indexSha256", "indexBytes", "bundleDigest", "indexDigest"],
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "bytes": {"type": "integer", "minimum": 1},
+        "indexPath": {"$ref": "#/$defs/path"},
+        "indexSha256": {"$ref": "#/$defs/sha256"},
+        "indexBytes": {"type": "integer", "minimum": 1},
+        "bundleDigest": {"$ref": "#/$defs/sha256"},
+        "indexDigest": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "issueEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "version", "sourceHeadSha", "entries"],
+      "properties": {
+        "schema": {"const": "fdir/issue-evidence-bindings"},
+        "version": {"const": "1.0.0"},
+        "sourceHeadSha": {"$ref": "#/$defs/sha40"},
+        "entries": {"type": "array", "minItems": 19, "items": {"$ref": "#/$defs/issueEvidenceEntry"}}
+      }
+    },
+    "issueEvidenceEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issueNumber", "requiredEvidenceIds", "bindings"],
+      "properties": {
+        "issueNumber": {"type": "integer", "minimum": 87, "maximum": 105},
+        "requiredEvidenceIds": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "bindings": {"type": "array", "items": {"$ref": "#/$defs/issueEvidenceBinding"}}
+      }
+    },
+    "issueEvidenceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidenceId", "commandIds", "sourcePaths", "artifactIds"],
+      "properties": {
+        "evidenceId": {"type": "string", "minLength": 1},
+        "commandIds": {"type": "array", "items": {"type": "string"}},
+        "sourcePaths": {"type": "array", "items": {"$ref": "#/$defs/path"}},
+        "artifactIds": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
       }
     },
     "blocker": {

@@ -30,6 +30,55 @@ REGRESSIONS_PATH = ROOT / "machine" / "false-completion-regressions.json"
 HEX64 = set("0123456789abcdef")
 DEFAULT_COMMAND_TIMEOUT_SECONDS = 900
 LIVE_ISSUE_NUMBERS = tuple(range(87, 106))
+COMMAND_IDS = (
+    "design-validation",
+    "acceptance",
+    "e2e",
+    "mutation-qualification",
+    "query-qualification",
+    "independent-corpus",
+    "format-qualification",
+    "metamorphic-qualification",
+    "strict-completion",
+    "evidence-self-test",
+    "release-contract-qualification",
+    "defect-injection",
+)
+
+# Each audit requirement resolves to a real command result and the source
+# files that define the qualified boundary.  These are bindings, not claims:
+# the command status and every digest are rechecked before a bundle is valid.
+ISSUE_EVIDENCE_SPECS: dict[str, dict[str, Any]] = {
+    "bundle.source": {"commands": ["design-validation"], "paths": ["machine/audit-recovery-plan.json"]},
+    "bundle.command-digests": {"commands": list(COMMAND_IDS), "paths": []},
+    "bundle.artifact-digests": {"commands": list(COMMAND_IDS), "paths": []},
+    "bundle.index-integrity": {"commands": ["evidence-self-test"], "paths": ["schemas/qualification-evidence.schema.json"]},
+    "defect.campaign": {"commands": ["defect-injection"], "paths": ["tools/run_defect_injection_campaign.py", "machine/defect-injection-contract.json"]},
+    "defect.negative-self-test": {"commands": ["evidence-self-test", "release-contract-qualification"], "paths": ["tools/evidence_bundle.py"]},
+    "defect.no-undetected-must": {"commands": ["defect-injection", "strict-completion"], "paths": ["machine/strict-completion-contract.json"]},
+    "normative-model": {"commands": ["design-validation", "acceptance"], "paths": ["machine/model-contract.json", "schemas/document-form-ir.schema.json", "tools/ir_validation.py", "machine/reference-registry.json"]},
+    "source-accounting": {"commands": ["e2e", "independent-corpus"], "paths": ["tools/qualification_evidence.py", "tools/adapter_common.py", "tools/run_e2e.py", "tools/independent_corpus.py"]},
+    "exact-value-provenance": {"commands": ["e2e", "independent-corpus", "mutation-qualification"], "paths": ["tools/qualification_evidence.py", "tools/adapter_xlsx.py", "tools/adapter_pdf.py"]},
+    "style-provenance": {"commands": ["e2e", "format-qualification"], "paths": ["tools/adapter_docx.py", "tools/adapter_common.py", "examples/style-resolution.json"]},
+    "geometry-provenance": {"commands": ["e2e", "format-qualification"], "paths": ["tools/adapter_docx.py", "tools/adapter_pdf.py", "tools/qualification_evidence.py"]},
+    "structure-topology": {"commands": ["e2e", "independent-corpus"], "paths": ["tools/adapter_docx.py", "tools/adapter_xlsx.py", "tools/adapter_markdown.py", "machine/model-contract.json"]},
+    "relationship-resource-closure": {"commands": ["e2e", "independent-corpus", "mutation-qualification"], "paths": ["machine/reference-registry.json", "tools/adapter_docx.py", "tools/adapter_xlsx.py", "tools/adapter_pdf.py", "schemas/extensions/format-extensions.schema.json"]},
+    "extension-registry-closure": {"commands": ["design-validation", "mutation-qualification"], "paths": ["machine/extension-registry.json", "schemas/extensions/format-extensions.schema.json", "tools/extension_registry.py"]},
+    "canonical-migration": {"commands": ["e2e", "query-qualification", "metamorphic-qualification"], "paths": ["machine/canonicalization.json", "tools/canonicalize_ir.py", "tools/adapter_common.py"]},
+    "docx-qualified-profile": {"commands": ["e2e", "format-qualification", "independent-corpus"], "paths": ["machine/format-qualified-profiles.json", "tools/adapter_docx.py", "tools/format_qualification.py", "e2e/corpus/manifest.json"]},
+    "xlsx-qualified-profile": {"commands": ["e2e", "format-qualification", "independent-corpus"], "paths": ["machine/format-qualified-profiles.json", "tools/adapter_xlsx.py", "tools/format_qualification.py", "e2e/corpus/manifest.json"]},
+    "pdf-qualified-profile": {"commands": ["e2e", "format-qualification", "independent-corpus"], "paths": ["machine/format-qualified-profiles.json", "tools/adapter_pdf.py", "tools/format_qualification.py", "e2e/corpus/manifest.json"]},
+    "markdown-qualified-profile": {"commands": ["e2e", "format-qualification", "independent-corpus"], "paths": ["machine/format-qualified-profiles.json", "tools/adapter_markdown.py", "tools/format_qualification.py", "e2e/corpus/manifest.json"]},
+    "query-completeness": {"commands": ["query-qualification", "e2e", "independent-corpus"], "paths": ["machine/query-contract.json", "tools/query_ir.py", "tools/query_qualification.py"]},
+    "independent-corpus": {"commands": ["independent-corpus"], "paths": ["e2e/corpus/manifest.json", "tools/independent_corpus.py", "tools/independent_oracle.py"]},
+    "differential": {"commands": ["metamorphic-qualification", "independent-corpus"], "paths": ["tools/metamorphic_qualification.py", "tools/independent_oracle.py", "machine/independent-corpus-contract.json"]},
+    "metamorphic": {"commands": ["metamorphic-qualification"], "paths": ["tools/metamorphic_qualification.py"]},
+    "hostile": {"commands": ["metamorphic-qualification", "defect-injection"], "paths": ["tools/run_defect_injection_campaign.py", "machine/defect-injection-contract.json"]},
+    "release-barrier": {"commands": ["release-contract-qualification", "strict-completion"], "paths": ["tools/release_gate.py", "machine/release-requirements.json", "machine/release-claim-manifest.json"]},
+    "clean-room": {"commands": ["evidence-self-test"], "paths": ["tools/evidence_bundle.py"]},
+    "claim-conformance": {"commands": ["release-contract-qualification", "format-qualification"], "paths": ["machine/release-claim-manifest.json", "machine/capability-profile.json", "tools/release_gate.py"]},
+    "all-child-evidence": {"commands": list(COMMAND_IDS), "paths": ["machine/audit-recovery-plan.json"]},
+}
 
 
 class EvidenceError(ValueError):
@@ -163,6 +212,143 @@ def artifact(path: Path, kind: str, artifact_id: str, command_id: str | None = N
     return value
 
 
+def source_artifact_id(path: str) -> str:
+    return f"source-{digest_bytes(path.encode('utf-8'))[:20]}"
+
+
+def issue_source_paths() -> list[str]:
+    paths = {path for spec in ISSUE_EVIDENCE_SPECS.values() for path in spec.get("paths", [])}
+    return sorted(paths)
+
+
+def source_artifacts() -> list[dict[str, Any]]:
+    result = []
+    for path in issue_source_paths():
+        resolved = root_path(path)
+        if not resolved.is_file():
+            raise EvidenceError("ISSUE_EVIDENCE_SOURCE_MISSING", f"required issue evidence source is missing: {path}")
+        result.append(artifact(resolved, "source", source_artifact_id(path)))
+    return result
+
+
+def _command_artifact_ids(command_id: str, artifacts: list[dict[str, Any]]) -> list[str]:
+    return sorted(item["id"] for item in artifacts if item.get("commandId") == command_id)
+
+
+def build_issue_evidence(source: dict[str, Any], commands: list[dict[str, Any]], artifacts: list[dict[str, Any]]) -> dict[str, Any]:
+    """Resolve every audit-plan evidence ID to commands and digested sources."""
+
+    try:
+        plan = json.loads(AUDIT_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise EvidenceError("ISSUE_EVIDENCE_PLAN_UNREADABLE", str(exc)) from exc
+    command_ids = {item.get("id") for item in commands}
+    artifact_ids = {item.get("id") for item in artifacts}
+    entries = [{"issueNumber": 87, "requiredEvidenceIds": ["all-child-evidence"], "bindings": []}]
+    for plan_item in plan.get("children", []):
+        issue_number = plan_item.get("issueNumber")
+        bindings = []
+        for evidence_id in plan_item.get("requiredEvidenceIds", []):
+            spec = ISSUE_EVIDENCE_SPECS.get(evidence_id)
+            if spec is None:
+                raise EvidenceError("ISSUE_EVIDENCE_SPEC_MISSING", f"no binding specification for {evidence_id}")
+            commands_for_binding = list(spec.get("commands", []))
+            paths_for_binding = list(spec.get("paths", []))
+            missing_commands = sorted(set(commands_for_binding) - command_ids)
+            missing_paths = sorted(set(paths_for_binding) - {item.get("path") for item in artifacts})
+            if missing_commands or missing_paths:
+                raise EvidenceError("ISSUE_EVIDENCE_UNRESOLVED", f"{evidence_id}: commands={missing_commands} paths={missing_paths}")
+            resolved_artifacts = set()
+            for command_id in commands_for_binding:
+                resolved_artifacts.update(_command_artifact_ids(command_id, artifacts))
+            resolved_artifacts.update(source_artifact_id(path) for path in paths_for_binding)
+            if not resolved_artifacts.issubset(artifact_ids):
+                raise EvidenceError("ISSUE_EVIDENCE_ARTIFACT_UNRESOLVED", evidence_id)
+            bindings.append({
+                "evidenceId": evidence_id,
+                "commandIds": commands_for_binding,
+                "sourcePaths": paths_for_binding,
+                "artifactIds": sorted(resolved_artifacts),
+            })
+        entries.append({"issueNumber": issue_number, "requiredEvidenceIds": list(plan_item.get("requiredEvidenceIds", [])), "bindings": bindings})
+    all_artifacts = sorted(artifact_ids)
+    entries[0]["bindings"] = [{
+        "evidenceId": "all-child-evidence",
+        "commandIds": list(COMMAND_IDS),
+        "sourcePaths": ["machine/audit-recovery-plan.json"],
+        "artifactIds": all_artifacts,
+    }]
+    return {
+        "schema": "fdir/issue-evidence-bindings",
+        "version": "1.0.0",
+        "sourceHeadSha": source["headSha"],
+        "entries": entries,
+    }
+
+
+def validate_issue_evidence(bundle: dict[str, Any]) -> None:
+    value = bundle.get("issueEvidence")
+    if not isinstance(value, dict) or value.get("schema") != "fdir/issue-evidence-bindings" or value.get("version") != "1.0.0":
+        raise EvidenceError("ISSUE_EVIDENCE_SCHEMA", "issue-specific evidence bindings are missing")
+    if value.get("sourceHeadSha") != bundle.get("source", {}).get("headSha"):
+        raise EvidenceError("ISSUE_EVIDENCE_SOURCE_MISMATCH", "issue evidence is bound to a different source commit")
+    by_issue = {item.get("issueNumber"): item for item in value.get("entries", []) if isinstance(item, dict)}
+    if set(by_issue) != set(LIVE_ISSUE_NUMBERS):
+        raise EvidenceError("ISSUE_EVIDENCE_SCOPE", "issue evidence must cover exactly #87-#105")
+    commands = {item.get("id"): item for item in bundle.get("commands", []) if isinstance(item, dict)}
+    artifacts = {item.get("id"): item for item in bundle.get("artifacts", []) if isinstance(item, dict)}
+    try:
+        plan = json.loads(AUDIT_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise EvidenceError("ISSUE_EVIDENCE_PLAN_UNREADABLE", str(exc)) from exc
+    expected = {87: ["all-child-evidence"]}
+    expected.update({item["issueNumber"]: item.get("requiredEvidenceIds", []) for item in plan.get("children", [])})
+    for issue_number, required_ids in expected.items():
+        entry = by_issue[issue_number]
+        if entry.get("requiredEvidenceIds") != required_ids:
+            raise EvidenceError("ISSUE_EVIDENCE_REQUIREMENTS", f"issue #{issue_number} evidence IDs do not match the audit plan")
+        bindings = {item.get("evidenceId"): item for item in entry.get("bindings", []) if isinstance(item, dict)}
+        if set(bindings) != set(required_ids):
+            raise EvidenceError("ISSUE_EVIDENCE_BINDINGS", f"issue #{issue_number} has unresolved required evidence")
+        for evidence_id in required_ids:
+            binding = bindings[evidence_id]
+            for command_id in binding.get("commandIds", []):
+                command = commands.get(command_id)
+                if not isinstance(command, dict):
+                    raise EvidenceError("ISSUE_EVIDENCE_COMMAND_MISSING", f"{evidence_id}: {command_id}")
+                if bundle.get("barrier", {}).get("releaseEligible") and (command.get("status") != "passed" or command.get("exitCode") != 0):
+                    raise EvidenceError("ISSUE_EVIDENCE_COMMAND_FAILED", f"{evidence_id}: {command_id}")
+            for path in binding.get("sourcePaths", []):
+                source_id = source_artifact_id(path)
+                item = artifacts.get(source_id)
+                if not isinstance(item, dict) or item.get("path") != path:
+                    raise EvidenceError("ISSUE_EVIDENCE_SOURCE_UNRESOLVED", f"{evidence_id}: {path}")
+            for artifact_id in binding.get("artifactIds", []):
+                if artifact_id not in artifacts:
+                    raise EvidenceError("ISSUE_EVIDENCE_ARTIFACT_UNRESOLVED", f"{evidence_id}: {artifact_id}")
+
+
+def validate_clean_room_bindings(bundle: dict[str, Any]) -> None:
+    clean_room = bundle.get("cleanRoom")
+    if not isinstance(clean_room, dict):
+        raise EvidenceError("CLEAN_ROOM_REQUIRED", "release-eligible evidence has no clean-room report")
+    if clean_room.get("sourceHeadSha") != bundle.get("source", {}).get("headSha") or clean_room.get("sourceTrackedDigest") != bundle.get("source", {}).get("trackedDigest"):
+        raise EvidenceError("CLEAN_ROOM_SOURCE_MISMATCH", "clean-room report is bound to a different source")
+    inputs = clean_room.get("inputs")
+    if not isinstance(inputs, list) or len(inputs) != 2 or len({item.get("path") for item in inputs if isinstance(item, dict)}) != 2:
+        raise EvidenceError("CLEAN_ROOM_INPUTS_REQUIRED", "clean-room report must bind two distinct raw replay bundles")
+    artifacts = {item.get("path"): item for item in bundle.get("artifacts", []) if isinstance(item, dict)}
+    for entry in inputs:
+        if not isinstance(entry, dict):
+            raise EvidenceError("CLEAN_ROOM_INPUTS_REQUIRED", "clean-room input is malformed")
+        raw = artifacts.get(entry.get("path"))
+        index = artifacts.get(entry.get("indexPath"))
+        if not isinstance(raw, dict) or raw.get("sha256") != entry.get("sha256") or raw.get("bytes") != entry.get("bytes"):
+            raise EvidenceError("CLEAN_ROOM_INPUT_DIGEST_MISMATCH", str(entry.get("path")))
+        if not isinstance(index, dict) or index.get("sha256") != entry.get("indexSha256") or index.get("bytes") != entry.get("indexBytes"):
+            raise EvidenceError("CLEAN_ROOM_INDEX_DIGEST_MISMATCH", str(entry.get("indexPath")))
+
+
 def digest_ref(path: Path) -> dict[str, Any]:
     sha, size = digest_file(path)
     return {"path": relative(path), "sha256": sha, "bytes": size}
@@ -228,6 +414,8 @@ def validate_shape(bundle: dict[str, Any]) -> None:
     if issue_state is not None:
         if not isinstance(issue_state, dict) or issue_state.get("status") != "passed" or issue_state.get("source") != "github-issue-api" or set(issue_state.get("issueNumbers", [])) != set(LIVE_ISSUE_NUMBERS):
             raise EvidenceError("ISSUE_STATE_INVALID", "bundle issue state is not a complete live GitHub snapshot")
+    if bundle.get("issueEvidence") is not None:
+        validate_issue_evidence(bundle)
     if bundle.get("barrier", {}).get("releaseEligible"):
         if issue_state is None:
             raise EvidenceError("ISSUE_STATE_REQUIRED", "release-eligible evidence has no live issue state")
@@ -249,6 +437,8 @@ def verify_bundle(bundle_path: Path, *, index_path: Path | None = None, require_
         raise EvidenceError("SOURCE_DIGEST_MISMATCH", "workspace bytes differ from the bundled source digest")
     if require_clean and (not source["workingTreeClean"] or bundle["source"].get("binding") != "exact-commit"):
         raise EvidenceError("DIRTY_SOURCE", "exact release evidence requires a clean commit-bound workspace")
+    if bundle.get("barrier", {}).get("releaseEligible") and (not source["workingTreeClean"] or bundle["source"].get("binding") != "exact-commit"):
+        raise EvidenceError("BARRIER_FALSE_RELEASE", "dirty or non-commit evidence cannot claim release eligibility")
     if bundle.get("integrity", {}).get("bundleDigest") != bundle_digest(bundle):
         raise EvidenceError("BUNDLE_DIGEST_MISMATCH", "bundle bytes or integrity fields were changed")
 
@@ -258,6 +448,12 @@ def verify_bundle(bundle_path: Path, *, index_path: Path | None = None, require_
         sha, size = digest_file(path)
         if sha != item["sha256"] or size != item["bytes"]:
             raise EvidenceError("ARTIFACT_DIGEST_MISMATCH", f"artifact bytes changed: {item['path']}")
+    if bundle.get("barrier", {}).get("releaseEligible"):
+        if bundle.get("issueEvidence") is None:
+            raise EvidenceError("ISSUE_EVIDENCE_REQUIRED", "release-eligible evidence has no issue-specific bindings")
+        validate_clean_room_bindings(bundle)
+    if bundle.get("issueEvidence") is not None:
+        validate_issue_evidence(bundle)
     issue_state = bundle.get("issueState")
     if isinstance(issue_state, dict):
         artifact_id = issue_state.get("artifactId")
@@ -293,8 +489,6 @@ def verify_bundle(bundle_path: Path, *, index_path: Path | None = None, require_
     bundle_index_core = {key: bundle["index"].get(key) for key in ("schema", "version", "entries", "digest")}
     if bundle_index_core != expected_index:
         raise EvidenceError("INDEX_DIGEST_MISMATCH", "index entries do not match artifact and command bindings")
-    if bundle.get("barrier", {}).get("releaseEligible") and (not source["workingTreeClean"] or bundle["source"].get("binding") != "exact-commit"):
-        raise EvidenceError("BARRIER_FALSE_RELEASE", "dirty or non-commit evidence cannot claim release eligibility")
     return {"status": "passed", "sourceHeadSha": source["headSha"], "bundleDigest": bundle["integrity"]["bundleDigest"], "indexDigest": bundle["index"]["digest"], "artifactCount": len(artifacts)}
 
 
@@ -408,6 +602,12 @@ def compare_clean_room(first_path: Path, second_path: Path) -> dict[str, Any]:
         raise EvidenceError("CLEAN_ROOM_UNREADABLE", str(exc)) from exc
     validate_shape(first)
     validate_shape(second)
+    first_index_path = root_path(first["index"]["path"])
+    second_index_path = root_path(second["index"]["path"])
+    first_sha, first_size = digest_file(first_path)
+    second_sha, second_size = digest_file(second_path)
+    first_index_sha, first_index_size = digest_file(first_index_path)
+    second_index_sha, second_index_size = digest_file(second_index_path)
     if first["source"] != second["source"]:
         differences = ["source binding differs"]
     else:
@@ -415,7 +615,22 @@ def compare_clean_room(first_path: Path, second_path: Path) -> dict[str, Any]:
         right = _clean_room_projection(second)
         differences = [] if left == right else ["normalized evidence bundle differs"]
     diff_digest = digest_bytes(canonical(differences))
-    return {"schema":"fdir/clean-room-replay-report","version":"1.0.0","status":"passed" if not differences else "failed","runs":2,"volatileFields":["integrity","environment","commands[*].durationMilliseconds","commands[*].*.path","artifacts[*].path","defect-injection-report.baseSuite[*].*Digest","defect-injection-report.cases[*].execution.*Digest"],"diffCount":len(differences),"diffDigest":diff_digest,"differences":differences}
+    return {
+        "schema": "fdir/clean-room-replay-report",
+        "version": "1.0.0",
+        "status": "passed" if not differences else "failed",
+        "runs": 2,
+        "sourceHeadSha": first.get("source", {}).get("headSha"),
+        "sourceTrackedDigest": first.get("source", {}).get("trackedDigest"),
+        "inputs": [
+            {"path": relative(first_path), "sha256": first_sha, "bytes": first_size, "indexPath": relative(first_index_path), "indexSha256": first_index_sha, "indexBytes": first_index_size, "bundleDigest": first.get("integrity", {}).get("bundleDigest"), "indexDigest": first.get("index", {}).get("digest")},
+            {"path": relative(second_path), "sha256": second_sha, "bytes": second_size, "indexPath": relative(second_index_path), "indexSha256": second_index_sha, "indexBytes": second_index_size, "bundleDigest": second.get("integrity", {}).get("bundleDigest"), "indexDigest": second.get("index", {}).get("digest")},
+        ],
+        "volatileFields": ["integrity", "environment", "commands[*].durationMilliseconds", "commands[*].*.path", "artifacts[*].path", "defect-injection-report.baseSuite[*].*Digest", "defect-injection-report.cases[*].execution.*Digest"],
+        "diffCount": len(differences),
+        "diffDigest": diff_digest,
+        "differences": differences,
+    }
 
 
 def load_clean_room_report(path: Path) -> dict[str, Any]:
@@ -423,13 +638,26 @@ def load_clean_room_report(path: Path) -> dict[str, Any]:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise EvidenceError("CLEAN_ROOM_UNREADABLE", str(exc)) from exc
-    if not isinstance(value, dict) or value.get("schema") != "fdir/clean-room-replay-report" or value.get("status") != "passed" or value.get("runs", 0) < 2 or value.get("diffCount") != 0 or not _hash_ok(value.get("diffDigest")):
+    if (
+        not isinstance(value, dict)
+        or value.get("schema") != "fdir/clean-room-replay-report"
+        or value.get("status") != "passed"
+        or value.get("runs", 0) < 2
+        or not _hash_ok(value.get("diffDigest"))
+        or not isinstance(value.get("sourceHeadSha"), str)
+        or len(value.get("sourceHeadSha", "")) != 40
+        or not _hash_ok(value.get("sourceTrackedDigest"))
+        or not isinstance(value.get("inputs"), list)
+        or len(value.get("inputs", [])) != 2
+        or any(not isinstance(item, dict) or not _hash_ok(item.get("sha256")) or not _hash_ok(item.get("indexSha256")) or not _hash_ok(item.get("bundleDigest")) or not _hash_ok(item.get("indexDigest")) for item in value.get("inputs", []))
+        or value.get("diffCount") != 0
+    ):
         raise EvidenceError("CLEAN_ROOM_REQUIRED", "clean-room replay is not passed with zero differences")
     return value
 
 
-def finalize_bundle(bundle_path: Path, index_path: Path, clean_room_report_path: Path) -> dict[str, Any]:
-    """Attach a verified two-run replay to a previously collected bundle."""
+def finalize_bundle(bundle_path: Path, index_path: Path, clean_room_report_path: Path, output_path: Path, output_index_path: Path) -> dict[str, Any]:
+    """Create a final bundle without overwriting either raw replay input."""
 
     try:
         bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
@@ -442,18 +670,43 @@ def finalize_bundle(bundle_path: Path, index_path: Path, clean_room_report_path:
         raise EvidenceError("DIRTY_SOURCE", "finalize requires an exact clean commit")
     if bundle.get("source") != source:
         raise EvidenceError("SOURCE_STATE_MISMATCH", "collected bundle is not from the current exact commit")
+    if clean_room.get("sourceHeadSha") != source["headSha"] or clean_room.get("sourceTrackedDigest") != source["trackedDigest"]:
+        raise EvidenceError("CLEAN_ROOM_SOURCE_MISMATCH", "clean-room replay is not bound to the current source")
     if bundle.get("issueState", {}).get("status") != "passed":
         raise EvidenceError("ISSUE_STATE_REQUIRED", "finalize requires a complete live GitHub issue snapshot")
+    inputs = clean_room.get("inputs")
+    if not isinstance(inputs, list) or len(inputs) != 2:
+        raise EvidenceError("CLEAN_ROOM_INPUTS_REQUIRED", "clean-room report must bind both raw replay bundles")
+    input_by_path = {item.get("path"): item for item in inputs if isinstance(item, dict)}
+    raw_paths = [bundle_path, root_path(inputs[1].get("path")) if inputs[0].get("path") == relative(bundle_path) else root_path(inputs[0].get("path"))]
+    if len(set(raw_paths)) != 2:
+        raise EvidenceError("CLEAN_ROOM_INPUTS_REQUIRED", "clean-room replay inputs must be two distinct bundles")
+    for raw_path in raw_paths:
+        entry = input_by_path.get(relative(raw_path))
+        if not isinstance(entry, dict):
+            raise EvidenceError("CLEAN_ROOM_INPUT_MISSING", f"clean-room report does not bind {relative(raw_path)}")
+        sha, size = digest_file(raw_path)
+        if sha != entry.get("sha256") or size != entry.get("bytes"):
+            raise EvidenceError("CLEAN_ROOM_INPUT_DIGEST_MISMATCH", relative(raw_path))
+        raw_index = root_path(entry.get("indexPath", ""))
+        index_sha, index_size = digest_file(raw_index)
+        if index_sha != entry.get("indexSha256") or index_size != entry.get("indexBytes"):
+            raise EvidenceError("CLEAN_ROOM_INDEX_DIGEST_MISMATCH", relative(raw_index))
     blockers = [item for item in bundle.get("barrier", {}).get("blockers", []) if item.get("code") != "CLEAN_ROOM_REQUIRED"]
     if blockers or any(item.get("status") != "passed" for item in bundle.get("commands", [])):
         raise EvidenceError("BUNDLE_BLOCKED", "command or live-state blockers remain before clean-room finalization")
     bundle["cleanRoom"] = clean_room
     bundle["artifacts"].append(artifact(clean_room_report_path, "report", "clean-room-replay"))
-    bundle["barrier"] = {"releaseEligible": True, "claimMode": "release-candidate", "blockers": []}
+    for label, raw_path in zip(("a", "b"), raw_paths):
+        entry = input_by_path[relative(raw_path)]
+        raw_index = root_path(entry["indexPath"])
+        bundle["artifacts"].append(artifact(raw_path, "report", f"clean-room-run-{label}"))
+        bundle["artifacts"].append(artifact(raw_index, "index", f"clean-room-run-{label}-index"))
+    bundle["barrier"] = {"releaseEligible": True, "claimMode": "release-candidate", "productReleaseEligible": False, "productClaimMode": "experimental-bounded-subset", "blockers": []}
     bundle["status"] = "passed"
-    write_bundle(bundle, bundle_path, index_path)
-    verified = verify_bundle(bundle_path, index_path=index_path, require_clean=True)
-    return {"status": "passed", "bundle": relative(bundle_path), "index": relative(index_path), "cleanRoom": clean_room, "bundleDigest": verified["bundleDigest"], "indexDigest": verified["indexDigest"]}
+    write_bundle(bundle, output_path, output_index_path)
+    verified = verify_bundle(output_path, index_path=output_index_path, require_clean=True)
+    return {"status": "passed", "bundle": relative(output_path), "index": relative(output_index_path), "cleanRoom": clean_room, "bundleDigest": verified["bundleDigest"], "indexDigest": verified["indexDigest"]}
 
 
 COMMANDS = [
@@ -527,6 +780,8 @@ def collect(
         command, produced = run_command(command_id, argv, log_dir, timeout)
         commands.append(command)
         artifacts.extend(produced)
+    artifacts.extend(source_artifacts())
+    issue_evidence = build_issue_evidence(source, commands, artifacts)
     blockers = []
     if not source["workingTreeClean"] and not allow_dirty:
         blockers.append({"code": "DIRTY_SOURCE", "detail": "collect requires a clean exact candidate; use --allow-dirty only for a blocked diagnostic report"})
@@ -550,11 +805,7 @@ def collect(
         blockers.append({"code": "CLEAN_ROOM_REQUIRED", "detail": "final release evidence must bind a passed two-run clean-room replay"})
     else:
         try:
-            clean_room = json.loads(clean_room_report_path.read_text(encoding="utf-8"))
-            if not isinstance(clean_room, dict) or clean_room.get("status") != "passed" or clean_room.get("runs", 0) < 2 or clean_room.get("diffCount") != 0:
-                raise EvidenceError("CLEAN_ROOM_REQUIRED", "clean-room replay is not passed with zero differences")
-            if not _hash_ok(clean_room.get("diffDigest")):
-                raise EvidenceError("CLEAN_ROOM_SCHEMA", "clean-room replay has no SHA-256 diff digest")
+            clean_room = load_clean_room_report(clean_room_report_path)
         except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
             blockers.append({"code": "CLEAN_ROOM_UNREADABLE", "detail": str(exc)})
         except EvidenceError as exc:
@@ -564,9 +815,10 @@ def collect(
     bundle: dict[str, Any] = {
         "schema": "fdir/qualification-evidence-bundle", "version": "1.0.0", "repository": "horiyamayoh/fdir",
         "source": source, "commands": commands, "artifacts": sorted(artifacts, key=lambda value: value["id"]),
-        "index": {}, "barrier": {"releaseEligible": not blockers, "claimMode": "release-candidate" if not blockers else "experimental-bounded-subset", "blockers": blockers},
+        "index": {}, "barrier": {"releaseEligible": not blockers, "claimMode": "release-candidate" if not blockers else "experimental-bounded-subset", "productReleaseEligible": False, "productClaimMode": "experimental-bounded-subset", "blockers": blockers},
         "status": "passed" if not blockers else "blocked", "integrity": {},
         "environment": {"python": platform.python_version(), "platform": platform.platform()},
+        "issueEvidence": issue_evidence,
     }
     if issue_state is not None:
         issue_state["artifactId"] = "live-issue-state"
@@ -600,7 +852,21 @@ def self_test() -> dict[str, Any]:
         }, sort_keys=True) + "\n", encoding="utf-8")
         _issue_snapshot, issue_state = load_issue_snapshot(issue_path)
         issue_state["artifactId"] = "live-issue-state"
-        clean_room = {"schema": "fdir/clean-room-replay-report", "version": "1.0.0", "status": "passed", "runs": 2, "volatileFields": [], "diffCount": 0, "diffDigest": "0" * 64}
+        clean_room = {
+            "schema": "fdir/clean-room-replay-report",
+            "version": "1.0.0",
+            "status": "passed",
+            "runs": 2,
+            "sourceHeadSha": "0" * 40,
+            "sourceTrackedDigest": "0" * 64,
+            "inputs": [
+                {"path": "raw-a.json", "sha256": "0" * 64, "bytes": 1, "indexPath": "raw-a.index.json", "indexSha256": "0" * 64, "indexBytes": 1, "bundleDigest": "0" * 64, "indexDigest": "0" * 64},
+                {"path": "raw-b.json", "sha256": "0" * 64, "bytes": 1, "indexPath": "raw-b.index.json", "indexSha256": "0" * 64, "indexBytes": 1, "bundleDigest": "0" * 64, "indexDigest": "0" * 64},
+            ],
+            "volatileFields": [],
+            "diffCount": 0,
+            "diffDigest": "0" * 64,
+        }
         clean_path = folder / "clean-room.json"
         clean_path.write_text(json.dumps(clean_room, sort_keys=True) + "\n", encoding="utf-8")
         source = source_state()
@@ -716,6 +982,8 @@ def main(argv: list[str] | None = None) -> int:
     finalize_parser.add_argument("bundle", type=Path)
     finalize_parser.add_argument("--index", type=Path, required=True)
     finalize_parser.add_argument("--clean-room-report", type=Path, required=True)
+    finalize_parser.add_argument("--output", type=Path, required=True, help="final bundle path; raw replay input is never overwritten")
+    finalize_parser.add_argument("--output-index", type=Path, required=True, help="final bundle index path")
     args = parser.parse_args(argv)
     try:
         if args.operation == "collect":
@@ -742,7 +1010,7 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
             return 0 if result["status"] == "passed" else 1
         if args.operation == "finalize":
-            result = finalize_bundle(root_path(args.bundle), root_path(args.index), root_path(args.clean_room_report))
+            result = finalize_bundle(root_path(args.bundle), root_path(args.index), root_path(args.clean_room_report), root_path(args.output), root_path(args.output_index))
             print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
             return 0
         result = self_test()

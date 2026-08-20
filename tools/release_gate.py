@@ -509,9 +509,12 @@ def check_evidence_release_track(bundle_path: Path | None, commands: list[dict[s
         raise GateError(f"evidence bundle verification failed: {exc}") from exc
     bundle = load_json(bundle_path)
     require(bundle.get("status") == "passed" and bundle.get("barrier", {}).get("releaseEligible") is True, "evidence bundle is not an eligible release candidate")
+    require(bundle.get("barrier", {}).get("productReleaseEligible") is False and bundle.get("barrier", {}).get("productClaimMode") == "experimental-bounded-subset", "evidence bundle does not expose the bounded product release barrier")
     require(not bundle.get("barrier", {}).get("blockers"), "evidence bundle contains release blockers")
     issue_state = bundle.get("issueState", {})
     require(issue_state.get("status") == "passed" and issue_state.get("source") == "github-issue-api" and set(issue_state.get("issueNumbers", [])) == set(range(87, 106)), "live GitHub issue state is missing or incomplete")
+    issue_evidence = bundle.get("issueEvidence", {})
+    require(issue_evidence.get("schema") == "fdir/issue-evidence-bindings" and len(issue_evidence.get("entries", [])) == 19, "issue-specific evidence bindings are missing")
     clean_room = check_clean_room_claim(bundle)
     return {"child_issues": len(children), "regression_cases": len(regression_cases), "self_test_negatives": self_report.get("negativeCount"), "defect_cases": campaign_report.get("total"), "bundle_digest": verified["bundleDigest"], "index_digest": verified["indexDigest"], "clean_room_runs": clean_room.get("runs")}
 
@@ -527,6 +530,9 @@ def check_clean_room_claim(bundle: dict[str, Any]) -> dict[str, Any]:
         and clean_room.get("diffCount") == 0,
         "clean-room replay evidence is missing or differs",
     )
+    require(clean_room.get("sourceHeadSha") == bundle.get("source", {}).get("headSha"), "clean-room replay source SHA is stale")
+    require(clean_room.get("sourceTrackedDigest") == bundle.get("source", {}).get("trackedDigest"), "clean-room replay source digest is stale")
+    require(isinstance(clean_room.get("inputs"), list) and len(clean_room["inputs"]) == 2 and len({item.get("path") for item in clean_room["inputs"] if isinstance(item, dict)}) == 2, "clean-room replay does not bind two distinct raw bundles")
     return clean_room
 
 

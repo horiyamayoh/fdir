@@ -48,7 +48,7 @@
     }
   ],
   "knownUnqualifiedScope": [
-    "live GitHub issue state has not been embedded into a final candidate bundle",
+    "live GitHub issue state is embedded only when the final bundle is collected while #87-#105 are closed as completed",
     "the current working tree is not an exact release candidate until committed",
     "format-specific qualification owned by #90-#104 is not claimed by this track",
     "CI artifact URLs and retention are created only by the workflow run"

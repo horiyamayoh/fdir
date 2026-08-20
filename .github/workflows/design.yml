@@ -1,16 +1,24 @@
-name: Document Form IR design validation
+name: Document Form IR qualification and release evidence
 
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
+  issues: read
 
 jobs:
-  design:
-    runs-on: ubuntu-latest
+  platform-smoke:
+    name: Platform smoke (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -20,37 +28,17 @@ jobs:
         run: python tools/validate_design.py
       - name: Run evidence tamper self-tests
         run: python tools/evidence_bundle.py self-test
-      - name: Run bounded executable defect campaign
-        run: python tools/run_defect_injection_campaign.py --json
-      - name: Run final release gate
-        if: always()
-        run: python tools/release_gate.py
-      - name: Run real-input adapter E2E
-        if: always()
+      - name: Run real-input adapter smoke suite
         run: python tools/run_e2e.py --all --json
-      - name: Collect commit-bound qualification bundle
-        if: always()
-        run: python tools/evidence_bundle.py collect --output reports/evidence-bundle.json --index reports/evidence-index.json --allow-blocked-report
-      - name: Verify release barrier against candidate bundle
-        if: always()
-        run: python tools/release_gate.py --evidence-bundle reports/evidence-bundle.json
-      - name: Upload qualification evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: fdir-qualification-evidence-${{ github.sha }}
-          path: reports/
-          if-no-files-found: error
-          retention-days: 14
 
-  clean-room:
-    needs: design
-    if: always()
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+  release-evidence:
+    name: Commit-bound release evidence
+    needs: platform-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PYTHONIOENCODING: utf-8
     steps:
       - uses: actions/checkout@v4
         with:
@@ -58,13 +46,50 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Collect fresh clean-room evidence
-        run: python tools/evidence_bundle.py collect --output reports/evidence-bundle.json --index reports/evidence-index.json --allow-blocked-report
-      - name: Upload clean-room evidence
+      - name: Create report directory
+        run: mkdir -p reports
+      - name: Fetch live issue state
+        run: python tools/github_issue_snapshot.py --output reports/live-issue-state.json
+      - name: Validate design authority
+        run: python tools/validate_design.py
+      - name: Run evidence tamper self-tests
+        run: python tools/evidence_bundle.py self-test
+      - name: Run executable defect campaign
+        run: python tools/run_defect_injection_campaign.py --json
+      - name: Collect raw qualification replay A
+        run: >-
+          python tools/evidence_bundle.py collect
+          --output reports/evidence-replay-a.json
+          --index reports/evidence-replay-a.index.json
+          --issue-snapshot reports/live-issue-state.json
+          --allow-blocked-report
+      - name: Collect raw qualification replay B
+        run: >-
+          python tools/evidence_bundle.py collect
+          --output reports/evidence-replay-b.json
+          --index reports/evidence-replay-b.index.json
+          --issue-snapshot reports/live-issue-state.json
+          --allow-blocked-report
+      - name: Compare raw clean-room replays
+        run: >-
+          python tools/evidence_bundle.py compare
+          reports/evidence-replay-a.json
+          reports/evidence-replay-b.json
+          --output reports/clean-room-replay.json
+      - name: Finalize evidence without overwriting raw replays
+        run: >-
+          python tools/evidence_bundle.py finalize reports/evidence-replay-a.json
+          --index reports/evidence-replay-a.index.json
+          --clean-room-report reports/clean-room-replay.json
+          --output reports/evidence-final.json
+          --output-index reports/evidence-final.index.json
+      - name: Run final release gate against the finalized bundle
+        run: python tools/release_gate.py --evidence-bundle reports/evidence-final.json
+      - name: Upload complete qualification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fdir-clean-room-${{ matrix.os }}-${{ github.sha }}
+          name: fdir-qualification-evidence-${{ github.sha }}
           path: reports/
           if-no-files-found: error
           retention-days: 14
