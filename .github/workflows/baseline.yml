@@ -79,3 +79,21 @@ jobs:
             Cargo.lock
           if-no-files-found: warn
           retention-days: 90
+      - name: Archive branch source for local validation
+        if: always()
+        shell: bash
+        run: |
+          tar --create --gzip \
+            --file /tmp/fdir-issue-12-source.tar.gz \
+            --exclude=.git \
+            --exclude=.validation \
+            --exclude=reports \
+            .
+      - name: Upload branch source for local validation
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: fdir-issue-12-source-${{ github.sha }}
+          path: /tmp/fdir-issue-12-source.tar.gz
+          if-no-files-found: error
+          retention-days: 2
