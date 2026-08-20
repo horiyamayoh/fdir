@@ -4,7 +4,7 @@
   "repository": "horiyamayoh/fdir",
   "auditBaseSha": "1fd948402500e088c7453aee0743c5e10521a14c",
   "umbrellaIssue": 87,
-  "releaseBlocked": false,
+  "releaseBlocked": true,
   "auditedClosedIssues": [
     47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61,
     62, 63, 64, 65, 66, 67, 68, 71, 74, 75, 76, 77, 78, 79, 83, 85
@@ -16,7 +16,7 @@
       "title": "resolvable and commit-bound evidence bundle",
       "dependsOn": [],
       "auditsClaimsFrom": [47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 86],
-      "status": "completed",
+      "status": "open",
       "evidenceIds": ["issue-88-qualification-contract"],
       "statusSource": "github-issue-api"
     },
@@ -25,7 +25,7 @@
       "title": "executable defect-injection qualification",
       "dependsOn": [88],
       "auditsClaimsFrom": [66, 70, 86],
-      "status": "completed",
+      "status": "open",
       "evidenceIds": ["issue-89-defect-injection"],
       "statusSource": "github-issue-api"
     },
@@ -34,7 +34,7 @@
       "title": "normative model and schema/runtime/reference closure",
       "dependsOn": [88, 89],
       "auditsClaimsFrom": [54, 55, 56, 71],
-      "status": "completed",
+      "status": "open",
       "evidenceIds": ["issue-90-model-contract"],
       "statusSource": "github-issue-api"
     },
@@ -43,7 +43,7 @@
       "title": "occurrence-level source accounting and fail-closed status",
       "dependsOn": [88, 90],
       "auditsClaimsFrom": [53, 72],
-      "status": "completed",
+      "status": "open",
       "evidenceIds": ["issue-91-occurrence-accounting"],
       "statusSource": "github-issue-api"
     },
@@ -52,7 +52,7 @@
       "title": "exact scalar, text, date, formula, display, and glyph provenance",
       "dependsOn": [88, 90, 91],
       "auditsClaimsFrom": [53, 56, 62, 64, 73],
-      "status": "completed",
+      "status": "open",
       "evidenceIds": ["issue-92-exact-values"],
       "statusSource": "github-issue-api"
     },
@@ -61,7 +61,7 @@
       "title": "complete style cascade and property provenance",
       "dependsOn": [88, 90, 91, 92],
       "auditsClaimsFrom": [55, 58, 62, 63, 64, 74],
-      "status": "completed",
+      "status": "open",
       "evidenceIds": ["issue-93-style-provenance"],
       "statusSource": "github-issue-api"
     },
@@ -70,7 +70,7 @@
       "title": "coordinate, geometry, anchor, clipping, transform, and order fidelity",
       "dependsOn": [88, 90, 91, 92],
       "auditsClaimsFrom": [55, 59, 63, 64, 75],
-      "status": "completed",
+      "status": "open",
       "evidenceIds": ["issue-94-geometry-order"],
       "statusSource": "github-issue-api"
     },
@@ -79,7 +79,7 @@
       "title": "parts, surfaces, containment, tables, merges, and grid topology",
       "dependsOn": [88, 90, 91],
       "auditsClaimsFrom": [54, 55, 58, 62, 65, 76],
-      "status": "completed",
+      "status": "open",
       "evidenceIds": ["issue-95-topology"],
       "statusSource": "github-issue-api"
     },
@@ -88,7 +88,7 @@
       "title": "resources, relationships, annotations, revisions, fields, and links",
       "dependsOn": [88, 90, 91, 92, 95],
       "auditsClaimsFrom": [56, 60, 63, 64, 77],
-      "status": "completed",
+      "status": "open",
       "evidenceIds": ["issue-96-relationship-closure"],
       "statusSource": "github-issue-api"
     },
@@ -97,7 +97,7 @@
       "title": "exhaustive typed and versioned extension registry",
       "dependsOn": [88, 90],
       "auditsClaimsFrom": [50, 61, 78],
-      "status": "completed",
+      "status": "open",
       "evidenceIds": ["issue-97-extension-registry"],
       "statusSource": "github-issue-api"
     },
@@ -106,7 +106,7 @@
       "title": "canonical identity, stable IDs, projections, and migration",
       "dependsOn": [88, 90, 97],
       "auditsClaimsFrom": [52, 79],
-      "status": "completed",
+      "status": "open",
       "evidenceIds": ["issue-98-canonical-identity"],
       "statusSource": "github-issue-api"
     },
@@ -115,7 +115,7 @@
       "title": "relationship-complete qualified DOCX profile",
       "dependsOn": [88, 91, 92, 93, 94, 95, 96, 97, 98],
       "auditsClaimsFrom": [58, 59, 60, 80],
-      "status": "completed",
+      "status": "open",
       "evidenceIds": ["issue-99-docx-profile"],
       "statusSource": "github-issue-api"
     },
@@ -124,7 +124,7 @@
       "title": "exact-value and relationship-complete qualified XLSX profile",
       "dependsOn": [88, 91, 92, 93, 94, 95, 96, 97, 98],
       "auditsClaimsFrom": [62, 63, 81],
-      "status": "completed",
+      "status": "open",
       "evidenceIds": ["issue-100-xlsx-profile"],
       "statusSource": "github-issue-api"
     },
@@ -133,7 +133,7 @@
       "title": "object, graphics-state, and font-aware qualified PDF profile",
       "dependsOn": [88, 91, 92, 94, 96, 97, 98],
       "auditsClaimsFrom": [64, 82],
-      "status": "completed",
+      "status": "open",
       "evidenceIds": ["issue-101-pdf-profile"],
       "statusSource": "github-issue-api"
     },
@@ -142,7 +142,7 @@
       "title": "standards-conformant qualified CommonMark/GFM profile",
       "dependsOn": [88, 91, 92, 95, 96, 97, 98],
       "auditsClaimsFrom": [65, 84, 85],
-      "status": "completed",
+      "status": "open",
       "evidenceIds": ["issue-102-markdown-profile"],
       "statusSource": "github-issue-api"
     },
@@ -151,7 +151,7 @@
       "title": "complete typed query and independently rebuildable index",
       "dependsOn": [88, 90, 91, 92, 95, 96, 97, 98],
       "auditsClaimsFrom": [57, 83],
-      "status": "completed",
+      "status": "open",
       "evidenceIds": ["issue-103-query-index"],
       "statusSource": "github-issue-api"
     },
@@ -160,7 +160,7 @@
       "title": "independent multi-producer and hostile qualification corpus",
       "dependsOn": [88, 89, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103],
       "auditsClaimsFrom": [66, 68, 70, 86],
-      "status": "completed",
+      "status": "open",
       "evidenceIds": ["issue-104-independent-corpus"],
       "statusSource": "github-issue-api"
     },
@@ -169,7 +169,7 @@
       "title": "behavioral acceptance, clean-room CI, packaging, and release barrier",
       "dependsOn": [88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104],
       "auditsClaimsFrom": [47, 51, 66, 67, 68, 69, 86],
-      "status": "completed",
+      "status": "open",
       "evidenceIds": ["issue-105-release-quality"],
       "statusSource": "github-issue-api"
     }

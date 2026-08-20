@@ -15,6 +15,8 @@ import os
 import re
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any, Callable
 
@@ -45,6 +47,7 @@ TRACEABILITY_PATH = ROOT / "machine" / "traceability.json"
 SCHEMA_PATH = ROOT / "schemas" / "document-form-ir.schema.json"
 EXAMPLES_PATH = ROOT / "examples"
 CLEAN_ROOM_REPLAY_PATH = ROOT / "e2e" / ".run" / "clean-room-replay.json"
+AUDIT_RECOVERY_ISSUES = tuple(range(87, 106))
 
 EXPECTED_REQUIREMENTS = 134
 EXPECTED_FAMILIES = 16
@@ -127,6 +130,54 @@ def relative(path: Path) -> str:
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise GateError(message)
+
+
+def fetch_live_audit_issue_state() -> dict[str, Any]:
+    """Read the audit issue state from GitHub instead of trusting repository JSON.
+
+    The recovery plan is intentionally only a local projection.  In
+    particular, a stale ``releaseBlocked`` flag must not be able to turn an
+    open/reopened issue into release evidence.  GitHub Actions supplies a
+    read-only token through the workflow; public repositories can also be
+    checked without one for local diagnostics.
+    """
+
+    repository = os.environ.get("GITHUB_REPOSITORY", "horiyamayoh/fdir")
+    require(re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository) is not None,
+            "GITHUB_REPOSITORY is invalid")
+    api_base = os.environ.get("GITHUB_API_URL", "https://api.github.com").rstrip("/")
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    states: list[dict[str, Any]] = []
+    for issue_number in AUDIT_RECOVERY_ISSUES:
+        request = urllib.request.Request(
+            f"{api_base}/repos/{repository}/issues/{issue_number}",
+            headers={
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+                **({"Authorization": f"Bearer {token}"} if token else {}),
+                "User-Agent": "fdir-release-gate/1.0",
+            },
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=20) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except (OSError, urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError) as exc:
+            raise GateError(f"cannot read live GitHub issue #{issue_number}: {type(exc).__name__}: {exc}") from exc
+        require(isinstance(payload, dict), f"GitHub issue #{issue_number} response is not an object")
+        require(payload.get("number") == issue_number, f"GitHub returned the wrong issue for #{issue_number}")
+        state = payload.get("state")
+        state_reason = payload.get("state_reason")
+        require(state in {"open", "closed"}, f"GitHub issue #{issue_number} has an invalid state")
+        require(state_reason in {"completed", "not_planned", "duplicate", "reopened", None},
+                f"GitHub issue #{issue_number} has an invalid state reason")
+        states.append({
+            "issueNumber": issue_number,
+            "state": state,
+            "stateReason": state_reason,
+            "closedAt": payload.get("closed_at"),
+            "updatedAt": payload.get("updated_at"),
+        })
+    return {"repository": repository, "issues": states}
 
 
 def check_source_closure_report(report: dict[str, Any], label: str) -> None:
@@ -432,33 +483,50 @@ def check_audit_recovery_release_boundary() -> dict[str, int]:
     }
     required_children = set(range(88, 106))
     require(child_numbers == required_children, "audit recovery plan does not cover #88-#105 exactly")
-    require(recovery.get("releaseBlocked") is False, "audit recovery issue #87 still marks the release as blocked")
+    live = fetch_live_audit_issue_state()
+    live_issues = live["issues"]
+    open_issues = [
+        int(item["issueNumber"])
+        for item in live_issues
+        if item.get("state") != "closed" or item.get("stateReason") != "completed"
+    ]
+    release_blocked = bool(open_issues)
+    require(recovery.get("releaseBlocked") is release_blocked,
+            "audit recovery releaseBlocked does not match live GitHub issue state")
     qualification = recovery.get("qualificationEvidence")
-    require(isinstance(qualification, dict) and qualification.get("status") == "passed",
-            "audit recovery plan has no passed qualification evidence binding")
+    require(isinstance(qualification, dict), "audit recovery plan has no qualification evidence binding")
     require(qualification.get("manifestPath") == "qualification/<source-sha>/manifest.json",
             "audit recovery qualification manifest path is not source-SHA templated")
     contract = load_json(QUALIFICATION_CONTRACT_PATH)
     expected_evidence = set(contract.get("scope", {}).get("requiredEvidenceIds", []))
     require(set(qualification.get("requiredEvidenceIds", [])) == expected_evidence,
             "audit recovery qualification evidence IDs do not match the contract")
-    for child in children:
-        require(child.get("status") == "completed" and isinstance(child.get("evidenceIds"), list) and len(child["evidenceIds"]) == 1,
-                f"audit recovery child is not evidence-bound: #{child.get('issueNumber')}")
 
     claims = load_json(RELEASE_CLAIM_MANIFEST_PATH)
     release = claims.get("release") if isinstance(claims, dict) else None
     require(isinstance(release, dict), "release claim manifest has no release state")
-    require(release.get("releaseBlocked") is False and release.get("status") == "release-ready",
-            "release claim manifest is not release-ready")
-    binding = release.get("qualificationBinding")
-    require(isinstance(binding, dict) and binding.get("status") == "passed",
-            "release claim manifest has no passed qualification binding")
-    require(binding.get("manifestPath") == "qualification/<source-sha>/manifest.json",
-            "release claim qualification manifest path is not source-SHA templated")
-    require(set(binding.get("requiredEvidenceIds", [])) == expected_evidence,
-            "release claim qualification evidence IDs do not match the contract")
-    return {"recovery_children": len(children), "umbrella_issue": 87}
+    if release_blocked:
+        require(release.get("releaseBlocked") is True and release.get("status") == "release-blocked",
+                "open audit issues must publish a release-blocked claim")
+        for child in children:
+            require(child.get("status") in {"open", "reopened", "blocked", "pending"},
+                    f"blocked audit child has a completion status despite an open issue: #{child.get('issueNumber')}")
+    else:
+        require(release.get("releaseBlocked") is False and release.get("status") == "release-ready",
+                "closed audit issues must publish a release-ready claim")
+        require(qualification.get("status") == "passed",
+                "closed audit plan has no passed qualification evidence binding")
+        for child in children:
+            require(child.get("status") == "completed" and isinstance(child.get("evidenceIds"), list) and len(child["evidenceIds"]) == 1,
+                    f"closed audit child is not evidence-bound: #{child.get('issueNumber')}")
+        binding = release.get("qualificationBinding")
+        require(isinstance(binding, dict) and binding.get("status") == "passed",
+                "release claim manifest has no passed qualification binding")
+        require(binding.get("manifestPath") == "qualification/<source-sha>/manifest.json",
+                "release claim qualification manifest path is not source-SHA templated")
+        require(set(binding.get("requiredEvidenceIds", [])) == expected_evidence,
+                "release claim qualification evidence IDs do not match the contract")
+    return {"recovery_children": len(children), "umbrella_issue": 87, "live_open_issues": len(open_issues)}
 
 
 def check_schema() -> dict[str, int]:

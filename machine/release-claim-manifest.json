@@ -4,8 +4,8 @@
   "release": {
     "id": "fdir-document-form-ir-1.0.0",
     "policy": "fail-closed",
-    "status": "release-ready",
-    "releaseBlocked": false,
+    "status": "release-blocked",
+    "releaseBlocked": true,
     "blockingAuthority": {
       "path": "machine/audit-recovery-plan.json",
       "schema": "fdir/audit-recovery-plan",
