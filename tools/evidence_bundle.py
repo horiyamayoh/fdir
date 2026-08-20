@@ -331,6 +331,44 @@ def compare_clean_room(first_path: Path, second_path: Path) -> dict[str, Any]:
     return {"schema":"fdir/clean-room-replay-report","version":"1.0.0","status":"passed" if not differences else "failed","runs":2,"volatileFields":["integrity","environment","commands[*].durationMilliseconds","commands[*].*.path","artifacts[*].path"],"diffCount":len(differences),"diffDigest":diff_digest,"differences":differences}
 
 
+def load_clean_room_report(path: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise EvidenceError("CLEAN_ROOM_UNREADABLE", str(exc)) from exc
+    if not isinstance(value, dict) or value.get("schema") != "fdir/clean-room-replay-report" or value.get("status") != "passed" or value.get("runs", 0) < 2 or value.get("diffCount") != 0 or not _hash_ok(value.get("diffDigest")):
+        raise EvidenceError("CLEAN_ROOM_REQUIRED", "clean-room replay is not passed with zero differences")
+    return value
+
+
+def finalize_bundle(bundle_path: Path, index_path: Path, clean_room_report_path: Path) -> dict[str, Any]:
+    """Attach a verified two-run replay to a previously collected bundle."""
+
+    try:
+        bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise EvidenceError("BUNDLE_UNREADABLE", str(exc)) from exc
+    validate_shape(bundle)
+    clean_room = load_clean_room_report(clean_room_report_path)
+    source = source_state()
+    if not source["workingTreeClean"] or source["binding"] != "exact-commit":
+        raise EvidenceError("DIRTY_SOURCE", "finalize requires an exact clean commit")
+    if bundle.get("source") != source:
+        raise EvidenceError("SOURCE_STATE_MISMATCH", "collected bundle is not from the current exact commit")
+    if bundle.get("issueState", {}).get("status") != "passed":
+        raise EvidenceError("ISSUE_STATE_REQUIRED", "finalize requires a complete live GitHub issue snapshot")
+    blockers = [item for item in bundle.get("barrier", {}).get("blockers", []) if item.get("code") != "CLEAN_ROOM_REQUIRED"]
+    if blockers or any(item.get("status") != "passed" for item in bundle.get("commands", [])):
+        raise EvidenceError("BUNDLE_BLOCKED", "command or live-state blockers remain before clean-room finalization")
+    bundle["cleanRoom"] = clean_room
+    bundle["artifacts"].append(artifact(clean_room_report_path, "report", "clean-room-replay"))
+    bundle["barrier"] = {"releaseEligible": True, "claimMode": "release-candidate", "blockers": []}
+    bundle["status"] = "passed"
+    write_bundle(bundle, bundle_path, index_path)
+    verified = verify_bundle(bundle_path, index_path=index_path, require_clean=True)
+    return {"status": "passed", "bundle": relative(bundle_path), "index": relative(index_path), "cleanRoom": clean_room, "bundleDigest": verified["bundleDigest"], "indexDigest": verified["indexDigest"]}
+
+
 COMMANDS = [
     ("design-validation", ["tools/validate_design.py"]),
     ("acceptance", ["tools/run_acceptance.py", "--all"]),
@@ -586,6 +624,11 @@ def main(argv: list[str] | None = None) -> int:
     compare_parser = sub.add_parser("compare")
     compare_parser.add_argument("first", type=Path)
     compare_parser.add_argument("second", type=Path)
+    compare_parser.add_argument("--output", type=Path)
+    finalize_parser = sub.add_parser("finalize")
+    finalize_parser.add_argument("bundle", type=Path)
+    finalize_parser.add_argument("--index", type=Path, required=True)
+    finalize_parser.add_argument("--clean-room-report", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
         if args.operation == "collect":
@@ -605,8 +648,16 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.operation == "compare":
             result = compare_clean_room(root_path(args.first), root_path(args.second))
+            if args.output:
+                output_path = root_path(args.output)
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                output_path.write_bytes(canonical(result))
             print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
             return 0 if result["status"] == "passed" else 1
+        if args.operation == "finalize":
+            result = finalize_bundle(root_path(args.bundle), root_path(args.index), root_path(args.clean_room_report))
+            print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+            return 0
         result = self_test()
         print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
         return 0
