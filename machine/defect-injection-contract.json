@@ -1025,7 +1025,7 @@
           {
             "count": 1,
             "new": "                    pass  # defect injection skips header/footer stories",
-            "old": "                    _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles)",
+            "old": "                    _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles, limits)",
             "path": "tools/adapter_docx.py"
           }
         ],
@@ -1064,8 +1064,8 @@
         "changes": [
           {
             "count": 1,
-            "new": "                    if False:\n                        _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles)",
-            "old": "                    _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles)",
+            "new": "                    if False:\n                        _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles, limits)",
+            "old": "                    _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles, limits)",
             "path": "tools/adapter_docx.py"
           }
         ],
@@ -1105,8 +1105,8 @@
         "changes": [
           {
             "count": 1,
-            "new": "                    if 0:\n                        _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles)",
-            "old": "                    _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles)",
+            "new": "                    if 0:\n                        _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles, limits)",
+            "old": "                    _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles, limits)",
             "path": "tools/adapter_docx.py"
           }
         ],
@@ -1146,8 +1146,8 @@
         "changes": [
           {
             "count": 1,
-            "new": "                    if part_name == \"__never__\":\n                        _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles)",
-            "old": "                    _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles)",
+            "new": "                    if part_name == \"__never__\":\n                        _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles, limits)",
+            "old": "                    _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles, limits)",
             "path": "tools/adapter_docx.py"
           }
         ],
@@ -2150,8 +2150,8 @@
         "changes": [
           {
             "count": 1,
-            "new": "                builder.add_item(\"annotations\", {\"annotationId\": annotation_id, \"kind\": \"annotation\", \"targetIds\": [page_id], \"body\": \"PDF annotation destination retained as form fact\", \"status\": \"preserved\"}, \"annotationId\")",
-            "old": "                builder.add_item(\"annotations\", {\"annotationId\": annotation_id, \"kind\": \"hyperlink\", \"targetIds\": [page_id], \"body\": \"PDF annotation destination retained as form fact\", \"status\": \"preserved\"}, \"annotationId\")",
+            "new": "            kind = \"comment\"",
+            "old": "            kind = \"hyperlink\"",
             "path": "tools/adapter_pdf.py"
           }
         ],
@@ -2188,8 +2188,8 @@
         "changes": [
           {
             "count": 1,
-            "new": "                builder.add_item(\"annotations\", {\"annotationId\": annotation_id, \"kind\": \"comment\", \"targetIds\": [page_id], \"body\": \"PDF annotation destination retained as form fact\", \"status\": \"preserved\"}, \"annotationId\")",
-            "old": "                builder.add_item(\"annotations\", {\"annotationId\": annotation_id, \"kind\": \"hyperlink\", \"targetIds\": [page_id], \"body\": \"PDF annotation destination retained as form fact\", \"status\": \"preserved\"}, \"annotationId\")",
+            "new": "            kind = \"comment\"",
+            "old": "            kind = \"hyperlink\"",
             "path": "tools/adapter_pdf.py"
           }
         ],
@@ -2227,8 +2227,8 @@
         "changes": [
           {
             "count": 1,
-            "new": "                builder.add_item(\"annotations\", {\"annotationId\": annotation_id, \"kind\": \"bookmark\", \"targetIds\": [page_id], \"body\": \"PDF annotation destination retained as form fact\", \"status\": \"preserved\"}, \"annotationId\")",
-            "old": "                builder.add_item(\"annotations\", {\"annotationId\": annotation_id, \"kind\": \"hyperlink\", \"targetIds\": [page_id], \"body\": \"PDF annotation destination retained as form fact\", \"status\": \"preserved\"}, \"annotationId\")",
+            "new": "            kind = \"bookmark\"",
+            "old": "            kind = \"hyperlink\"",
             "path": "tools/adapter_pdf.py"
           }
         ],
@@ -2266,8 +2266,8 @@
         "changes": [
           {
             "count": 1,
-            "new": "                builder.add_item(\"annotations\", {\"annotationId\": annotation_id, \"kind\": \"form\", \"targetIds\": [page_id], \"body\": \"PDF annotation destination retained as form fact\", \"status\": \"preserved\"}, \"annotationId\")",
-            "old": "                builder.add_item(\"annotations\", {\"annotationId\": annotation_id, \"kind\": \"hyperlink\", \"targetIds\": [page_id], \"body\": \"PDF annotation destination retained as form fact\", \"status\": \"preserved\"}, \"annotationId\")",
+            "new": "            kind = \"form\"",
+            "old": "            kind = \"hyperlink\"",
             "path": "tools/adapter_pdf.py"
           }
         ],
@@ -2696,7 +2696,7 @@
           {
             "count": 1,
             "new": "                mapping = []  # defect injection drops ToUnicode mappings",
-            "old": "                mapping = _parse_cmap(_decode_stream(cmap_data))",
+            "old": "                mapping = _parse_cmap(_decode_stream(cmap_data, limits=limits, events=events), limits=limits, events=events)",
             "path": "tools/adapter_pdf.py"
           }
         ],
@@ -2734,7 +2734,7 @@
           {
             "count": 1,
             "new": "                mapping = _parse_cmap(b\"\")",
-            "old": "                mapping = _parse_cmap(_decode_stream(cmap_data))",
+            "old": "                mapping = _parse_cmap(_decode_stream(cmap_data, limits=limits, events=events), limits=limits, events=events)",
             "path": "tools/adapter_pdf.py"
           }
         ],
@@ -2772,8 +2772,8 @@
         "changes": [
           {
             "count": 1,
-            "new": "                mapping = _parse_cmap(_decode_stream(cmap_data)) if False else []",
-            "old": "                mapping = _parse_cmap(_decode_stream(cmap_data))",
+            "new": "                mapping = _parse_cmap(_decode_stream(cmap_data, limits=limits, events=events), limits=limits, events=events) if False else []",
+            "old": "                mapping = _parse_cmap(_decode_stream(cmap_data, limits=limits, events=events), limits=limits, events=events)",
             "path": "tools/adapter_pdf.py"
           }
         ],
@@ -3644,7 +3644,7 @@
           {
             "count": 1,
             "new": "            status = \"complete\"",
-            "old": "            status = \"failed\" if any(d.get(\"severity\") in {\"fatal\", \"error\"} for d in self.diagnostics) else \"partial\" if source_loss else \"complete\"",
+            "old": "            status = \"failed\" if has_error else \"partial\" if source_loss else \"complete-with-warnings\" if has_warning else \"complete\"",
             "path": "tools/adapter_common.py"
           }
         ],
@@ -6695,7 +6695,8 @@
     "tools/defect_profile_common.py",
     "tools/defect_profile_formats.py",
     "tools/defect_profile_release.py",
-    "tools/defect_profile_validator.py"
+    "tools/defect_profile_validator.py",
+    "tools/generate_e2e_fixtures.py"
   ],
   "syntaxCheck": {
     "command": [

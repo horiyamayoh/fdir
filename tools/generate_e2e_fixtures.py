@@ -143,18 +143,26 @@ def unsupported_xlsx_parts() -> dict[str, str | bytes]:
     return parts
 
 
-def pdf_bytes(*, unsupported: bool = False) -> bytes:
+def pdf_bytes(*, unsupported: bool = False, annotation: bool = False) -> bytes:
     stream = b"BT /F1 18 Tf 72 720 Td (FDIR PDF E2E) Tj ET\n"
     if unsupported:
         stream += b"/XUnsupported Do\n"
     stream += b"0 0 m 120 120 l 120 0 l h W n\n72 680 m 200 680 l S\n"
+    page = b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>"
+    if annotation:
+        page = b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Annots [7 0 R] /Contents 4 0 R >>"
     objects = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+        page,
         b"<< /Length " + str(len(stream)).encode("ascii") + b" >>\nstream\n" + stream + b"endstream",
         b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
     ]
+    if annotation:
+        objects.extend([
+            b"<< /Type /Metadata /Subtype /XML >>",
+            b"<< /Type /Annot /Subtype /Link /Dest [3 0 R /Fit] >>",
+        ])
     out = bytearray(b"%PDF-1.7\n%\xe2\xe3\xcf\xd3\n")
     offsets = [0]
     for number, obj in enumerate(objects, start=1):

@@ -181,8 +181,7 @@ def probe_pdf(probe: str, root: Path) -> None:
             _, _, unsupported, _, _ = _interpret_content(b"/XUnsupported Do")
             require("Do" in unsupported, "PDF unknown operator was not recorded")
         elif probe == "pdf-annotation-target":
-            raw = pdf_bytes().replace(b"/Contents 4 0 R >>", b"/Annots [7 0 R] /Contents 4 0 R >>")
-            path.write_bytes(raw)
+            path.write_bytes(pdf_bytes(annotation=True))
             document = validate_result(convert_pdf(path), probe)
             require(any(item.get("kind") == "hyperlink" and item.get("targetIds") for item in document.get("annotations", [])), "PDF annotation target was not typed as a hyperlink")
         elif probe == "pdf-interleaved-paint":

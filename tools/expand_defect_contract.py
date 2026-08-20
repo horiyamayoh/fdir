@@ -78,9 +78,9 @@ VARIANTS: dict[str, list[str]] = {
         "                        elif item_local == \"drawing\" and item_local != \"drawing\":",
     ],
     "docx-story-processing": [
-        "                    if False:\n                        _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles)",
-        "                    if 0:\n                        _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles)",
-        "                    if part_name == \"__never__\":\n                        _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles)",
+        "                    if False:\n                        _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles, limits)",
+        "                    if 0:\n                        _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles, limits)",
+        "                    if part_name == \"__never__\":\n                        _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles, limits)",
     ],
     "docx-missing-relationship": [
         "                            relation_status = \"ambiguous\"",
@@ -124,7 +124,7 @@ VARIANTS: dict[str, list[str]] = {
     ],
     "pdf-tounicode": [
         "                mapping = _parse_cmap(b\"\")",
-        "                mapping = _parse_cmap(_decode_stream(cmap_data)) if False else []",
+        "                mapping = _parse_cmap(_decode_stream(cmap_data, limits=limits, events=events), limits=limits, events=events) if False else []",
     ],
     "pdf-graphics-restore": [
         "            elif operator == \"Q\" and False:",
@@ -135,9 +135,9 @@ VARIANTS: dict[str, list[str]] = {
         "            unsupported += []",
     ],
     "pdf-annotation-target": [
-        "                builder.add_item(\"annotations\", {\"annotationId\": annotation_id, \"kind\": \"comment\", \"targetIds\": [page_id], \"body\": \"PDF annotation destination retained as form fact\", \"status\": \"preserved\"}, \"annotationId\")",
-        "                builder.add_item(\"annotations\", {\"annotationId\": annotation_id, \"kind\": \"bookmark\", \"targetIds\": [page_id], \"body\": \"PDF annotation destination retained as form fact\", \"status\": \"preserved\"}, \"annotationId\")",
-        "                builder.add_item(\"annotations\", {\"annotationId\": annotation_id, \"kind\": \"form\", \"targetIds\": [page_id], \"body\": \"PDF annotation destination retained as form fact\", \"status\": \"preserved\"}, \"annotationId\")",
+        "            kind = \"comment\"",
+        "            kind = \"bookmark\"",
+        "            kind = \"form\"",
     ],
     "pdf-interleaved-paint": [
         "enumerate(list(reversed(builder.document[\"nodes\"][1:])))",
@@ -283,7 +283,7 @@ def expand(contract: dict[str, Any]) -> dict[str, Any]:
     result = copy.deepcopy(contract)
     result["cases"] = sorted(retained_cases + generated_cases, key=lambda item: str(item["id"]))
     result["invariantMatrix"] = sorted(retained_rows + generated_rows, key=lambda item: str(item["id"]))
-    result["supportFiles"] = sorted(set(result.get("supportFiles", [])) | {"tools/defect_profile_canonical.py", "tools/defect_profile_formats.py"})
+    result["supportFiles"] = sorted(set(result.get("supportFiles", [])) | {"tools/defect_profile_canonical.py", "tools/defect_profile_formats.py", "tools/generate_e2e_fixtures.py"})
     return result
 
 
