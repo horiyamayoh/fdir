@@ -20,12 +20,17 @@ NS_W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 NS_WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
 NS_A = "http://schemas.openxmlformats.org/drawingml/2006/main"
 NS_WPS = "http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+ZIP_TIMESTAMP = (2020, 1, 1, 0, 0, 0)
 
 
 def write_zip(path: Path, parts: dict[str, str | bytes]) -> None:
-    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
         for name, value in sorted(parts.items()):
-            archive.writestr(name, value.encode("utf-8") if isinstance(value, str) else value)
+            info = zipfile.ZipInfo(name, date_time=ZIP_TIMESTAMP)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.create_system = 3
+            info.external_attr = 0o100644 << 16
+            archive.writestr(info, value.encode("utf-8") if isinstance(value, str) else value)
 
 
 def docx_parts() -> dict[str, str | bytes]:

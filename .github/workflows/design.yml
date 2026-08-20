@@ -12,6 +12,10 @@ permissions:
   contents: read
   issues: read
 
+concurrency:
+  group: fdir-qualification-${{ github.workflow }}-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: false
+
 jobs:
   platform-smoke:
     name: Platform smoke (${{ matrix.os }})
