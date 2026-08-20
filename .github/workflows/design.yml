@@ -13,7 +13,7 @@ permissions:
   issues: read
 
 concurrency:
-  group: fdir-qualification-${{ github.ref }}
+  group: fdir-qualification-${{ github.workflow }}-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
