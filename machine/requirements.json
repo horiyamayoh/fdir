@@ -2,6 +2,7 @@
   "schema": "fdir/document-form-requirements",
   "version": "1.0.0",
   "product": "Document Form IR",
+  "expectedRequirementCount": 134,
   "minimumRequirementCount": 120,
   "requirements": [
     {"id":"DFIR-BND-001","category":"boundary","priority":"must","statement":"FDIR converts recorded document-form facts rather than semantic meaning.","ownerIssue":"DFIR-I-001","acceptanceTests":["AT-BND-001"]},

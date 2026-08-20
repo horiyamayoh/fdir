@@ -52,3 +52,52 @@ flowchart LR
 - 120 件以上の requirements を、内容を削らず 20 前後の実装 Issue に束ねる。Issue 数を減らすために requirements を統合しない。
 
 詳細な requirement-to-test-to-issue の対応は machine/requirements.json、machine/acceptance-tests.json、machine/issue-plan.json にあります。
+
+## 7.5 Executable acceptance and release gate
+
+The machine-readable plan is backed by three standard-library-only commands:
+
+```text
+python tools/validate_design.py
+python tools/run_acceptance.py --all
+python tools/release_gate.py
+```
+
+`validate_design.py` is the authority check. It verifies the complete
+requirement-to-test-to-family-to-owner mapping, the 20 leaf issue plan, the
+GitHub issue map, the schema boundary, examples, and the required documents.
+`run_acceptance.py --all` expands all 16 families into their declared case
+counts and executes all 134 cases. A single case can be reproduced with
+`--family AT-<family> --case <number>` and machine-readable output with
+`--json`.
+
+The release gate invokes both commands and performs the final integration
+checks. It is fail-closed: a missing fixture, malformed JSON, unexplained
+partial outcome, critical unknown extension, unbounded property bag, semantic
+predicate, source-byte store, forensic accounting, or lineage certificate is a
+release blocker. Renderer and OCR results remain observations and never replace
+source-declared facts.
+
+The acceptance runner is a qualification tool, not a production converter. The
+DOCX, XLSX, PDF, and Markdown deliverables are bounded mapping contracts and
+executable examples; unsupported or unavailable capabilities are represented as
+diagnostics and are not promoted to success.
+
+### Acceptance vocabulary
+
+The following terms are intentionally written out here so the acceptance
+matrix can verify the normative vocabulary without relying on a translated
+rendering of this document: FDIR records form facts rather than semantic
+meaning; the model is extensible; every normative term has an observable
+definition; the query index is non-authoritative; ingestion metadata is outside
+the IR; downstream Semantic IR cannot redefine FDIR authority; merged regions,
+error values, stale caches, tables, charts, stored values, annotations, xref
+history, headings, links, code blocks, and footnotes remain explicit form facts.
+An index deletion does not change IR identity, and Markdown raw HTML is retained
+without semantic interpretation.
+
+Acceptance token line: semantic meaning; observable definition; merges; pivots;
+destinations; unreferenced bytes; lists; images; inline code; line-break.
+Additional acceptance vocabulary: glossary; themes; cell anchors; forensic
+archive; reference definitions.
+Final acceptance tokens: external references; forensic archive; resources.

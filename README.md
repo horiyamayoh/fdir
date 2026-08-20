@@ -46,6 +46,24 @@ FDIR は、DOCX、XLSX、PDF、Markdown などに記録された構造・表現�
 
     python tools/validate_design.py
 
+### Executable release gate
+
+The design release is executable and fail-closed. Run the following commands
+from the repository root:
+
+    python tools/validate_design.py
+    python tools/run_acceptance.py --all
+    python tools/release_gate.py
+
+The first command validates the authority graph (134 requirements, 16
+acceptance families, and the 20 leaf issues). The second executes every
+acceptance case, including positive, negative, partial-conversion,
+unknown-extension, query, and resource-boundary cases. The final command is the
+integration gate and fails if any command, fixture, schema, documentation, or
+product-boundary check fails. The four format adapters are deliberately bounded
+form-mapping contracts and fixtures; they do not claim semantic interpretation
+or preservation of source bytes.
+
 GitHub issue key/number mapping is recorded in [machine/github-issue-map.json](machine/github-issue-map.json). The disposition of superseded legacy issues is recorded in [machine/legacy-issue-map.json](machine/legacy-issue-map.json).
 
 要件は 120 件を下回らない粒度へ展開し、各要件に受入テストと担当 Issue を割り当てます。Issue を閉じる条件は、実装・テスト・文書・未対応状態の説明がそろい、未所有要件がないことです。

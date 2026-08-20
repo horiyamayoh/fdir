@@ -1,0 +1,43 @@
+{
+  "schema": "fdir/document-form-release-gate",
+  "version": "1.0.0",
+  "expected": {
+    "requirements": 134,
+    "acceptanceFamilies": 16,
+    "acceptanceCases": 134,
+    "leafIssues": 20
+  },
+  "commands": [
+    "python tools/validate_design.py",
+    "python tools/run_acceptance.py --all"
+  ],
+  "requiredFormats": ["docx", "xlsx", "pdf", "markdown"],
+  "requiredExamples": [
+    "examples/callout.json",
+    "examples/cell-formula.json",
+    "examples/markdown-authoring.json",
+    "examples/partial-conversion.json",
+    "examples/pdf-observation.json",
+    "examples/style-resolution.json"
+  ],
+  "forbiddenConcepts": [
+    "semanticEquivalence",
+    "EquivalenceCertificate",
+    "LineageCertificate",
+    "AccountingItem",
+    "sourceByteStore",
+    "contentAddressedSource",
+    "sourceBytes",
+    "forensicByteCensus"
+  ],
+  "checks": [
+    "authority-and-traceability",
+    "schema-and-typed-examples",
+    "positive-negative-partial-fixtures",
+    "unknown-extension-compatibility",
+    "canonical-identity",
+    "rebuildable-query",
+    "parser-observation-boundary",
+    "resource-and-package-boundary"
+  ]
+}

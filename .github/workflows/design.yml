@@ -18,3 +18,5 @@ jobs:
           python-version: "3.12"
       - name: Validate design authority
         run: python tools/validate_design.py
+      - name: Run final release gate
+        run: python tools/release_gate.py
