@@ -522,7 +522,7 @@ def check_xlsx(ctx: Context, case: int) -> None:
     cell = example(ctx, "cell-formula.json")
     formula = cell["formulas"][0]
     if case == 1:
-        ensure(cell["sourceFormat"]["name"] == "xlsx" and cell["nodes"][1]["kind"] == "cell", "XLSX cell mapping is missing")
+        ensure(cell["sourceFormat"]["name"] == "xlsx" and any(node.get("kind") == "cell" for node in cell["nodes"]), "XLSX cell mapping is missing")
     elif case == 2:
         docs_have(ctx, "shared", "inline string")
     elif case == 3:
@@ -651,6 +651,17 @@ def check_qa(ctx: Context, case: int) -> None:
         ensure("resource-and-package-boundary" in manifest.get("checks", []), "resource boundary is not a release check")
         ensure("real-input-e2e" in manifest.get("checks", []), "real-input E2E is not a release check")
         ensure((ROOT / "tools/release_gate.py").is_file(), "release gate is missing")
+        mutation = subprocess.run(
+            [sys.executable, str(ROOT / "tools" / "mutation_qualification.py"), "--json"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            timeout=90,
+            check=False,
+        )
+        ensure(mutation.returncode == 0, f"mutation qualification failed: {(mutation.stdout + mutation.stderr).strip()}")
+        report = json.loads(mutation.stdout)
+        ensure(report.get("status") == "passed" and not report.get("survivors"), "mutation survivors remain")
 
 
 CHECKS: dict[str, Callable[[Context, int], None]] = {

@@ -1,0 +1,48 @@
+{
+  "schema": "fdir/independent-fidelity-corpus",
+  "version": "1.0.0",
+  "independent": true,
+  "sourceOfTruth": "hand-authored source fixtures, not generated IR or generated E2E fixtures",
+  "cases": [
+    {
+      "id": "docx-independent",
+      "format": "docx",
+      "kind": "ooxml-parts",
+      "path": "docx-independent",
+      "expected": ["Independent DOCX", "relationship"],
+      "status": "preserved-or-diagnosed"
+    },
+    {
+      "id": "xlsx-independent",
+      "format": "xlsx",
+      "kind": "ooxml-parts",
+      "path": "xlsx-independent",
+      "expected": ["Independent XLSX", "SUM(A1:A2)"],
+      "status": "preserved-or-diagnosed"
+    },
+    {
+      "id": "pdf-independent",
+      "format": "pdf",
+      "kind": "file",
+      "path": "pdf-independent.pdf",
+      "expected": ["Independent PDF"],
+      "status": "preserved-or-diagnosed"
+    },
+    {
+      "id": "markdown-independent",
+      "format": "markdown",
+      "kind": "file",
+      "path": "markdown-independent.md",
+      "expected": ["Independent Markdown", "escaped | pipe"],
+      "status": "preserved-or-diagnosed"
+    }
+  ],
+  "negativeChecks": [
+    {
+      "id": "resource-limit",
+      "method": "max-input-bytes",
+      "value": 1,
+      "expectedStatus": "failed"
+    }
+  ]
+}

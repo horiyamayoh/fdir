@@ -1,0 +1,17 @@
+{
+  "schema": "fdir/document-form-canonicalization",
+  "version": "1.0.0",
+  "encoding": {"charset":"UTF-8","bom":false,"terminalLineFeed":true,"objectKeyOrder":"UTF-16 code-unit lexical order","stringNormalization":"none"},
+  "numberPolicy": {"jsonNumbers":"finite only","decimal":"canonical fixed-point string","negativeZero":"0","exponents":"normalized to fixed-point"},
+  "projections": [
+    {"name":"full","includes":["all IR fields"],"excludes":[]},
+    {"name":"content","includes":["sourceFormat","parts","surfaces","nodes","texts","tables","styles","layouts","coordinateSpaces","geometries","resources","formulas","fields","annotations","relations","orders","extensions"],"excludes":["documentId","sourceMaps","diagnostics","conversion","observations"]},
+    {"name":"source-map-excluded","aliasOf":"content"}
+  ],
+  "defaultDigestProjection": "source-map-excluded",
+  "collectionOrder": "entity collections sort by stable id; authored child/order arrays retain order",
+  "entityCollections": {"parts":"partId","surfaces":"surfaceId","nodes":"nodeId","texts":"textId","tables":"tableId","styles":"styleId","layouts":"layoutId","coordinateSpaces":"coordinateSpaceId","geometries":"geometryId","resources":"resourceId","formulas":"formulaId","fields":"fieldId","annotations":"annotationId","relations":"relationId","orders":"orderId","observations":"observationId","extensions":"extensionId","sourceMaps":"sourceMapId","diagnostics":"diagnosticId"},
+  "ordinalCollections": ["items"],
+  "schemaVersion": "1.0.0",
+  "algorithm": "FDIR-C14N-1"
+}

@@ -149,7 +149,7 @@ def validate_release_gate_manifest(manifest: dict) -> None:
     for key, value in {"requirements": 134, "acceptanceFamilies": 16, "acceptanceCases": 134, "leafIssues": 20, "e2eIssue": 68}.items():
         require(expected.get(key) == value, f"release gate expected count mismatch: {key}")
     commands = manifest.get("commands")
-    require(isinstance(commands, list) and "python tools/validate_design.py" in commands and "python tools/run_acceptance.py --all" in commands and "python tools/run_e2e.py --all" in commands,
+    require(isinstance(commands, list) and "python tools/validate_design.py" in commands and "python tools/run_acceptance.py --all" in commands and "python tools/run_e2e.py --all" in commands and "python tools/mutation_qualification.py --json" in commands and "python tools/query_qualification.py" in commands and "python tools/independent_corpus.py --json" in commands,
             "release gate commands are incomplete")
     for relative in manifest.get("requiredAdapters", []):
         require((ROOT / relative).is_file(), f"release gate adapter is missing: {relative}")
@@ -159,6 +159,8 @@ def validate_release_gate_manifest(manifest: dict) -> None:
     require(set(manifest.get("requiredFormats", [])) == {"docx", "xlsx", "pdf", "markdown"}, "release gate formats are incomplete")
     for relative in manifest.get("requiredExamples", []):
         require((ROOT / relative).is_file(), f"release gate example is missing: {relative}")
+    for relative in ("machine/phase2-issue-plan.json", "machine/capability-profile.json", "machine/reference-registry.json", "machine/extension-registry.json", "machine/canonicalization.json", "machine/query-contract.json", "machine/release-claim-manifest.json", "e2e/corpus/manifest.json", "tools/mutation_qualification.py", "tools/query_qualification.py", "tools/independent_corpus.py"):
+        require((ROOT / relative).is_file(), f"phase2 release artifact is missing: {relative}")
     require(len(manifest.get("checks", [])) >= 9 and "real-input-e2e" in manifest.get("checks", []), "release gate checks are incomplete")
 
 

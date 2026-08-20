@@ -1,0 +1,47 @@
+{
+  "schema": "fdir/document-form-release-claim-manifest",
+  "version": "1.0.0",
+  "release": {
+    "id": "fdir-document-form-ir-1.0.0",
+    "policy": "fail-closed",
+    "claimBoundary": "typed source-form facts, provenance, relationships, and explicit unavailable or unsupported states",
+    "forbiddenClaims": ["semantic equivalence", "source-byte archival", "silent-loss completeness"]
+  },
+  "capabilityClaims": [
+    {"id":"claim-docx","profileId":"format:docx:ECMA-376:1","issueNumbers":[80],"requiredStates":["complete","complete-with-warnings","partial","failed"],"noFabricationRule":"missing or external OOXML targets become relationships, diagnostics, and truthful status"},
+    {"id":"claim-xlsx","profileId":"format:xlsx:Office Open XML:1","issueNumbers":[81],"requiredStates":["complete","complete-with-warnings","partial","failed"],"noFabricationRule":"stored, formula, cached, displayed, and computed lanes remain distinct; unsupported workbook facts are not invented"},
+    {"id":"claim-pdf","profileId":"format:pdf:1.7:1","issueNumbers":[82],"requiredStates":["complete","complete-with-warnings","partial","failed"],"noFabricationRule":"unknown operators, missing font mapping, and unavailable rendering remain diagnostics or observations"},
+    {"id":"claim-markdown","profileId":"format:markdown:commonmark:1","issueNumbers":[84],"requiredStates":["complete","complete-with-warnings","partial","failed"],"noFabricationRule":"dialect and source spelling are retained or the construct is explicitly unsupported"}
+  ],
+  "issueClaims": [
+    {"issueNumber":70,"claim":"executable conformance and mutation qualification","evidenceCommands":["python tools/run_acceptance.py --all","python tools/mutation_qualification.py --json"],"evidencePaths":["tools/mutation_qualification.py","machine/acceptance-tests.json"]},
+    {"issueNumber":71,"claim":"closed discriminated IR graph and invariants","evidenceCommands":["python tools/validate_design.py","python tools/mutation_qualification.py --json"],"evidencePaths":["schemas/document-form-ir.schema.json","tools/ir_validation.py","machine/reference-registry.json"]},
+    {"issueNumber":72,"claim":"capability and status aggregation","evidenceCommands":["python tools/validate_design.py","python tools/run_e2e.py --all"],"evidencePaths":["machine/capability-profile.json","tools/adapter_common.py"]},
+    {"issueNumber":73,"claim":"exact scalar and provenance lanes","evidenceCommands":["python tools/run_e2e.py --all","python tools/mutation_qualification.py --json"],"evidencePaths":["tools/adapter_common.py","tools/adapter_xlsx.py","tools/adapter_pdf.py"]},
+    {"issueNumber":74,"claim":"style cascade, color, paint, and provenance","evidenceCommands":["python tools/run_acceptance.py --all"],"evidencePaths":["tools/adapter_docx.py","examples/style-resolution.json"]},
+    {"issueNumber":75,"claim":"coordinate, geometry, clipping, anchors, and order","evidenceCommands":["python tools/run_e2e.py --all"],"evidencePaths":["tools/adapter_docx.py","tools/adapter_pdf.py"]},
+    {"issueNumber":76,"claim":"parts, surfaces, containment, tables, and grids","evidenceCommands":["python tools/run_e2e.py --all"],"evidencePaths":["tools/adapter_docx.py","tools/adapter_xlsx.py","tools/adapter_markdown.py"]},
+    {"issueNumber":77,"claim":"resources, relationships, links, annotations, revisions, and fields","evidenceCommands":["python tools/run_e2e.py --all","python tools/independent_corpus.py --json"],"evidencePaths":["machine/reference-registry.json","tools/adapter_docx.py","tools/adapter_xlsx.py"]},
+    {"issueNumber":78,"claim":"typed extension registry and critical compatibility","evidenceCommands":["python tools/validate_design.py","python tools/mutation_qualification.py --json"],"evidencePaths":["machine/extension-registry.json","schemas/extensions/format-extensions.schema.json","tools/extension_registry.py"]},
+    {"issueNumber":79,"claim":"canonical identity and migration boundary","evidenceCommands":["python tools/run_e2e.py --all","python tools/query_qualification.py"],"evidencePaths":["machine/canonicalization.json","tools/canonicalize_ir.py","tools/adapter_common.py"]},
+    {"issueNumber":80,"claim":"relationship-complete DOCX adapter","evidenceCommands":["python tools/run_e2e.py --all","python tools/independent_corpus.py --json"],"evidencePaths":["tools/adapter_docx.py","machine/capability-profile.json"]},
+    {"issueNumber":81,"claim":"exact-value relationship-complete XLSX workbook and grid","evidenceCommands":["python tools/run_e2e.py --all","python tools/independent_corpus.py --json"],"evidencePaths":["tools/adapter_xlsx.py","schemas/extensions/format-extensions.schema.json"]},
+    {"issueNumber":82,"claim":"stateful PDF object, graphics, and font-aware adapter","evidenceCommands":["python tools/run_e2e.py --all","python tools/independent_corpus.py --json"],"evidencePaths":["tools/adapter_pdf.py","schemas/extensions/format-extensions.schema.json"]},
+    {"issueNumber":83,"claim":"universal typed query and rebuildable index","evidenceCommands":["python tools/query_qualification.py","python tools/run_e2e.py --all"],"evidencePaths":["machine/query-contract.json","tools/query_ir.py","tools/query_qualification.py"]},
+    {"issueNumber":84,"claim":"dialect-declared source-faithful Markdown parser","evidenceCommands":["python tools/run_e2e.py --all","python tools/independent_corpus.py --json"],"evidencePaths":["tools/adapter_markdown.py","machine/capability-profile.json","machine/extension-registry.json"]},
+    {"issueNumber":86,"claim":"independent fail-closed release gate","evidenceCommands":["python tools/validate_design.py","python tools/run_acceptance.py --all","python tools/run_e2e.py --all","python tools/mutation_qualification.py --json","python tools/query_qualification.py","python tools/independent_corpus.py --json","python tools/release_gate.py"],"evidencePaths":["machine/release-claim-manifest.json","e2e/corpus/manifest.json","tools/release_gate.py"]}
+  ],
+  "independentEvidence": {
+    "manifest": "e2e/corpus/manifest.json",
+    "runner": "tools/independent_corpus.py",
+    "requiredFormats": ["docx", "xlsx", "pdf", "markdown"],
+    "negativeChecks": ["resource-limit", "malformed-inputs", "unsupported-constructs"]
+  },
+  "crossLayerChecks": [
+    "authority IR validation precedes canonicalization and query",
+    "direct lookup and rebuildable index return the same entity set",
+    "feature results exactly aggregate into feature inventory",
+    "canonical identity excludes diagnostics and source maps by default",
+    "unknown critical extensions reject and non-critical complete claims reject"
+  ]
+}

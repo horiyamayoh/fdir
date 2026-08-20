@@ -7,6 +7,8 @@ facts.  It does not preserve the package byte stream or infer document meaning.
 from __future__ import annotations
 
 from pathlib import Path
+import mimetypes
+import posixpath
 import re
 from typing import Any
 import zipfile
@@ -32,6 +34,10 @@ def _local(tag: str) -> str:
 
 
 def _children(element: ET.Element, name: str) -> list[ET.Element]:
+    return [item for item in list(element) if _local(item.tag) == name]
+
+
+def _descendants(element: ET.Element, name: str) -> list[ET.Element]:
     return [item for item in element.iter() if _local(item.tag) == name]
 
 
@@ -47,11 +53,51 @@ def _read_xml(archive: zipfile.ZipFile, name: str) -> ET.Element:
     return ET.fromstring(archive.read(name))
 
 
-def _rels(archive: zipfile.ZipFile, name: str) -> dict[str, tuple[str, str]]:
+def _rels(archive: zipfile.ZipFile, name: str) -> dict[str, tuple[str, str, str]]:
     if name not in archive.namelist():
         return {}
     root = _read_xml(archive, name)
-    return {_attr(item, "Id"): (_attr(item, "Target"), _attr(item, "Type")) for item in root if _local(item.tag) == "Relationship"}
+    return {_attr(item, "Id"): (_attr(item, "Target"), _attr(item, "Type"), _attr(item, "TargetMode")) for item in root if _local(item.tag) == "Relationship"}
+
+
+def _content_types(archive: zipfile.ZipFile) -> dict[str, str]:
+    if "[Content_Types].xml" not in archive.namelist():
+        return {}
+    root = _read_xml(archive, "[Content_Types].xml")
+    defaults: dict[str, str] = {}
+    overrides: dict[str, str] = {}
+    for item in list(root):
+        local = _local(item.tag)
+        if local == "Default":
+            defaults[_attr(item, "Extension").lower()] = _attr(item, "ContentType")
+        elif local == "Override":
+            overrides[_attr(item, "PartName").lstrip("/")] = _attr(item, "ContentType")
+    result = dict(overrides)
+    for name in archive.namelist():
+        normalized = name.replace("\\", "/")
+        if normalized not in result:
+            result[normalized] = defaults.get(normalized.rsplit(".", 1)[-1].lower(), "application/octet-stream") if "." in normalized else "application/octet-stream"
+    return result
+
+
+def _relationship_source(rels_name: str) -> str:
+    if rels_name == "_rels/.rels":
+        return "[package]"
+    if "/_rels/" not in rels_name:
+        return "[package]"
+    directory, rel_name = rels_name.split("/_rels/", 1)
+    return f"{directory}/{rel_name[:-5]}" if rel_name.endswith(".rels") else f"{directory}/{rel_name}"
+
+
+def _relationship_target(source_name: str, target: str) -> str:
+    target = target.replace("\\", "/")
+    if target.startswith("/"):
+        return posixpath.normpath(target.lstrip("/"))
+    if source_name == "[package]":
+        base = ""
+    else:
+        base = source_name.rsplit("/", 1)[0] if "/" in source_name else ""
+    return posixpath.normpath(posixpath.join(base, target))
 
 
 def inspect(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any]:
@@ -66,8 +112,8 @@ def inspect(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
             "version": "ECMA-376",
             "bytes": path.stat().st_size,
             "parts": len(names),
-            "paragraphs": len(_children(root, "p")),
-            "tables": len(_children(root, "tbl")),
+            "paragraphs": len(_descendants(root, "p")),
+            "tables": len(_descendants(root, "tbl")),
             "capabilities": ["paragraphs", "runs", "tables", "styles", "fields", "comments", "revisions", "drawings", "source-maps"],
             "limits": {"maxInputBytes": limits.max_input_bytes, "maxXmlParts": limits.max_xml_parts},
         }
@@ -135,6 +181,58 @@ def _style_cycle(graph: dict[str, str | None]) -> bool:
     return any(visit(style_id) for style_id in graph)
 
 
+def _resolve_styles(
+    builder: DocumentBuilder,
+    graph: dict[str, str | None],
+    declarations: dict[str, dict[str, Any]],
+    styles: dict[str, tuple[str, str]],
+) -> None:
+    cache: dict[str, tuple[dict[str, Any], dict[str, str], list[str], list[dict[str, Any]]]] = {}
+
+    def resolve(style_id: str, visiting: set[str] | None = None) -> tuple[dict[str, Any], dict[str, str], list[str], list[dict[str, Any]]]:
+        if style_id in cache:
+            return cache[style_id]
+        visiting = set() if visiting is None else visiting
+        if style_id in visiting:
+            return {}, {}, [style_id], []
+        visiting.add(style_id)
+        merged: dict[str, Any] = {}
+        provenance: dict[str, str] = {}
+        chain: list[str] = []
+        trace: list[dict[str, Any]] = []
+        based_id = graph.get(style_id)
+        if based_id and based_id in graph:
+            base_values, base_provenance, base_chain, base_trace = resolve(based_id, visiting)
+            merged.update(base_values)
+            provenance.update(base_provenance)
+            chain.extend(base_chain)
+            trace.extend(base_trace)
+            for property_name in base_values:
+                trace.append({"property": property_name, "source": styles[based_id][0], "action": "inherit"})
+        authored = declarations.get(style_id, {})
+        merged.update(authored)
+        for property_name in authored:
+            provenance[property_name] = styles[style_id][0]
+            trace.append({"property": property_name, "source": styles[style_id][0], "action": "direct"})
+        chain.append(style_id)
+        visiting.remove(style_id)
+        result = (merged, provenance, chain, trace)
+        cache[style_id] = result
+        return result
+
+    for style_id, (_, resolved_id) in styles.items():
+        resolved_values, provenance, chain, trace = resolve(style_id)
+        resolved_item = builder.find("styles", "styleId", resolved_id)
+        if resolved_item is None:
+            continue
+        resolved_item["resolved"] = resolved_values
+        resolved_item["declaration"] = resolved_values
+        resolved_item["resolvedFrom"] = [styles[item][0] for item in chain if item in styles]
+        resolved_item["cascadeTrace"] = trace
+        resolved_item["propertyProvenance"] = [{"property": name, "source": source, "status": "normalized"} for name, source in sorted(provenance.items())]
+        resolved_item["status"] = "normalized"
+
+
 def _extension(builder: DocumentBuilder, target_id: str, extension_type: str, payload: dict[str, Any], *, criticality: str = "non-critical") -> None:
     extension_id = safe_id("extension", f"docx-{extension_type}-{len(builder.document['extensions'])}")
     builder.add_item("extensions", {"extensionId": extension_id, "targetId": target_id, "namespace": "urn:fdir:format:docx", "type": extension_type, "schemaVersion": "1.0.0", "schemaId": f"urn:fdir:schema:docx-{extension_type}", "payload": payload, "criticality": criticality}, "extensionId")
@@ -155,11 +253,13 @@ def _add_text_run(builder: DocumentBuilder, parent_id: str, run: ET.Element, lin
         if _local(item.tag) in {"t", "delText", "instrText"} and item.text is not None:
             values.append(item.text)
     value = "".join(values)
-    if value:
-        text_id = safe_id("text", f"docx-text-{line_index}-{len(builder.document['texts'])}")
-        builder.add_text(text_id, value, representation="source", provenance="authored")
-        builder.link_text(run_id, text_id)
-        builder.add_source_map(run_id, {"part": "word/document.xml", "path": f"paragraph[{line_index}]", "lineStart": max(1, line_index), "columnStart": 1, "lineEnd": max(1, line_index), "columnEnd": len(value) + 1})
+    # An OOXML run may contain a break/tab/property-only construct with no
+    # w:t.  Retain the empty authored text fact so the run is not silently
+    # disconnected from the graph.
+    text_id = safe_id("text", f"docx-text-{line_index}-{len(builder.document['texts'])}")
+    builder.add_text(text_id, value, representation="source", provenance="authored")
+    builder.link_text(run_id, text_id)
+    builder.add_source_map(run_id, {"part": "word/document.xml", "path": f"paragraph[{line_index}]", "lineStart": max(1, line_index), "columnStart": 1, "lineEnd": max(1, line_index), "columnEnd": len(value) + 1})
     return run_id
 
 
@@ -175,12 +275,12 @@ def _geometry(builder: DocumentBuilder, target_id: str, extent: ET.Element | Non
 
 
 def _drawing(builder: DocumentBuilder, parent_id: str, drawing: ET.Element, line_index: int) -> None:
-    extent = next(iter(_children(drawing, "extent")), None)
-    if _children(drawing, "cxnSp"):
+    extent = next(iter(_descendants(drawing, "extent")), None)
+    if _descendants(drawing, "cxnSp"):
         kind = "connector"
-    elif _children(drawing, "txbx") or _children(drawing, "wsp"):
-        kind = "textBox" if _children(drawing, "txbx") else "shape"
-    elif _children(drawing, "pic"):
+    elif _descendants(drawing, "txbx") or _descendants(drawing, "wsp"):
+        kind = "textBox" if _descendants(drawing, "txbx") else "shape"
+    elif _descendants(drawing, "pic"):
         kind = "image"
     else:
         kind = "shape"
@@ -188,9 +288,9 @@ def _drawing(builder: DocumentBuilder, parent_id: str, drawing: ET.Element, line
     geometry_id = _geometry(builder, node_id, extent, "rectangle")
     builder.add_node(kind, node_id, parent_id=parent_id, geometryId=geometry_id, status="preserved")
     builder.add_item("layouts", {"layoutId": safe_id("layout", f"docx-{node_id}"), "targetId": node_id, "placement": "inline", "anchor": {"kind": "inline", "nodeId": parent_id}, "declaredGeometryId": geometry_id, "zIndex": line_index, "status": "preserved"}, "layoutId")
-    for connector in _children(drawing, "cxnSp"):
+    for connector in _descendants(drawing, "cxnSp"):
         for endpoint, endpoint_kind in (("stCxn", "start"), ("endCxn", "to")):
-            item = next(iter(_children(connector, endpoint)), None)
+            item = next(iter(_descendants(connector, endpoint)), None)
             if item is not None:
                 target = _wattr(item, "id", "unknown")
                 relation_id = safe_id("relation", f"docx-connector-{node_id}-{endpoint_kind}")
@@ -206,9 +306,9 @@ def _drawing(builder: DocumentBuilder, parent_id: str, drawing: ET.Element, line
                     builder.add_feature("connector-target", "ambiguous", target_id=node_id, diagnostic_ids=[diagnostic])
                     continue
                 builder.add_item("relations", {"relationId": relation_id, "kind": "connectorTarget", "fromId": node_id, "toId": target_node_id, "endpoint": endpoint_kind, "status": "ambiguous"}, "relationId")
-    for text_box in _children(drawing, "txbx"):
-        for paragraph in _children(text_box, "p"):
-            for run in _children(paragraph, "r"):
+    for text_box in _descendants(drawing, "txbx"):
+        for paragraph in _descendants(text_box, "p"):
+            for run in _descendants(paragraph, "r"):
                 _add_text_run(builder, node_id, run, line_index, {})
     _extension(builder, node_id, "drawing", {"kind": kind, "anchor": "inline", "extentEmu": {"cx": _attr(extent, "cx") if extent is not None else "0", "cy": _attr(extent, "cy") if extent is not None else "0"}})
 
@@ -233,19 +333,83 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
             if "word/styles.xml" in names:
                 style_root = _read_xml(archive, "word/styles.xml")
                 style_graph: dict[str, str | None] = {}
+                style_declarations: dict[str, dict[str, Any]] = {}
                 for style in _children(style_root, "style"):
                     style_id = _wattr(style, "styleId")
                     if style_id:
                         based = next(iter(_children(style, "basedOn")), None)
                         style_graph[style_id] = _wattr(based, "val") if based is not None and _wattr(based, "val") else None
+                        style_declarations[style_id] = _style_properties(style)
                         authored = _add_style(builder, style, style_id, "paragraph" if _wattr(style, "type") == "paragraph" else "character")
                         styles[style_id] = (authored, safe_id("style", f"docx-resolved-{style_id}"))
                 if _style_cycle(style_graph):
                     diagnostic = builder.add_diagnostic("DFIR-DOCX-STYLE-CYCLE", "style basedOn inheritance contains a cycle", severity="error", phase="validate")
                     builder.add_feature("style-inheritance", "failed", diagnostic_ids=[diagnostic])
+                else:
+                    _resolve_styles(builder, style_graph, style_declarations, styles)
+            content_types = _content_types(archive)
+            package_part_id = safe_id("part", "docx-package")
+            builder.add_item("parts", {"partId": package_part_id, "kind": "package", "name": "OOXML package", "contentType": "application/vnd.openxmlformats-package", "rootNodeIds": [builder.root_id], "status": "preserved"}, "partId")
             part_id = safe_id("part", "docx-document")
             surface_id = safe_id("surface", "docx-page-1")
-            builder.add_item("parts", {"partId": part_id, "kind": "document", "name": "word/document.xml", "rootNodeIds": [builder.root_id], "surfaceIds": [surface_id], "status": "preserved"}, "partId")
+            builder.add_item("parts", {"partId": part_id, "kind": "document", "name": "word/document.xml", "contentType": content_types.get("word/document.xml", "application/xml"), "parentPartId": package_part_id, "rootNodeIds": [builder.root_id], "surfaceIds": [surface_id], "relationshipIds": [], "status": "preserved"}, "partId")
+            part_ids: dict[str, str] = {"[package]": package_part_id, "word/document.xml": part_id}
+            for package_name in sorted(names):
+                normalized_name = package_name.replace("\\", "/")
+                if normalized_name in {"[Content_Types].xml", "word/document.xml"} or normalized_name.endswith(".rels"):
+                    continue
+                package_part_id_for_name = safe_id("part", f"docx-{normalized_name}")
+                part_ids[normalized_name] = package_part_id_for_name
+                suffix = normalized_name.rsplit(".", 1)[-1].lower() if "." in normalized_name else ""
+                kind = "image" if normalized_name.startswith("word/media/") else "xml" if suffix == "xml" else "embeddedObject"
+                builder.add_item("parts", {"partId": package_part_id_for_name, "kind": kind, "name": normalized_name, "contentType": content_types.get(normalized_name, "application/octet-stream"), "parentPartId": package_part_id, "rootNodeIds": [], "relationshipIds": [], "status": "preserved"}, "partId")
+            relationship_loss = False
+            for relationship_file in sorted(name for name in names if name == "_rels/.rels" or "/_rels/" in name):
+                source_name = _relationship_source(relationship_file)
+                source_part_id = part_ids.get(source_name)
+                if source_part_id is None:
+                    source_part_id = safe_id("part", f"docx-missing-source-{source_name}")
+                    part_ids[source_name] = source_part_id
+                    builder.add_item("parts", {"partId": source_part_id, "kind": "unknown", "name": source_name, "external": True, "rootNodeIds": [], "relationshipIds": [], "status": "unavailable"}, "partId")
+                source_part = builder.find("parts", "partId", source_part_id)
+                for relationship_key, (target, relationship_type, target_mode) in _rels(archive, relationship_file).items():
+                    relation_id = safe_id("relation", f"docx-{relationship_file}-{relationship_key}")
+                    if target_mode == "External":
+                        target_id = safe_id("resource", f"docx-external-{target}")
+                        if builder.find("resources", "resourceId", target_id) is None:
+                            builder.add_item("resources", {"resourceId": target_id, "kind": "linkedObject", "mediaType": "application/octet-stream", "availability": "unavailable", "externalTarget": target, "sourceRelationshipId": relation_id}, "resourceId")
+                        relation_kind = "links"
+                        relation_status = "unavailable"
+                        relationship_loss = True
+                    else:
+                        target_name = _relationship_target(source_name, target)
+                        target_id = part_ids.get(target_name)
+                        relation_kind = "references"
+                        relation_status = "preserved"
+                        if target_id is None:
+                            target_id = safe_id("resource", f"docx-missing-target-{target_name}")
+                            if builder.find("resources", "resourceId", target_id) is None:
+                                builder.add_item("resources", {"resourceId": target_id, "kind": "linkedObject", "mediaType": "application/octet-stream", "availability": "unavailable", "externalTarget": target_name, "sourceRelationshipId": relation_id}, "resourceId")
+                            diagnostic = builder.add_diagnostic("DFIR-DOCX-RELATION-TARGET-MISSING", f"relationship target is missing from the package: {target_name}", target_id=source_part_id, phase="parse", related_ids=[relation_id])
+                            builder.add_feature("package-relationship", "ambiguous", target_id=source_part_id, diagnostic_ids=[diagnostic])
+                            relation_status = "unavailable"
+                            relationship_loss = True
+                    builder.add_item("relations", {"relationId": relation_id, "kind": relation_kind, "fromId": source_part_id, "toId": target_id, "status": relation_status}, "relationId")
+                    if source_part is not None:
+                        source_part.setdefault("relationshipIds", []).append(relation_id)
+            if not relationship_loss:
+                builder.add_feature("package-relationships", "preserved", target_id=builder.root_id)
+            for package_part in builder.document.get("parts", []):
+                part_name = str(package_part.get("name", ""))
+                if re.fullmatch(r"word/(header|footer)\d+\.xml", part_name):
+                    package_part["status"] = "ambiguous"
+                    diagnostic = builder.add_diagnostic(
+                        "DFIR-DOCX-STORY-PART-UNPARSED",
+                        f"DOCX story part is retained as a typed package part but its body is outside the main-story parser: {part_name}",
+                        target_id=package_part["partId"],
+                        phase="normalize",
+                    )
+                    builder.add_feature("story-part", "ambiguous", target_id=package_part["partId"], diagnostic_ids=[diagnostic])
             builder.add_item("surfaces", {"surfaceId": surface_id, "partId": part_id, "kind": "page", "ordinal": 0, "status": "preserved"}, "surfaceId")
             body = next(iter(_children(root, "body")), root)
             table_entities: list[dict[str, Any]] = []
@@ -272,7 +436,8 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
                     for item in list(child):
                         item_local = _local(item.tag)
                         if item_local in {"r", "ins", "del"}:
-                            for run in _children(item, "r"):
+                            runs = [item] if item_local == "r" else _children(item, "r")
+                            for run in runs:
                                 run_id = _add_text_run(builder, paragraph_id, run, paragraph_number, styles)
                                 if item_local == "ins":
                                     _extension(builder, run_id, "revision", {"kind": "insert", "author": _wattr(item, "author"), "revisionId": _wattr(item, "id")})

@@ -1,10 +1,11 @@
 {
   "schema": {"name": "fdir/document-form", "version": "1.0.0"},
   "documentId": "doc-partial",
-  "sourceFormat": {"namespace": "format", "name": "docx", "version": "ecma-376"},
+  "sourceFormat": {"namespace": "format", "name": "docx", "version": "ECMA-376"},
   "rootNodeId": "node-document",
   "nodes": [{"nodeId": "node-document", "kind": "document", "childIds": ["node-paragraph", "node-unsupported-shape"], "status": "preserved"}, {"nodeId": "node-paragraph", "kind": "paragraph", "parentId": "node-document", "childIds": [], "status": "preserved"}, {"nodeId": "node-unsupported-shape", "kind": "shape", "parentId": "node-document", "childIds": [], "geometryId": "geometry-unknown", "status": "unsupported"}],
+  "coordinateSpaces": [{"coordinateSpaceId": "space-page", "unit": "pt", "origin": {"x": "0", "y": "0"}}],
   "geometries": [{"geometryId": "geometry-unknown", "spaceId": "space-page", "kind": "rectangle", "primitives": [], "status": "unsupported"}],
   "diagnostics": [{"diagnosticId": "diagnostic-unsupported-shape", "code": "DFIR-DOCX-UNSUPPORTED-SHAPE", "severity": "warning", "phase": "parse", "message": "The shape is retained as an unsupported node.", "targetId": "node-unsupported-shape"}],
-  "conversion": {"status": "partial", "features": [{"feature": "paragraph", "targetId": "node-paragraph", "status": "preserved"}, {"feature": "shape", "targetId": "node-unsupported-shape", "status": "unsupported", "diagnosticIds": ["diagnostic-unsupported-shape"]}], "diagnostics": ["diagnostic-unsupported-shape"]}
+  "conversion": {"status": "partial", "capabilityProfile": "format:docx:ECMA-376:1", "features": [{"feature": "paragraph", "targetId": "node-paragraph", "status": "preserved"}, {"feature": "shape", "targetId": "node-unsupported-shape", "status": "unsupported", "diagnosticIds": ["diagnostic-unsupported-shape"]}], "featureInventory": [{"feature": "paragraph", "occurrences": 1, "disposition": "core", "status": "preserved"}, {"feature": "shape", "occurrences": 1, "disposition": "non-preserved", "status": "unsupported", "diagnosticIds": ["diagnostic-unsupported-shape"]}], "diagnostics": ["diagnostic-unsupported-shape"]}
 }

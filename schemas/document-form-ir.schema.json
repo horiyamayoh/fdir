@@ -130,8 +130,11 @@
         "kind": {"type": "string", "minLength": 1},
         "parentPartId": {"$ref": "#/$defs/id"},
         "name": {"type": "string"},
+        "contentType": {"type": "string"},
+        "external": {"type": "boolean"},
         "rootNodeIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
         "surfaceIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "relationshipIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
         "visibility": {"$ref": "#/$defs/visibility"},
         "status": {"$ref": "#/$defs/status"}
       }
@@ -173,6 +176,7 @@
         "fieldId": {"$ref": "#/$defs/id"},
         "annotationIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
         "resourceIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "value": {"$ref": "#/$defs/typedValue"},
         "status": {"$ref": "#/$defs/status"},
         "visibility": {"$ref": "#/$defs/visibility"},
         "address": {"$ref": "#/$defs/cellAddress"}
@@ -202,7 +206,30 @@
         "provenance": {"type": "string", "enum": ["authored", "decoded", "calculated", "formatter", "renderer", "ocr"]},
         "value": {"type": "string"},
         "sourceTextId": {"$ref": "#/$defs/id"},
+        "sourceRange": {"$ref": "#/$defs/textRange"},
+        "transformations": {"type": "array", "items": {"$ref": "#/$defs/textTransformation"}},
         "status": {"$ref": "#/$defs/status"}
+      }
+    },
+    "textRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": {"type": "integer", "minimum": 0},
+        "end": {"type": "integer", "minimum": 0}
+      }
+    },
+    "textTransformation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "sourceStart", "sourceEnd", "targetStart", "targetEnd"],
+      "properties": {
+        "kind": {"type": "string", "enum": ["identity", "split", "merge", "decode", "normalize", "format", "observe"]},
+        "sourceStart": {"type": "integer", "minimum": 0},
+        "sourceEnd": {"type": "integer", "minimum": 0},
+        "targetStart": {"type": "integer", "minimum": 0},
+        "targetEnd": {"type": "integer", "minimum": 0}
       }
     },
     "cellAddress": {
@@ -250,10 +277,32 @@
         "theme": {"$ref": "#/$defs/themeRef"},
         "conditional": {"type": "array", "items": {"$ref": "#/$defs/conditionalRule"}},
         "resolvedFrom": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "cascadeTrace": {"type": "array", "items": {"$ref": "#/$defs/cascadeStep"}},
+        "propertyProvenance": {"type": "array", "items": {"$ref": "#/$defs/propertyProvenance"}},
         "authored": {"$ref": "#/$defs/styleProperties"},
         "direct": {"$ref": "#/$defs/styleProperties"},
         "resolved": {"$ref": "#/$defs/styleProperties"},
         "declaration": {"$ref": "#/$defs/styleProperties"},
+        "status": {"$ref": "#/$defs/status"}
+      }
+    },
+    "cascadeStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["property", "source", "action"],
+      "properties": {
+        "property": {"type": "string"},
+        "source": {"$ref": "#/$defs/id"},
+        "action": {"type": "string", "enum": ["inherit", "default", "theme", "direct", "conditional", "clear", "resolve"]}
+      }
+    },
+    "propertyProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["property", "source", "status"],
+      "properties": {
+        "property": {"type": "string"},
+        "source": {"$ref": "#/$defs/id"},
         "status": {"$ref": "#/$defs/status"}
       }
     },
@@ -313,8 +362,20 @@
         "g": {"type": "integer", "minimum": 0, "maximum": 255},
         "b": {"type": "integer", "minimum": 0, "maximum": 255},
         "a": {"type": "number", "minimum": 0, "maximum": 1},
+        "gray": {"type": "number", "minimum": 0, "maximum": 1},
+        "c": {"type": "number", "minimum": 0, "maximum": 1},
+        "m": {"type": "number", "minimum": 0, "maximum": 1},
+        "y": {"type": "number", "minimum": 0, "maximum": 1},
+        "k": {"type": "number", "minimum": 0, "maximum": 1},
+        "themeId": {"$ref": "#/$defs/id"},
         "slot": {"type": "string"}
-      }
+      },
+      "oneOf": [
+        {"properties": {"kind": {"const": "rgb"}}, "required": ["r", "g", "b"], "not": {"anyOf": [{"required": ["gray"]}, {"required": ["c"]}, {"required": ["m"]}, {"required": ["y"]}, {"required": ["k"]}, {"required": ["slot"]}]}},
+        {"properties": {"kind": {"const": "gray"}}, "required": ["gray"], "not": {"anyOf": [{"required": ["r"]}, {"required": ["c"]}, {"required": ["slot"]}]}},
+        {"properties": {"kind": {"const": "cmyk"}}, "required": ["c", "m", "y", "k"], "not": {"anyOf": [{"required": ["r"]}, {"required": ["gray"]}, {"required": ["slot"]}]}},
+        {"properties": {"kind": {"const": "theme"}}, "required": ["slot"], "not": {"anyOf": [{"required": ["r"]}, {"required": ["gray"]}, {"required": ["c"]}]}}
+      ]
     },
     "indentation": {
       "type": "object",
@@ -352,7 +413,11 @@
       "properties": {
         "kind": {"type": "string", "enum": ["solid", "pattern", "none"]},
         "color": {"$ref": "#/$defs/color"}
-      }
+      },
+      "allOf": [
+        {"if": {"properties": {"kind": {"enum": ["solid", "pattern"]}}}, "then": {"required": ["color"]}},
+        {"if": {"properties": {"kind": {"const": "none"}}}, "then": {"not": {"required": ["color"]}}}
+      ]
     },
     "stroke": {
       "type": "object",
@@ -412,7 +477,16 @@
         "points": {"type": "array", "items": {"$ref": "#/$defs/point"}},
         "segments": {"type": "array", "items": {"$ref": "#/$defs/pathSegment"}},
         "arrowhead": {"type": "string"}
-      }
+      },
+      "oneOf": [
+        {"properties": {"kind": {"const": "point"}}, "required": ["x", "y"]},
+        {"properties": {"kind": {"const": "line"}}, "required": ["x", "y", "points"]},
+        {"properties": {"kind": {"enum": ["polyline", "polygon"]}}, "required": ["points"], "not": {"required": ["segments"]}},
+        {"properties": {"kind": {"enum": ["rectangle", "rotatedRectangle"]}}, "required": ["x", "y", "width", "height"]},
+        {"properties": {"kind": {"const": "bezier"}}, "required": ["segments"]},
+        {"properties": {"kind": {"const": "clip"}}, "required": ["segments"]},
+        {"properties": {"kind": {"const": "arrowhead"}}, "required": ["arrowhead"]}
+      ]
     },
     "pathSegment": {
       "type": "object",
@@ -422,7 +496,13 @@
         "kind": {"type": "string", "enum": ["move", "line", "bezier", "close"]},
         "points": {"type": "array", "items": {"$ref": "#/$defs/point"}},
         "to": {"$ref": "#/$defs/point"}
-      }
+      },
+      "oneOf": [
+        {"properties": {"kind": {"const": "move"}}, "required": ["to"]},
+        {"properties": {"kind": {"const": "line"}}, "required": ["to"]},
+        {"properties": {"kind": {"const": "bezier"}}, "required": ["points"], "minProperties": 0},
+        {"properties": {"kind": {"const": "close"}}, "not": {"anyOf": [{"required": ["to"]}, {"required": ["points"]}]}}
+      ]
     },
     "layout": {
       "type": "object",
@@ -457,7 +537,15 @@
         "moveWithCells": {"type": "boolean"},
         "sizeWithCells": {"type": "boolean"},
         "offset": {"type": "string"}
-      }
+      },
+      "oneOf": [
+        {"properties": {"kind": {"const": "inline"}}, "required": ["nodeId"]},
+        {"properties": {"kind": {"const": "page"}}, "required": ["surfaceId"]},
+        {"properties": {"kind": {"const": "paragraph"}}, "required": ["nodeId"]},
+        {"properties": {"kind": {"const": "cell-range"}}, "required": ["gridId", "from", "to"]},
+        {"properties": {"kind": {"const": "floating"}}, "required": ["surfaceId"]},
+        {"properties": {"kind": {"const": "endpoint-pair"}}, "required": ["nodeId"]}
+      ]
     },
     "cellAnchor": {
       "type": "object",
@@ -480,6 +568,10 @@
         "mediaType": {"type": "string"},
         "availability": {"type": "string", "enum": ["available", "unavailable", "omitted-by-policy"]},
         "derivedHandle": {"type": "string"},
+        "sourceRelationshipId": {"$ref": "#/$defs/id"},
+        "intrinsicWidth": {"type": "integer", "minimum": 0},
+        "intrinsicHeight": {"type": "integer", "minimum": 0},
+        "externalTarget": {"type": "string"},
         "width": {"$ref": "#/$defs/length"},
         "height": {"$ref": "#/$defs/length"}
       }
@@ -518,7 +610,13 @@
         "type": {"type": "string", "enum": ["blank", "boolean", "integer", "number", "decimal", "string", "date", "datetime", "error"]},
         "value": {"type": ["string", "boolean", "number", "null"]},
         "status": {"$ref": "#/$defs/status"}
-      }
+      },
+      "oneOf": [
+        {"properties": {"type": {"const": "blank"}}, "required": ["value"], "properties": {"type":{"const":"blank"},"value":{"type":"null"},"status":{"$ref":"#/$defs/status"}}},
+        {"properties": {"type": {"const": "boolean"}}, "required": ["value"], "properties": {"type":{"const":"boolean"},"value":{"type":"boolean"},"status":{"$ref":"#/$defs/status"}}},
+        {"properties": {"type": {"enum": ["integer", "number", "decimal"]}}, "required": ["value"], "properties": {"type":{"enum":["integer","number","decimal"]},"value":{"type":["string","number","integer"]},"status":{"$ref":"#/$defs/status"}}},
+        {"properties": {"type": {"enum": ["string", "date", "datetime", "error"]}}, "required": ["value"], "properties": {"type":{"enum":["string","date","datetime","error"]},"value":{"type":["string","null"]},"status":{"$ref":"#/$defs/status"}}}
+      ]
     },
     "calculationContext": {
       "type": "object",
@@ -542,6 +640,10 @@
         "storedResult": {"type": "string"},
         "computedResult": {"type": "string"},
         "displayedResult": {"type": "string"},
+        "range": {"$ref": "#/$defs/textRange"},
+        "instructionTextId": {"$ref": "#/$defs/id"},
+        "resultTextId": {"$ref": "#/$defs/id"},
+        "flags": {"type": "array", "items": {"type": "string", "enum": ["dirty", "locked", "private"]}},
         "status": {"$ref": "#/$defs/status"}
       }
     },
@@ -554,8 +656,23 @@
         "kind": {"type": "string", "enum": ["comment", "footnote", "endnote", "revision", "hyperlink", "bookmark", "form", "ocrToken"]},
         "targetIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
         "body": {"type": "string"},
+        "bodyNodeId": {"$ref": "#/$defs/id"},
+        "bodyTextId": {"$ref": "#/$defs/id"},
+        "range": {"$ref": "#/$defs/textRange"},
+        "referenceId": {"type": "string"},
+        "metadata": {"$ref": "#/$defs/annotationMetadata"},
         "author": {"type": "string"},
         "status": {"$ref": "#/$defs/status"}
+      }
+    },
+    "annotationMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "createdAt": {"type": "string"},
+        "updatedAt": {"type": "string"},
+        "revisionId": {"type": "string"},
+        "threadId": {"type": "string"}
       }
     },
     "relation": {
@@ -622,6 +739,7 @@
         "schemaId": {"type": "string", "minLength": 1},
         "payload": {"type": "object"},
         "criticality": {"type": "string", "enum": ["critical", "non-critical"]},
+        "retention": {"type": "string", "enum": ["interpreted", "opaque"]},
         "compatibility": {"type": "object", "additionalProperties": false, "properties": {"unknownVersion": {"type": "string", "enum": ["reject", "preserve-and-mark", "ignore"]}}}
       }
     },
@@ -664,7 +782,10 @@
       "required": ["status", "features", "diagnostics"],
       "properties": {
         "status": {"type": "string", "enum": ["complete", "partial", "failed"]},
+        "capabilityProfile": {"type": "string"},
         "features": {"type": "array", "items": {"$ref": "#/$defs/featureResult"}},
+        "featureInventory": {"type": "array", "items": {"$ref": "#/$defs/featureInventoryEntry"}},
+        "warnings": {"type": "array", "items": {"$ref": "#/$defs/id"}},
         "diagnostics": {"type": "array", "items": {"$ref": "#/$defs/id"}}
       }
     },
@@ -675,6 +796,21 @@
       "properties": {
         "feature": {"type": "string"},
         "targetId": {"$ref": "#/$defs/id"},
+        "status": {"$ref": "#/$defs/status"},
+        "diagnosticIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "occurrences": {"type": "integer", "minimum": 0},
+        "handler": {"type": "string"},
+        "disposition": {"type": "string", "enum": ["core", "extension", "non-preserved", "observation", "not-present"]}
+      }
+    },
+    "featureInventoryEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["feature", "occurrences", "disposition"],
+      "properties": {
+        "feature": {"type": "string"},
+        "occurrences": {"type": "integer", "minimum": 0},
+        "disposition": {"type": "string", "enum": ["core", "extension", "non-preserved", "observation", "not-present"]},
         "status": {"$ref": "#/$defs/status"},
         "diagnosticIds": {"type": "array", "items": {"$ref": "#/$defs/id"}}
       }
@@ -691,7 +827,8 @@
         "message": {"type": "string"},
         "targetId": {"$ref": "#/$defs/id"},
         "sourceMapId": {"$ref": "#/$defs/id"},
-        "relatedIds": {"type": "array", "items": {"$ref": "#/$defs/id"}}
+        "relatedIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "action": {"type": "string", "enum": ["review", "retry", "omit", "configure", "none"]}
       }
     }
   }

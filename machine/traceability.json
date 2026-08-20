@@ -8,11 +8,15 @@
     "machine/github-issue-map.json",
     "machine/legacy-issue-map.json",
     "machine/release-gate.json",
+    "machine/phase2-issue-plan.json",
+    "machine/release-claim-manifest.json",
     "schemas/document-form-ir.schema.json",
     "tools/convert_document.py",
     "tools/run_e2e.py",
     "e2e/README.md",
-    "e2e/fixtures/README.md"
+    "e2e/fixtures/README.md",
+    "e2e/corpus/manifest.json",
+    "tools/independent_corpus.py"
   ],
   "derivation": {
     "requirementToIssue": "requirements.ownerIssue",

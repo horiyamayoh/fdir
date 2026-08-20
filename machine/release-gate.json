@@ -11,7 +11,10 @@
   "commands": [
     "python tools/validate_design.py",
     "python tools/run_acceptance.py --all",
-    "python tools/run_e2e.py --all"
+    "python tools/run_e2e.py --all",
+    "python tools/mutation_qualification.py --json",
+    "python tools/query_qualification.py",
+    "python tools/independent_corpus.py --json"
   ],
   "requiredAdapters": [
     "tools/adapter_docx.py",
@@ -36,7 +39,18 @@
     "e2e/fixtures/README.md",
     "tools/generate_e2e_fixtures.py",
     "tools/convert_document.py",
-    "tools/run_e2e.py"
+    "tools/run_e2e.py",
+    "machine/phase2-issue-plan.json",
+    "machine/capability-profile.json",
+    "machine/reference-registry.json",
+    "machine/extension-registry.json",
+    "machine/canonicalization.json",
+    "machine/query-contract.json",
+    "machine/release-claim-manifest.json",
+    "e2e/corpus/manifest.json",
+    "e2e/corpus/README.md",
+    "tools/query_qualification.py",
+    "tools/independent_corpus.py"
   ],
   "forbiddenConcepts": [
     "semanticEquivalence",
@@ -57,6 +71,11 @@
     "rebuildable-query",
     "parser-observation-boundary",
     "resource-and-package-boundary",
-    "real-input-e2e"
+    "real-input-e2e",
+    "phase2-contracts",
+    "release-claims",
+    "mutation-qualification",
+    "query-qualification",
+    "independent-corpus"
   ]
 }

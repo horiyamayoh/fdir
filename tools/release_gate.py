@@ -24,6 +24,14 @@ REQUIREMENTS_PATH = ROOT / "machine" / "requirements.json"
 ACCEPTANCE_PATH = ROOT / "machine" / "acceptance-tests.json"
 ISSUE_PLAN_PATH = ROOT / "machine" / "issue-plan.json"
 GITHUB_ISSUE_MAP_PATH = ROOT / "machine" / "github-issue-map.json"
+PHASE2_ISSUE_PLAN_PATH = ROOT / "machine" / "phase2-issue-plan.json"
+CAPABILITY_PROFILE_PATH = ROOT / "machine" / "capability-profile.json"
+REFERENCE_REGISTRY_PATH = ROOT / "machine" / "reference-registry.json"
+EXTENSION_REGISTRY_PATH = ROOT / "machine" / "extension-registry.json"
+CANONICALIZATION_PATH = ROOT / "machine" / "canonicalization.json"
+QUERY_CONTRACT_PATH = ROOT / "machine" / "query-contract.json"
+RELEASE_CLAIM_MANIFEST_PATH = ROOT / "machine" / "release-claim-manifest.json"
+INDEPENDENT_CORPUS_MANIFEST_PATH = ROOT / "e2e" / "corpus" / "manifest.json"
 TRACEABILITY_PATH = ROOT / "machine" / "traceability.json"
 SCHEMA_PATH = ROOT / "schemas" / "document-form-ir.schema.json"
 EXAMPLES_PATH = ROOT / "examples"
@@ -295,6 +303,81 @@ def check_traceability() -> dict[str, int]:
     return {"authoritative_inputs": len(authoritative), "derivation_rules": len(derivation)}
 
 
+def check_phase2_contracts() -> dict[str, int]:
+    plan = load_json(PHASE2_ISSUE_PLAN_PATH)
+    require(isinstance(plan, dict), "phase2 issue plan root must be an object")
+    policy = plan.get("policy")
+    entries = plan.get("issues")
+    require(isinstance(policy, dict) and isinstance(entries, list), "phase2 issue plan is incomplete")
+    numbers = [entry.get("issueNumber") for entry in entries if isinstance(entry, dict)]
+    expected_numbers = list(range(69, 85)) + [86]
+    require(numbers == expected_numbers, "phase2 issue plan must cover issues #69 through #84 and #86 in order")
+    require(policy.get("activeIssueNumbers") == expected_numbers, "phase2 active issue numbers are incomplete")
+    required_commands = policy.get("requiredCommands")
+    require(isinstance(required_commands, list) and "python tools/mutation_qualification.py --json" in required_commands and "python tools/query_qualification.py" in required_commands and "python tools/release_gate.py" in required_commands, "phase2 qualification commands are incomplete")
+
+    capability = load_json(CAPABILITY_PROFILE_PATH)
+    profiles = capability.get("profiles") if isinstance(capability, dict) else None
+    require(isinstance(profiles, list) and {item.get("format") for item in profiles if isinstance(item, dict)} == {"docx", "xlsx", "pdf", "markdown"}, "capability profiles do not cover all formats")
+    for profile in profiles:
+        require(isinstance(profile, dict) and isinstance(profile.get("id"), str) and isinstance(profile.get("supportedFeatures"), list), "capability profile is malformed")
+        require(profile.get("disposition") == "preserve-or-diagnose" and profile.get("unknownConstructPolicy") == "partial-with-diagnostic", "capability profile policy is not fail-closed")
+    status_contract = capability.get("statusContract") if isinstance(capability, dict) else None
+    require(isinstance(status_contract, dict) and status_contract.get("normalizedIsComplete") is True and "unavailable" in status_contract.get("observationOnlyStatuses", []), "capability status contract is incomplete")
+
+    reference = load_json(REFERENCE_REGISTRY_PATH)
+    references = reference.get("references") if isinstance(reference, dict) else None
+    require(isinstance(references, list) and references, "reference registry is empty")
+    owners = [item.get("owner") for item in references if isinstance(item, dict)]
+    require(len(owners) == len(set(owners)), "reference registry contains duplicate owners")
+
+    canonicalization = load_json(CANONICALIZATION_PATH)
+    require(isinstance(canonicalization.get("entityCollections"), dict), "canonicalization registry lacks entity collections")
+    require(canonicalization.get("defaultDigestProjection") == "source-map-excluded", "canonicalization default projection is wrong")
+    require({item.get("name") for item in canonicalization.get("projections", []) if isinstance(item, dict)} >= {"full", "content", "source-map-excluded"}, "canonicalization projections are incomplete")
+
+    query_contract = load_json(QUERY_CONTRACT_PATH)
+    operations = query_contract.get("operations") if isinstance(query_contract, dict) else None
+    require(isinstance(operations, list) and {"list-entities", "get-entity", "rebuild-index", "get-text"}.issubset(set(operations)), "typed query contract is incomplete")
+    require(query_contract.get("index", {}).get("schema") == "fdir/document-form-index", "query index contract is missing")
+
+    try:
+        from extension_registry import validate_registry_integrity
+    except ImportError:  # pragma: no cover
+        from tools.extension_registry import validate_registry_integrity
+    extension_details = validate_registry_integrity()
+    return {"phase2_issues": len(numbers), "capability_profiles": len(profiles), "references": len(references), "extension_entries": extension_details["entries"], "canonical_entity_collections": len(canonicalization["entityCollections"]), "query_operations": len(operations)}
+
+
+def check_release_claims() -> dict[str, int]:
+    manifest = load_json(RELEASE_CLAIM_MANIFEST_PATH)
+    require(manifest.get("schema") == "fdir/document-form-release-claim-manifest", "release claim manifest schema is missing")
+    release = manifest.get("release")
+    require(isinstance(release, dict) and release.get("policy") == "fail-closed", "release claim policy is not fail-closed")
+    claims = manifest.get("issueClaims")
+    plan = load_json(PHASE2_ISSUE_PLAN_PATH)
+    plan_numbers = {entry.get("issueNumber") for entry in plan.get("issues", []) if isinstance(entry, dict)}
+    require(isinstance(claims, list), "release claim issue claims are missing")
+    claim_numbers = {claim.get("issueNumber") for claim in claims if isinstance(claim, dict)}
+    require(claim_numbers == plan_numbers - {69}, "release claims do not cover every phase2 child issue")
+    for claim in claims:
+        require(isinstance(claim, dict) and isinstance(claim.get("claim"), str) and claim.get("claim"), "release claim is malformed")
+        for command in claim.get("evidenceCommands", []):
+            require(isinstance(command, str) and command, "release claim evidence command is malformed")
+        for relative in claim.get("evidencePaths", []):
+            require((ROOT / relative).is_file(), f"release claim evidence path is missing: {relative}")
+    capability_claims = manifest.get("capabilityClaims")
+    capability = load_json(CAPABILITY_PROFILE_PATH)
+    profile_ids = {profile.get("id") for profile in capability.get("profiles", []) if isinstance(profile, dict)}
+    require(isinstance(capability_claims, list) and {item.get("profileId") for item in capability_claims if isinstance(item, dict)} == profile_ids, "capability claims do not cover every profile")
+    corpus = load_json(INDEPENDENT_CORPUS_MANIFEST_PATH)
+    require(corpus.get("independent") is True and len(corpus.get("cases", [])) >= 4, "independent corpus is incomplete")
+    required_formats = {"docx", "xlsx", "pdf", "markdown"}
+    require({case.get("format") for case in corpus.get("cases", []) if isinstance(case, dict)} == required_formats, "independent corpus format matrix is incomplete")
+    require(manifest.get("independentEvidence", {}).get("runner") == "tools/independent_corpus.py", "independent corpus runner is not claimed")
+    return {"child_claims": len(claims), "capability_claims": len(capability_claims), "independent_cases": len(corpus["cases"])}
+
+
 def check_schema() -> dict[str, int]:
     schema = load_json(SCHEMA_PATH)
     require(isinstance(schema, dict), "IR schema root must be an object")
@@ -495,6 +578,9 @@ def main(argv: list[str] | None = None) -> int:
         ("design_validation", "python tools/validate_design.py", ["tools/validate_design.py"]),
         ("acceptance_all", "python tools/run_acceptance.py --all", ["tools/run_acceptance.py", "--all"]),
         ("real_input_e2e", "python tools/run_e2e.py --all", ["tools/run_e2e.py", "--all"]),
+        ("mutation_qualification", "python tools/mutation_qualification.py --json", ["tools/mutation_qualification.py", "--json"]),
+        ("query_qualification", "python tools/query_qualification.py", ["tools/query_qualification.py"]),
+        ("independent_corpus", "python tools/independent_corpus.py --json", ["tools/independent_corpus.py", "--json"]),
     ):
         command_result = run_command(name, display, command)
         commands.append(command_result)
@@ -513,6 +599,8 @@ def main(argv: list[str] | None = None) -> int:
     check_functions: tuple[tuple[str, Callable[[], dict[str, int]]], ...] = (
         ("design_catalog", check_design_catalog),
         ("issue_plan_and_github_map", check_issue_plan),
+        ("phase2_contracts", check_phase2_contracts),
+        ("release_claims", check_release_claims),
         ("traceability", check_traceability),
         ("schema", check_schema),
         ("examples", check_examples),

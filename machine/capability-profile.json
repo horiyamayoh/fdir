@@ -1,0 +1,51 @@
+{
+  "schema": "fdir/document-form-capability-profile",
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "id": "format:docx:ECMA-376:1",
+      "format": "docx",
+      "version": "ECMA-376",
+      "supportedFeatures": ["package-parts", "relationships", "paragraphs", "runs", "tables", "styles", "fields", "annotations", "revisions", "drawings", "resources", "source-maps"],
+      "disposition": "preserve-or-diagnose",
+      "unknownConstructPolicy": "partial-with-diagnostic"
+    },
+    {
+      "id": "format:xlsx:Office Open XML:1",
+      "format": "xlsx",
+      "version": "Office Open XML",
+      "supportedFeatures": ["package-parts", "relationships", "workbook", "worksheets", "cells", "formulas", "values", "styles", "tables", "conditional-formatting", "grids", "source-maps"],
+      "exactnessLanes": ["stored-value", "formula", "cached-value", "displayed-value", "date-system", "relationship-graph"],
+      "disposition": "preserve-or-diagnose",
+      "unknownConstructPolicy": "partial-with-diagnostic"
+    },
+    {
+      "id": "format:pdf:1.7:1",
+      "format": "pdf",
+      "version": "1.7",
+      "supportedFeatures": ["pages", "text", "glyph-codes", "paths", "clipping", "paint-order", "resources", "annotations", "source-maps"],
+      "exactnessLanes": ["indirect-object", "content-operator", "graphics-state", "font-mapping", "glyph-geometry"],
+      "disposition": "preserve-or-diagnose",
+      "unknownConstructPolicy": "partial-with-diagnostic"
+    },
+    {
+      "id": "format:markdown:commonmark:1",
+      "format": "markdown",
+      "version": "commonmark",
+      "supportedFeatures": ["blocks", "inline", "links", "images", "tables", "lists", "footnotes", "front-matter", "authoring", "source-maps"],
+      "dialect": {
+        "name": "commonmark",
+        "extensions": ["gfm-tables", "task-list", "front-matter", "raw-html"],
+        "parserLanes": ["block-state-machine", "inline-token-stream", "source-span", "resource-resolution"]
+      },
+      "disposition": "preserve-or-diagnose",
+      "unknownConstructPolicy": "partial-with-diagnostic"
+    }
+  ],
+  "statusContract": {
+    "normalizedIsComplete": true,
+    "warningOnly": "complete-with-warnings",
+    "partialStatuses": ["approximated", "ambiguous", "unsupported", "omitted-by-policy", "failed"],
+    "observationOnlyStatuses": ["unavailable"]
+  }
+}

@@ -32,6 +32,19 @@ class CanonicalizationError(ValueError):
     """Raised when a value cannot be an authoritative IR document."""
 
 
+CANONICALIZATION_PATH = Path(__file__).resolve().parents[1] / "machine" / "canonicalization.json"
+
+
+def _canonicalization_config() -> dict[str, Any]:
+    try:
+        value = json.loads(CANONICALIZATION_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CanonicalizationError(f"cannot load canonicalization registry: {exc}") from exc
+    if not isinstance(value, dict) or not isinstance(value.get("entityCollections"), dict):
+        raise CanonicalizationError("canonicalization registry lacks entityCollections")
+    return value
+
+
 def _walk(value: Any, path: str = "$") -> None:
     if isinstance(value, dict):
         for key, child in value.items():
@@ -47,11 +60,17 @@ def _walk(value: Any, path: str = "$") -> None:
         raise CanonicalizationError(f"non-finite number at {path}")
 
 
-def canonical_bytes(document: dict[str, Any]) -> bytes:
-    """Return deterministic UTF-8 JSON bytes for an IR document."""
+def _validate_authority(document: dict[str, Any]) -> None:
+    try:
+        from ir_validation import validate_document  # type: ignore
+    except ImportError:  # pragma: no cover - package-style import
+        from tools.ir_validation import validate_document  # type: ignore
+    validate_document(document)
 
-    if not isinstance(document, dict):
-        raise CanonicalizationError("IR document must be a JSON object")
+
+def _canonical_bytes(document: dict[str, Any], *, validate: bool) -> bytes:
+    if validate:
+        _validate_authority(document)
     _walk(document)
     normalized = _normalize(document)
     try:
@@ -66,27 +85,15 @@ def canonical_bytes(document: dict[str, Any]) -> bytes:
         raise CanonicalizationError(f"document is not canonicalizable: {exc}") from exc
 
 
-_ID_ARRAYS = {
-    "parts": "partId",
-    "surfaces": "surfaceId",
-    "nodes": "nodeId",
-    "texts": "textId",
-    "tables": "tableId",
-    "styles": "styleId",
-    "layouts": "layoutId",
-    "coordinateSpaces": "coordinateSpaceId",
-    "geometries": "geometryId",
-    "resources": "resourceId",
-    "formulas": "formulaId",
-    "fields": "fieldId",
-    "annotations": "annotationId",
-    "relations": "relationId",
-    "orders": "orderId",
-    "observations": "observationId",
-    "extensions": "extensionId",
-    "sourceMaps": "sourceMapId",
-    "diagnostics": "diagnosticId",
-}
+def canonical_bytes(document: dict[str, Any]) -> bytes:
+    """Return authoritative deterministic UTF-8 JSON bytes for a valid IR."""
+
+    if not isinstance(document, dict):
+        raise CanonicalizationError("IR document must be a JSON object")
+    return _canonical_bytes(document, validate=True)
+
+
+_ID_ARRAYS = {str(key): str(value) for key, value in _canonicalization_config()["entityCollections"].items()}
 
 
 def _normalize(value: Any, field: str | None = None) -> Any:
@@ -110,13 +117,47 @@ def _normalize(value: Any, field: str | None = None) -> Any:
     return value
 
 
-def canonical_digest(document: dict[str, Any]) -> str:
-    """Return the SHA-256 identity of canonical IR bytes."""
+def projection_document(document: dict[str, Any], projection: str = "source-map-excluded") -> dict[str, Any]:
+    """Return a named identity projection without mutating the source object."""
 
-    identity_document = copy.deepcopy(document)
-    # Source maps are optional locators and explicitly outside IR identity.
-    identity_document.pop("sourceMaps", None)
-    return hashlib.sha256(canonical_bytes(identity_document)).hexdigest()
+    if projection not in {"full", "content", "source-map-excluded"}:
+        raise CanonicalizationError(f"unknown digest projection: {projection}")
+    projected = copy.deepcopy(document)
+    if projection == "full":
+        return projected
+    # Source maps, diagnostics, conversion outcomes, observations, and the
+    # caller-visible documentId are not source-declared form content.
+    for key in ("documentId", "sourceMaps", "diagnostics", "conversion", "observations"):
+        projected.pop(key, None)
+    return projected
+
+
+def canonical_digest(document: dict[str, Any], projection: str = "source-map-excluded") -> str:
+    """Return a SHA-256 digest for the named, validated IR projection."""
+
+    _validate_authority(document)
+    projected = projection_document(document, projection)
+    return hashlib.sha256(_canonical_bytes(projected, validate=False)).hexdigest()
+
+
+def full_canonical_digest(document: dict[str, Any]) -> str:
+    """Return the digest of every canonical IR field, including locators."""
+
+    return canonical_digest(document, "full")
+
+
+def migrate_document(document: dict[str, Any], target_version: str) -> tuple[dict[str, Any], list[dict[str, str]]]:
+    """Perform the intentionally narrow version migration boundary.
+
+    Version ``1.0.0`` is currently the only supported wire version.  The
+    function still returns a receipt-shaped diagnostic list so future schema
+    migrations cannot silently discard fields or pretend compatibility.
+    """
+
+    _validate_authority(document)
+    if target_version != document.get("schema", {}).get("version"):
+        raise CanonicalizationError(f"no registered migration to {target_version}")
+    return copy.deepcopy(document), []
 
 
 def load_document(path: Path) -> dict[str, Any]:
@@ -135,6 +176,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input", type=Path, help="Document Form IR JSON file")
     parser.add_argument("--digest", action="store_true", help="print only the SHA-256 digest")
+    parser.add_argument("--projection", choices=("full", "content", "source-map-excluded"), default="source-map-excluded", help="digest identity projection")
     parser.add_argument("--output", type=Path, help="write canonical JSON to this file")
     parser.add_argument("--check", action="store_true", help="fail unless input bytes are already canonical")
     return parser
@@ -145,14 +187,15 @@ def main(argv: list[str] | None = None) -> int:
     try:
         document = load_document(args.input)
         encoded = canonical_bytes(document)
-        if args.check and args.input.read_bytes() != encoded:
+        canonical_file = encoded + b"\n"
+        if args.check and args.input.read_bytes() not in {encoded, canonical_file}:
             raise CanonicalizationError("input is not in canonical JSON form")
         if args.output:
-            args.output.write_bytes(encoded + b"\n")
+            args.output.write_bytes(canonical_file)
         elif args.digest:
-            print(hashlib.sha256(encoded).hexdigest())
+            print(canonical_digest(document, args.projection))
         else:
-            sys.stdout.buffer.write(encoded + b"\n")
+            sys.stdout.buffer.write(canonical_file)
     except (OSError, CanonicalizationError) as exc:
         print(f"CANONICALIZATION ERROR: {exc}", file=sys.stderr)
         return 1

@@ -1,0 +1,12 @@
+{
+  "schema": "fdir/document-form-query-contract",
+  "version": "1.0.0",
+  "acceptedSchema": {"name": "fdir/document-form", "version": "1.0.0"},
+  "canonicalAlgorithm": "FDIR-C14N-1",
+  "validation": "authority IR validation is mandatory before query",
+  "operations": ["list-entities", "get-entity", "list-nodes", "get-text", "ancestors", "descendants", "find-relations", "find-extensions", "find-observations", "rebuild-index"],
+  "representations": ["source", "normalized", "stored", "computed", "displayed", "rendered", "observed"],
+  "ordering": "entity IDs are lexical; authored child/order arrays retain source ordinal",
+  "pagination": {"offset": "zero-based integer", "limit": "non-negative integer"},
+  "index": {"schema": "fdir/document-form-index", "version": "1.0.0", "authority": "non-authoritative deterministic projection"}
+}

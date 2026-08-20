@@ -10,7 +10,9 @@ never stores source bytes in an IR document.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 import hashlib
+import json
 import re
 from pathlib import Path
 from typing import Any, Iterable
@@ -73,6 +75,40 @@ def file_document_id(path: Path, format_name: str) -> str:
     return safe_id("doc", token)
 
 
+_ENTITY_ID_FIELDS = {
+    "parts": "partId", "surfaces": "surfaceId", "nodes": "nodeId", "texts": "textId",
+    "tables": "tableId", "styles": "styleId", "layouts": "layoutId", "coordinateSpaces": "coordinateSpaceId",
+    "geometries": "geometryId", "resources": "resourceId", "formulas": "formulaId", "fields": "fieldId",
+    "annotations": "annotationId", "relations": "relationId", "orders": "orderId", "extensions": "extensionId",
+}
+
+
+def _identity_normalize(value: Any, field: str | None = None) -> Any:
+    if isinstance(value, dict):
+        return {key: _identity_normalize(child, key) for key, child in sorted(value.items())}
+    if isinstance(value, list):
+        values = [_identity_normalize(child) for child in value]
+        identifier = _ENTITY_ID_FIELDS.get(field or "")
+        if identifier and all(isinstance(item, dict) and isinstance(item.get(identifier), str) for item in values):
+            return sorted(values, key=lambda item: item[identifier])
+        return values
+    return value
+
+
+def document_content_id(document: dict[str, Any]) -> str:
+    """Return a path-independent identity for source-declared form facts.
+
+    Ingestion path, source maps, diagnostics, conversion status, observations,
+    and the id itself are deliberately outside this projection.  The source
+    bytes are never copied into the IR or into this identity input.
+    """
+
+    excluded = {"documentId", "sourceMaps", "diagnostics", "conversion", "observations"}
+    projection = {key: value for key, value in document.items() if key not in excluded}
+    encoded = json.dumps(_identity_normalize(projection), ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    return safe_id("doc", hashlib.sha256(encoded).hexdigest())
+
+
 def text_value(value: Any, *, max_chars: int) -> str:
     text = "" if value is None else str(value)
     if len(text) > max_chars:
@@ -81,18 +117,40 @@ def text_value(value: Any, *, max_chars: int) -> str:
 
 
 def decimal(value: Any) -> str:
-    """Format a numeric value as the schema's decimal string."""
+    """Return a canonical fixed-point decimal without lossy fallback.
+
+    Exponents are accepted as input and normalized to fixed point.  Invalid,
+    non-finite, and NaN values raise ``AdapterError`` so an adapter cannot
+    fabricate zero while claiming a preserved source value.
+    """
 
     if isinstance(value, bool):
         value = int(value)
-    if isinstance(value, int):
-        return str(value)
-    if isinstance(value, float):
-        if value != value or value in (float("inf"), float("-inf")):
-            return "0"
-        return format(value, ".12g")
-    value = str(value).strip()
-    return value if re.match(r"^-?(0|[1-9][0-9]*)(\.[0-9]+)?$", value) else "0"
+    if isinstance(value, float) and (value != value or value in (float("inf"), float("-inf"))):
+        raise AdapterError(f"non-finite decimal value: {value!r}")
+    token = str(value).strip()
+    if not token:
+        raise AdapterError("empty decimal value")
+    if not re.fullmatch(r"[+-]?(?:(?:\d+(?:\.\d*)?)|(?:\.\d+))(?:[eE][+-]?\d+)?", token):
+        raise AdapterError(f"invalid decimal value: {token!r}")
+    try:
+        parsed = Decimal(token)
+    except InvalidOperation as exc:
+        raise AdapterError(f"invalid decimal value: {token!r}") from exc
+    if not parsed.is_finite():
+        raise AdapterError(f"non-finite decimal value: {token!r}")
+    if parsed == 0:
+        return "0"
+    fixed = format(parsed, "f")
+    if fixed.startswith("+"):
+        fixed = fixed[1:]
+    if fixed.startswith("-0.") and Decimal(fixed) == 0:
+        return "0"
+    if "." in fixed:
+        fixed = fixed.rstrip("0").rstrip(".")
+    if fixed in {"-0", "+0", ""}:
+        return "0"
+    return fixed
 
 
 class DocumentBuilder:
@@ -146,7 +204,14 @@ class DocumentBuilder:
             "extensions": [],
             "sourceMaps": [],
             "diagnostics": self.diagnostics,
-            "conversion": {"status": "complete", "features": self.features, "diagnostics": []},
+            "conversion": {
+                "status": "complete",
+                "capabilityProfile": f"format:{format_name}:{format_version}:1",
+                "features": self.features,
+                "featureInventory": [],
+                "warnings": [],
+                "diagnostics": [],
+            },
         }
         self.add_node(root_kind, root_id, status="preserved")
 
@@ -294,9 +359,36 @@ class DocumentBuilder:
 
     def finish(self, *, status: str | None = None) -> dict[str, Any]:
         if status is None:
-            status = "failed" if any(d.get("severity") in {"fatal", "error"} for d in self.diagnostics) else "partial" if self.diagnostics else "complete"
+            source_loss = any(
+                item.get("status") in {"approximated", "ambiguous", "unsupported", "omitted-by-policy", "failed"}
+                for collection in ("parts", "surfaces", "nodes", "texts", "tables", "styles", "layouts", "geometries", "resources", "formulas", "fields", "annotations", "relations", "orders", "extensions")
+                for item in self.document.get(collection, [])
+                if isinstance(item, dict)
+            ) or any(item.get("status") in {"approximated", "ambiguous", "unsupported", "omitted-by-policy", "failed"} for item in self.features)
+            status = "failed" if any(d.get("severity") in {"fatal", "error"} for d in self.diagnostics) else "partial" if source_loss else "complete"
+        if status not in {"complete", "partial", "failed"}:
+            raise AdapterError(f"invalid conversion status: {status}")
+        inventory: dict[tuple[str, str], dict[str, Any]] = {}
+        for feature in self.features:
+            key = (str(feature.get("feature")), str(feature.get("status")))
+            entry = inventory.setdefault(key, {"feature": key[0], "occurrences": 0, "disposition": "core", "status": key[1]})
+            entry["occurrences"] += 1
+            diagnostic_ids = feature.get("diagnosticIds", [])
+            if diagnostic_ids:
+                entry.setdefault("diagnosticIds", []).extend(item for item in diagnostic_ids if item not in entry.setdefault("diagnosticIds", []))
+            if key[1] in {"unsupported", "omitted-by-policy", "failed", "ambiguous", "approximated"}:
+                entry["disposition"] = "non-preserved"
+            elif key[1] == "unavailable":
+                entry["disposition"] = "observation"
+            elif key[0] in {"renderer-observation", "ocr-observation"}:
+                entry["disposition"] = "observation"
+            elif key[0].endswith("-extension") or key[0] == "extension":
+                entry["disposition"] = "extension"
+        self.document["conversion"]["featureInventory"] = sorted(inventory.values(), key=lambda item: (item["feature"], item["status"]))
         self.document["conversion"]["status"] = status
+        self.document["conversion"]["warnings"] = [d["diagnosticId"] for d in self.diagnostics if d.get("severity") in {"info", "warning"}]
         self.document["conversion"]["diagnostics"] = [d["diagnosticId"] for d in self.diagnostics]
+        self.document["documentId"] = document_content_id(self.document)
         return self.document
 
 
