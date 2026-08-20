@@ -324,6 +324,18 @@ def run_all() -> dict[str, Any]:
         # disposable one-lane positive bundle must use a non-recursive schema
         # check as its command or the matrix would spawn itself indefinitely.
         first_spec["command"] = ["python", "tools/validate_qualification_bundle.py", "--schema-only"]
+        # The production #88 output is written by the integrity command.  The
+        # disposable bundle uses the schema-only command above, so bind its
+        # payload to an immutable repository input instead of relying on a
+        # possibly stale e2e/.run/qualification-issue-88.json left by a prior
+        # local invocation.  A clean CI checkout must exercise the same path.
+        first_spec["outputs"] = [
+            {
+                "sourcePath": "schemas/qualification-evidence.schema.json",
+                "path": "artifacts/88/qualification-evidence.schema.json",
+                "role": "schema-fixture",
+            }
+        ]
         integrity_contract["scope"] = {
             "issueNumbers": list(first_spec["issueNumbers"]),
             "requiredEvidenceIds": [first_spec["evidenceId"]],
