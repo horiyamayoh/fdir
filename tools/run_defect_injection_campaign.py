@@ -1098,6 +1098,37 @@ def _report_digest(report: dict[str, Any]) -> str:
     return _digest_bytes(_json_bytes(_stable_projection(report)))
 
 
+def _campaign_assertions(report: dict[str, Any]) -> list[dict[str, Any]]:
+    """Materialize the release-scope claims checked by the campaign.
+
+    The campaign report is consumed as Issue #89 qualification evidence.  A
+    zero exit code and a large case count are not sufficient evidence on their
+    own, so keep the decisive outcomes in the report with explicit actual
+    values.  This also gives the bundle validator a stable, non-empty
+    assertion surface to bind to the exact source SHA.
+    """
+
+    completion = report.get("completion") if isinstance(report.get("completion"), dict) else {}
+    base_worktree = report.get("base_worktree") if isinstance(report.get("base_worktree"), dict) else {}
+    checks = [
+        ("campaign-calculated", True, report.get("campaign_calculated")),
+        ("coverage-complete", True, completion.get("coverage_complete")),
+        ("must-undetected-zero", True, completion.get("must_undetected_zero")),
+        ("undetected-count-zero", 0, len(report.get("undetected", [])) if isinstance(report.get("undetected"), list) else None),
+        ("base-worktree-clean", False, base_worktree.get("dirty")),
+        ("release-eligible", True, completion.get("release_eligible")),
+    ]
+    return [
+        {
+            "assertionId": assertion_id,
+            "expected": expected,
+            "actual": actual,
+            "status": "passed" if actual == expected else "failed",
+        }
+        for assertion_id, expected, actual in checks
+    ]
+
+
 def _write_report(path: Path | None, report: dict[str, Any]) -> None:
     rendered = json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     if path is not None:
@@ -1118,6 +1149,7 @@ def _base_report(contract: dict[str, Any], contract_check: dict[str, Any], base_
         "framework_version": RUNNER_VERSION,
         "status": "failed",
         "campaign_calculated": False,
+        "sourceSha": base_sha,
         "base_sha": base_sha,
         "contract_digest": contract_digest,
         "config_digest": contract_digest,
@@ -1131,6 +1163,7 @@ def _base_report(contract: dict[str, Any], contract_check: dict[str, Any], base_
         "classification_case_ids": {key: [] for key in CLASSIFICATIONS},
         "invariant_coverage": [],
         "resource_usage": _resource_usage(None, [], [], 1),
+        "assertions": [],
     }
 
 
@@ -1289,6 +1322,7 @@ def run_campaign(
             report["failure_reason"] = "declared release profile case minimums are incomplete"
         elif report["undetected"] and not report.get("failure_reason"):
             report["failure_reason"] = "one or more cases were not detected without an allowed waiver"
+        report["assertions"] = _campaign_assertions(report)
     finally:
         shutil.rmtree(temporary_root, ignore_errors=True)
     report["report_digest"] = _report_digest(report)
