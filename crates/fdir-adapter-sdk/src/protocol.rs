@@ -2503,10 +2503,10 @@ mod tests {
 
     #[test]
     fn manifest_and_negotiation_fail_closed() -> Result<(), Box<dyn std::error::Error>> {
-        let mut manifest = manifest()?;
-        manifest.process_boundary = ProcessBoundary::InProcess;
+        let mut invalid_manifest = manifest()?;
+        invalid_manifest.process_boundary = ProcessBoundary::InProcess;
         assert_eq!(
-            manifest.validate().map_err(|error| error.code()),
+            invalid_manifest.validate().map_err(|error| error.code()),
             Err("FDIR-PROTOCOL-WORKER-ISOLATION")
         );
 
