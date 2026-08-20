@@ -1,5 +1,7 @@
 name: Document Form IR qualification and release evidence
 
+run-name: fdir qualification ${{ github.sha }}
+
 on:
   push:
     branches: [main]
@@ -87,9 +89,22 @@ jobs:
         run: python tools/release_gate.py --evidence-bundle reports/evidence-final.json
       - name: Upload complete qualification evidence
         if: always()
+        id: upload-evidence
         uses: actions/upload-artifact@v4
         with:
           name: fdir-qualification-evidence-${{ github.sha }}
           path: reports/
           if-no-files-found: error
           retention-days: 14
+      - name: Publish CI evidence links
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Commit-bound qualification evidence"
+            echo "- Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "- Commit: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$GITHUB_SHA"
+            echo "- Artifact: ${{ steps.upload-evidence.outputs.artifact-url }}"
+            echo "- Artifact ID: ${{ steps.upload-evidence.outputs.artifact-id }}"
+            echo "- Retention days: 14"
+          } >> "$GITHUB_STEP_SUMMARY"
