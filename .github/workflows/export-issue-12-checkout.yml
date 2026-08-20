@@ -1,3 +1,4 @@
+# Temporary checkout exporter for API-only development; remove before merge.
 name: Export Issue 12 checkout
 
 on:
