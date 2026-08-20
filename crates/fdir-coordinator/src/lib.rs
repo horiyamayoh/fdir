@@ -217,6 +217,7 @@ mod tests {
                 "canonical-identity",
                 "authoritative-storage",
                 "rebuildable-sqlite-index",
+                "adapter-protocol",
             ]
         );
     }

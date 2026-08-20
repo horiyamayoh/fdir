@@ -34,7 +34,7 @@ fn help_version_and_metadata_have_stable_foundation_shape() -> Result<(), Box<dy
     assert!(metadata.status.success());
     let metadata = String::from_utf8(metadata.stdout)?;
     assert!(metadata.contains("\"status\":\"complete\""));
-    assert!(metadata.contains("\"protocolVersion\":\"0.1.0-dev.1\""));
+    assert!(metadata.contains("\"protocolVersion\":\"1.0.0\""));
     assert!(metadata.contains("\"productionReady\":false"));
     Ok(())
 }
@@ -44,8 +44,11 @@ fn unavailable_product_work_is_not_advertised_as_success() -> Result<(), Box<dyn
     let capabilities = invoke(["capabilities", "--output", "json"])?;
     assert!(capabilities.status.success());
     let capabilities = String::from_utf8(capabilities.stdout)?;
+    assert!(
+        capabilities.contains("\"id\":\"adapter-protocol\",\"owningIssue\":12,\"available\":true")
+    );
     assert!(capabilities.contains("\"available\":false"));
-    assert!(!capabilities.contains("\"available\":true"));
+    assert!(!capabilities.contains("\"productionReady\":true"));
 
     let unknown = invoke(["convert"])?;
     assert_eq!(unknown.status.code(), Some(2));

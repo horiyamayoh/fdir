@@ -8,7 +8,7 @@ use fdir_coordinator::{CAPABILITIES, OutputFormat, RuntimeConfig, build_metadata
 use fdir_core::{CommandFailure, FailureClass, json_quote};
 
 /// Stable command help. No unavailable operation is advertised as successful.
-pub const HELP: &str = "FDIR reference-product foundation\n\nUsage:\n  fdir [--config PATH] [--output text|json] <command>\n  fdir --help\n  fdir --version\n\nCommands:\n  metadata         Print build, model, protocol, and qualification metadata\n  capabilities     List unavailable product capability boundaries\n  status-codes     Print stable completion and failure exit semantics\n  validate-config  Validate the selected deterministic configuration\n\nGlobal options:\n  --config PATH       Read deterministic key=value configuration\n  --output FORMAT     Select text or JSON output\n  -h, --help          Print this help\n  -V, --version       Print stable version metadata\n";
+pub const HELP: &str = "FDIR reference-product foundation\n\nUsage:\n  fdir [--config PATH] [--output text|json] <command>\n  fdir --help\n  fdir --version\n\nCommands:\n  metadata         Print build, model, protocol, and qualification metadata\n  capabilities     List product capability and qualification boundaries\n  status-codes     Print stable completion and failure exit semantics\n  validate-config  Validate the selected deterministic configuration\n\nGlobal options:\n  --config PATH       Read deterministic key=value configuration\n  --output FORMAT     Select text or JSON output\n  -h, --help          Print this help\n  -V, --version       Print stable version metadata\n";
 
 const PRODUCT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const SOURCE_REVISION: &str = env!("FDIR_SOURCE_REVISION");
@@ -279,9 +279,17 @@ fn render_capabilities(output: OutputFormat) -> String {
         OutputFormat::Text => CAPABILITIES
             .iter()
             .map(|capability| {
+                let availability = if capability.available {
+                    "available"
+                } else {
+                    "unavailable"
+                };
                 format!(
-                    "{}: unavailable (issue #{}, production-ready false)",
-                    capability.id, capability.owning_issue
+                    "{}: {} (issue #{}, production-ready {})",
+                    capability.id,
+                    availability,
+                    capability.owning_issue,
+                    capability.production_ready,
                 )
             })
             .collect::<Vec<_>>()
@@ -291,9 +299,11 @@ fn render_capabilities(output: OutputFormat) -> String {
                 .iter()
                 .map(|capability| {
                     format!(
-                        "{{\"id\":{},\"owningIssue\":{},\"available\":false,\"productionReady\":false}}",
+                        "{{\"id\":{},\"owningIssue\":{},\"available\":{},\"productionReady\":{}}}",
                         json_quote(capability.id),
                         capability.owning_issue,
+                        capability.available,
+                        capability.production_ready,
                     )
                 })
                 .collect::<Vec<_>>()

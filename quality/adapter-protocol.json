@@ -1,0 +1,66 @@
+{
+  "capabilityState": "implemented-unqualified",
+  "compatibility": [
+    {
+      "client": "1.0.0",
+      "outcome": "accepted",
+      "worker": "1.0.0"
+    },
+    {
+      "client": "1.0.0",
+      "outcome": "protocol-mismatch",
+      "worker": "2.0.0"
+    },
+    {
+      "client": "2.0.0",
+      "outcome": "protocol-mismatch",
+      "worker": "1.0.0"
+    }
+  ],
+  "conformanceImplementations": [
+    "rust-sdk",
+    "python-mock-worker"
+  ],
+  "durableOutcomes": [
+    "complete",
+    "partial",
+    "unsupported",
+    "unresolved",
+    "cancelled",
+    "failed",
+    "unreadable",
+    "resource-limited",
+    "policy-excluded",
+    "timed-out",
+    "worker-crash",
+    "sandbox-denied",
+    "protocol-mismatch",
+    "identity-mismatch",
+    "malformed-response",
+    "truncated-output"
+  ],
+  "evidenceLanes": [
+    "native-substrate-census",
+    "semantic-helper",
+    "renderer-observation",
+    "ocr-inference-observation",
+    "storage-codec"
+  ],
+  "ownerIssue": 12,
+  "productionLauncherContract": {
+    "ambientCredentials": "deny",
+    "arbitraryChildProcesses": "deny",
+    "artifactAccess": "opaque-read-only-handle",
+    "environmentInheritance": "deny",
+    "filesystem": "isolated-temporary-storage",
+    "network": "deny",
+    "requiredReceipt": "fdir/adapter-sandbox-receipt/1",
+    "resourceLimits": "required"
+  },
+  "productionReady": false,
+  "protocolSchema": "machine/adapter-protocol.schema.json",
+  "protocolVersion": "1.0.0",
+  "sandboxReceiptSchema": "machine/adapter-sandbox-receipt.schema.json",
+  "schema": "fdir/adapter-protocol-quality/1",
+  "workerManifestSchema": "machine/adapter-worker-manifest.schema.json"
+}

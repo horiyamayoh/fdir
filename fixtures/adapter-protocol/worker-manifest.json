@@ -1,0 +1,43 @@
+{
+  "buildDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "capabilities": [
+    {
+      "id": "test-native-census",
+      "lanes": ["native-substrate-census"],
+      "profiles": ["conformance"],
+      "qualificationState": "admitted-unqualified"
+    }
+  ],
+  "dependencies": [
+    {
+      "features": [],
+      "ffi": false,
+      "id": "python-runtime",
+      "lanes": ["native-substrate-census"],
+      "nativeCode": false,
+      "normalizations": [],
+      "processBoundary": "isolated-worker",
+      "unavailableSourceDistinctions": [],
+      "unsafeCode": false,
+      "version": "3.12.11"
+    }
+  ],
+  "deterministic": true,
+  "ffi": false,
+  "id": "mock-python-worker",
+  "implementationLanguage": "Python",
+  "lanes": ["native-substrate-census"],
+  "name": "Mock Python worker",
+  "nativeCode": false,
+  "networkPolicy": "deny",
+  "normalizations": [],
+  "ownerIssue": 12,
+  "processBoundary": "isolated-worker",
+  "protocolVersions": ["1.0.0"],
+  "qualificationState": "admitted-unqualified",
+  "receivesUntrustedDocumentBytes": true,
+  "schema": "fdir/adapter-worker-manifest/1",
+  "unavailableSourceDistinctions": [],
+  "unsafeCode": false,
+  "version": "1.0.0"
+}

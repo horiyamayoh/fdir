@@ -25,6 +25,7 @@ FDIR is an intermediate representation and compiler architecture for extracting 
 | Quality framework issue | [#6](https://github.com/horiyamayoh/fdir/issues/6) |
 | Foundation decision issue | [#32](https://github.com/horiyamayoh/fdir/issues/32) |
 | First product implementation issue | [#7](https://github.com/horiyamayoh/fdir/issues/7) |
+| Adapter protocol implementation | `1.0.0`; Issue [#12](https://github.com/horiyamayoh/fdir/issues/12); implemented-unqualified |
 
 A successful schema validation or example extraction is not a production claim. A capability becomes production-qualified only for an exact format/capability/profile tuple backed by qualification evidence.
 
@@ -76,6 +77,7 @@ EquivalenceCertificate                    InventoryDomain / AccountingItem
 - [Repository quality and required-check policy](quality/README.md)
 - [Product-development handoff](release/development-handoff.md)
 - [Dependency candidate assessment baseline](references/dependency-candidate-assessments.md)
+- [Adapter protocol and isolation boundary](references/adapter-protocol.md)
 - [Security and private vulnerability reporting](SECURITY.md)
 - [Apache License 2.0](LICENSE)
 - [Issue intake forms](.github/ISSUE_TEMPLATE/)
