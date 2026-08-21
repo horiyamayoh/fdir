@@ -208,8 +208,14 @@ def _source_sha() -> str | None:
     return value if result.returncode == 0 and SOURCE_SHA_RE.fullmatch(value) else None
 
 
-def _source_tree_clean() -> bool | None:
-    """Return whether the report's source SHA describes a clean checkout."""
+def _source_tree_clean(out_dir: Path | None = None) -> bool | None:
+    """Return whether the report's source SHA describes a clean checkout.
+
+    Git honors the repository's broad ``e2e/.run/`` ignore rule, so a
+    temporary qualification output directory can otherwise make a copied
+    checkout appear clean.  The declared Issue #100 bundle directory is the
+    only in-tree output directory that is allowed to be ignored here.
+    """
 
     try:
         result = subprocess.run(
@@ -225,7 +231,16 @@ def _source_tree_clean() -> bool | None:
         return None
     if result.returncode != 0:
         return None
-    return not result.stdout.strip()
+    clean = not result.stdout.strip()
+    if not clean or out_dir is None:
+        return clean
+    try:
+        resolved_out_dir = Path(out_dir).resolve()
+        resolved_root = ROOT.resolve()
+        resolved_out_dir.relative_to(resolved_root)
+    except (OSError, ValueError):
+        return clean
+    return clean and resolved_out_dir == DEFAULT_OUT_DIR.resolve()
 
 
 def _local(tag: str) -> str:
@@ -1757,11 +1772,11 @@ def _report(
 
 
 def run_qualification(*, corpus_path: Path = DEFAULT_CORPUS_PATH, out_dir: Path = DEFAULT_OUT_DIR) -> int:
+    out_dir = Path(out_dir).resolve()
     source_sha = _source_sha()
-    source_tree_clean = _source_tree_clean()
+    source_tree_clean = _source_tree_clean(out_dir)
     corpus = load_corpus(corpus_path)
     corpus_sha = _sha256_file(corpus_path)
-    out_dir = Path(out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
     work = out_dir / "work"
     work.mkdir(parents=True, exist_ok=True)

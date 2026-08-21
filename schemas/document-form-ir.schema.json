@@ -44,6 +44,10 @@
       "type": "string",
       "pattern": "^[A-Za-z][A-Za-z0-9_.:/-]{0,127}$"
     },
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
     "decimal": {
       "type": "string",
       "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$"
@@ -724,6 +728,101 @@
         "height": {"$ref": "#/$defs/length"}
       }
     },
+    "annotationAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,31}$"},
+        "target": {"$ref": "#/$defs/nonEmptyString"},
+        "name": {"$ref": "#/$defs/nonEmptyString"},
+        "relationshipId": {"$ref": "#/$defs/id"}
+      },
+      "oneOf": [
+        {"properties": {"kind": {"enum": ["URI", "GoTo", "GoToR", "JavaScript", "destination", "anchor", "external", "location"]}}, "required": ["target"]},
+        {"properties": {"kind": {"const": "field"}}, "required": ["name"]},
+        {"properties": {"kind": {"const": "relationship"}}, "required": ["relationshipId"]},
+        {
+          "required": ["kind", "target"],
+          "not": {"properties": {"kind": {"enum": ["URI", "GoTo", "GoToR", "JavaScript", "destination", "anchor", "external", "location", "field", "relationship"]}}, "required": ["kind"]}
+        }
+      ]
+    },
+    "annotationGeometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "rect": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"$ref": "#/$defs/decimal"}},
+        "quadPoints": {"type": "array", "minItems": 8, "maxItems": 8, "items": {"$ref": "#/$defs/decimal"}},
+        "cellRange": {"$ref": "#/$defs/nonEmptyString"}
+      },
+      "anyOf": [
+        {"required": ["rect"]},
+        {"required": ["quadPoints"]},
+        {"required": ["cellRange"]}
+      ],
+      "not": {"anyOf": [
+        {"required": ["cellRange", "rect"]},
+        {"required": ["cellRange", "quadPoints"]}
+      ]}
+    },
+    "annotationAnchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {"type": "string", "enum": ["content", "range", "cell", "page", "reference", "checkbox", "definition"]},
+        "resolved": {"type": "boolean"},
+        "tokens": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/nonEmptyString"}},
+        "start": {"$ref": "#/$defs/nonEmptyString"},
+        "end": {"$ref": "#/$defs/nonEmptyString"},
+        "balanced": {"type": "boolean"},
+        "address": {"$ref": "#/$defs/nonEmptyString"},
+        "surfaceId": {"$ref": "#/$defs/id"},
+        "label": {"$ref": "#/$defs/nonEmptyString"},
+        "checked": {"type": "boolean"},
+        "marker": {"$ref": "#/$defs/nonEmptyString"}
+      },
+      "oneOf": [
+        {"properties": {"kind": {"const": "content"}}, "required": ["resolved"], "not": {"anyOf": [{"required": ["start"]}, {"required": ["end"]}, {"required": ["address"]}, {"required": ["surfaceId"]}]}},
+        {"properties": {"kind": {"const": "range"}}, "required": ["start", "end", "balanced"], "not": {"anyOf": [{"required": ["resolved"]}, {"required": ["address"]}, {"required": ["surfaceId"]}]}},
+        {"properties": {"kind": {"const": "cell"}}, "required": ["address", "resolved"], "not": {"anyOf": [{"required": ["start"]}, {"required": ["end"]}, {"required": ["surfaceId"]}]}},
+        {"properties": {"kind": {"const": "page"}}, "required": ["surfaceId"], "not": {"anyOf": [{"required": ["resolved"]}, {"required": ["start"]}, {"required": ["end"]}, {"required": ["address"]}, {"required": ["tokens"]}]}},
+        {"properties": {"kind": {"const": "reference"}}, "required": ["label", "resolved"], "not": {"anyOf": [{"required": ["tokens"]}, {"required": ["start"]}, {"required": ["end"]}, {"required": ["balanced"]}, {"required": ["address"]}, {"required": ["surfaceId"]}, {"required": ["checked"]}, {"required": ["marker"]}]}},
+        {"properties": {"kind": {"const": "checkbox"}}, "required": ["checked", "marker"], "not": {"anyOf": [{"required": ["resolved"]}, {"required": ["tokens"]}, {"required": ["start"]}, {"required": ["end"]}, {"required": ["balanced"]}, {"required": ["address"]}, {"required": ["surfaceId"]}, {"required": ["label"]}]}},
+        {"properties": {"kind": {"const": "definition"}}, "required": ["label", "resolved"], "not": {"anyOf": [{"required": ["tokens"]}, {"required": ["start"]}, {"required": ["end"]}, {"required": ["balanced"]}, {"required": ["address"]}, {"required": ["surfaceId"]}, {"required": ["checked"]}, {"required": ["marker"]}]}}
+      ]
+    },
+    "formulaExpression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "language", "status"],
+      "properties": {
+        "source": {"$ref": "#/$defs/nonEmptyString"},
+        "language": {"type": "string", "enum": ["excel-a1", "excel-r1c1", "ooxml-formula", "word-field", "field-instruction"]},
+        "status": {"$ref": "#/$defs/status"}
+      }
+    },
+    "formulaValue": {
+      "allOf": [
+        {"$ref": "#/$defs/typedValue"},
+        {"not": {"properties": {"value": {"const": ""}}, "required": ["value"]}}
+      ]
+    },
+    "formulaDisplayedValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "status"],
+      "properties": {
+        "text": {"type": "string"},
+        "status": {"$ref": "#/$defs/status"}
+      },
+      "oneOf": [
+        {"properties": {"text": {"minLength": 1}}},
+        {"properties": {"text": {"const": ""}, "status": {"enum": ["unavailable", "omitted-by-policy", "failed"]}}, "required": ["text", "status"]}
+      ]
+    },
     "formula": {
       "type": "object",
       "additionalProperties": false,
@@ -736,7 +835,7 @@
         "formulaType": {"type": "string", "enum": ["normal", "shared", "array", "dataTable"]},
         "sharedIndex": {"type": "string"},
         "sourceReference": {"type": "string"},
-        "expression": {"type": "object", "additionalProperties": false, "required": ["source", "language", "status"], "properties": {"source": {"type": "string"}, "language": {"type": "string"}, "status": {"$ref": "#/$defs/status"}}},
+        "expression": {"$ref": "#/$defs/formulaExpression"},
         "values": {"$ref": "#/$defs/formulaValues"},
         "range": {"$ref": "#/$defs/formulaRange"},
         "numberFormat": {"$ref": "#/$defs/numberFormat"},
@@ -747,14 +846,22 @@
     "formulaValues": {
       "type": "object",
       "additionalProperties": false,
+      "minProperties": 1,
       "properties": {
-        "raw": {"$ref": "#/$defs/typedValue"},
-        "stored": {"$ref": "#/$defs/typedValue"},
-        "cached": {"$ref": "#/$defs/typedValue"},
-        "computed": {"$ref": "#/$defs/typedValue"},
-        "displayed": {"type": "object", "additionalProperties": false, "required": ["text", "status"], "properties": {"text": {"type": "string"}, "status": {"$ref": "#/$defs/status"}}},
-        "laneProvenance": {"type": "object", "additionalProperties": false, "required": ["stored", "cached", "computed", "displayed"], "properties": {"stored": {"type": "string"}, "cached": {"type": "string"}, "computed": {"type": "string"}, "displayed": {"type": "string"}}}
-      }
+        "raw": {"$ref": "#/$defs/formulaValue"},
+        "stored": {"$ref": "#/$defs/formulaValue"},
+        "cached": {"$ref": "#/$defs/formulaValue"},
+        "computed": {"$ref": "#/$defs/formulaValue"},
+        "displayed": {"$ref": "#/$defs/formulaDisplayedValue"},
+        "laneProvenance": {"type": "object", "additionalProperties": false, "required": ["stored", "cached", "computed", "displayed"], "properties": {"stored": {"$ref": "#/$defs/nonEmptyString"}, "cached": {"$ref": "#/$defs/nonEmptyString"}, "computed": {"$ref": "#/$defs/nonEmptyString"}, "displayed": {"$ref": "#/$defs/nonEmptyString"}}}
+      },
+      "anyOf": [
+        {"required": ["raw"]},
+        {"required": ["stored"]},
+        {"required": ["cached"]},
+        {"required": ["computed"]},
+        {"required": ["displayed"]}
+      ]
     },
     "formulaRange": {
       "type": "object",
@@ -775,7 +882,7 @@
         "value": {"type": ["string", "boolean", "number", "null"]},
         "unit": {"type": "string"},
         "sourceRepresentation": {"type": "string"},
-        "logicalValue": {"type": ["string", "boolean", "number", "null", "object"]},
+        "logicalValue": {"type": ["string", "boolean", "number", "null"]},
         "normalizationRuleId": {"type": "string"},
         "provenance": {"type": "string"},
         "exactness": {"type": "string"},
@@ -834,9 +941,9 @@
         "referenceId": {"type": "string"},
         "metadata": {"$ref": "#/$defs/annotationMetadata"},
         "sourceSubtype": {"type": "string"},
-        "action": {"type": "object"},
-        "geometry": {"type": "object"},
-        "anchor": {"type": "object"},
+        "action": {"$ref": "#/$defs/annotationAction"},
+        "geometry": {"$ref": "#/$defs/annotationGeometry"},
+        "anchor": {"$ref": "#/$defs/annotationAnchor"},
         "displayText": {"type": ["string", "null"]},
         "destination": {"type": "string"},
         "author": {"type": "string"},
@@ -929,11 +1036,125 @@
         "type": {"type": "string", "minLength": 1},
         "schemaVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
         "schemaId": {"type": "string", "minLength": 1},
-        "payload": {"type": "object"},
+        "payload": {"$ref": "#/$defs/extensionPayload"},
         "criticality": {"type": "string", "enum": ["critical", "non-critical"]},
         "retention": {"type": "string", "enum": ["interpreted", "opaque"]},
         "compatibility": {"type": "object", "additionalProperties": false, "properties": {"unknownVersion": {"type": "string", "enum": ["reject", "preserve-and-mark", "ignore"]}}}
       }
+    },
+    "extensionPayloadValue": {
+      "oneOf": [
+        {"$ref": "#/$defs/nonEmptyString"},
+        {"type": "boolean"},
+        {"type": "number"},
+        {"type": "null"},
+        {"type": "array", "items": {"$ref": "#/$defs/extensionPayloadValue"}},
+        {"$ref": "#/$defs/extensionPayloadObject"}
+      ]
+    },
+    "opaqueExtensionPayloadValue": {
+      "oneOf": [
+        {"$ref": "#/$defs/nonEmptyString"},
+        {"type": "boolean"},
+        {"type": "number"},
+        {"type": "null"},
+        {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/opaqueExtensionPayloadValue"}},
+        {"$ref": "#/$defs/opaqueExtensionPayloadObject"}
+      ]
+    },
+    "opaqueExtensionPayloadObject": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/opaqueExtensionPayloadValue"},
+      "minProperties": 1
+    },
+    "extensionPayloadValueAllowEmpty": {
+      "type": "string"
+    },
+    "extensionPayloadObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "numId": {"$ref": "#/$defs/extensionPayloadValue"}, "ilvl": {"$ref": "#/$defs/extensionPayloadValue"},
+        "kind": {"$ref": "#/$defs/extensionPayloadValue"}, "anchor": {"$ref": "#/$defs/extensionPayloadValue"},
+        "extentEmu": {"$ref": "#/$defs/extensionPayloadValue"}, "transform": {"$ref": "#/$defs/extensionPayloadValue"},
+        "cx": {"$ref": "#/$defs/extensionPayloadValue"}, "cy": {"$ref": "#/$defs/extensionPayloadValue"},
+        "matrix": {"$ref": "#/$defs/extensionPayloadValue"},
+        "endpoint": {"$ref": "#/$defs/extensionPayloadValue"}, "sourceId": {"$ref": "#/$defs/extensionPayloadValue"},
+        "part": {"$ref": "#/$defs/extensionPayloadValue"}, "id": {"$ref": "#/$defs/extensionPayloadValue"},
+        "body": {"$ref": "#/$defs/extensionPayloadValueAllowEmpty"}, "author": {"$ref": "#/$defs/extensionPayloadValue"},
+        "revisionId": {"$ref": "#/$defs/extensionPayloadValue"}, "status": {"$ref": "#/$defs/extensionPayloadValue"},
+        "sourceLocator": {"$ref": "#/$defs/extensionPayloadValue"}, "depth": {"$ref": "#/$defs/extensionPayloadValue"},
+        "events": {"$ref": "#/$defs/extensionPayloadValue"}, "pageProperties": {"$ref": "#/$defs/extensionPayloadValue"},
+        "pgSz": {"$ref": "#/$defs/extensionPayloadValue"}, "pgMar": {"$ref": "#/$defs/extensionPayloadValue"},
+        "columns": {"$ref": "#/$defs/extensionPayloadValue"}, "lineNumbering": {"$ref": "#/$defs/extensionPayloadValue"},
+        "w": {"$ref": "#/$defs/extensionPayloadValue"}, "h": {"$ref": "#/$defs/extensionPayloadValue"},
+        "orient": {"$ref": "#/$defs/extensionPayloadValue"}, "top": {"$ref": "#/$defs/extensionPayloadValue"},
+        "right": {"$ref": "#/$defs/extensionPayloadValue"}, "bottom": {"$ref": "#/$defs/extensionPayloadValue"},
+        "left": {"$ref": "#/$defs/extensionPayloadValue"}, "header": {"$ref": "#/$defs/extensionPayloadValue"},
+        "footer": {"$ref": "#/$defs/extensionPayloadValue"}, "gutter": {"$ref": "#/$defs/extensionPayloadValue"},
+        "num": {"$ref": "#/$defs/extensionPayloadValue"}, "space": {"$ref": "#/$defs/extensionPayloadValueAllowEmpty"},
+        "countBy": {"$ref": "#/$defs/extensionPayloadValue"},
+        "presetGeometry": {"$ref": "#/$defs/extensionPayloadValue"}, "path": {"$ref": "#/$defs/extensionPayloadValue"},
+        "name": {"$ref": "#/$defs/extensionPayloadValue"}, "range": {"$ref": "#/$defs/extensionPayloadValue"},
+        "mappings": {"$ref": "#/$defs/extensionPayloadValue"}, "source": {"$ref": "#/$defs/extensionPayloadValue"},
+        "rules": {"$ref": "#/$defs/extensionPayloadValue"}, "runs": {"$ref": "#/$defs/extensionPayloadValue"},
+        "value": {"$ref": "#/$defs/extensionPayloadValueAllowEmpty"}, "priority": {"$ref": "#/$defs/extensionPayloadValue"},
+        "text": {"$ref": "#/$defs/extensionPayloadValue"}, "bold": {"$ref": "#/$defs/extensionPayloadValue"},
+        "italic": {"$ref": "#/$defs/extensionPayloadValue"}, "underline": {"$ref": "#/$defs/extensionPayloadValue"},
+        "phonetic": {"$ref": "#/$defs/extensionPayloadValue"}, "viewId": {"$ref": "#/$defs/extensionPayloadValue"},
+        "pane": {"$ref": "#/$defs/extensionPayloadValue"}, "selection": {"$ref": "#/$defs/extensionPayloadValue"},
+        "xSplit": {"$ref": "#/$defs/extensionPayloadValue"}, "ySplit": {"$ref": "#/$defs/extensionPayloadValue"},
+        "topLeftCell": {"$ref": "#/$defs/extensionPayloadValue"}, "activePane": {"$ref": "#/$defs/extensionPayloadValue"},
+        "state": {"$ref": "#/$defs/extensionPayloadValue"}, "activeCell": {"$ref": "#/$defs/extensionPayloadValue"},
+        "sqref": {"$ref": "#/$defs/extensionPayloadValue"},
+        "type": {"$ref": "#/$defs/extensionPayloadValue"}, "operator": {"$ref": "#/$defs/extensionPayloadValue"},
+        "allowBlank": {"$ref": "#/$defs/extensionPayloadValue"}, "formulas": {"$ref": "#/$defs/extensionPayloadValue"},
+        "localSheetId": {"$ref": "#/$defs/extensionPayloadValueAllowEmpty"}, "hidden": {"$ref": "#/$defs/extensionPayloadValue"},
+        "formula": {"$ref": "#/$defs/extensionPayloadValue"}, "rawStringBytesHex": {"$ref": "#/$defs/extensionPayloadValue"},
+        "rawBytes": {"$ref": "#/$defs/extensionPayloadValue"},
+        "characterCode": {"$ref": "#/$defs/extensionPayloadValue"}, "characterCodes": {"$ref": "#/$defs/extensionPayloadValue"},
+        "fontResource": {"$ref": "#/$defs/extensionPayloadValue"}, "fontObject": {"$ref": "#/$defs/extensionPayloadValue"},
+        "glyphIdentity": {"$ref": "#/$defs/extensionPayloadValue"}, "glyphName": {"$ref": "#/$defs/extensionPayloadValueAllowEmpty"},
+        "encoding": {"$ref": "#/$defs/extensionPayloadValueAllowEmpty"}, "unicode": {"$ref": "#/$defs/extensionPayloadValueAllowEmpty"},
+        "mappingStatus": {"$ref": "#/$defs/extensionPayloadValue"}, "mappingSource": {"$ref": "#/$defs/extensionPayloadValue"},
+        "mappingCoverage": {"$ref": "#/$defs/extensionPayloadValue"}, "sourceLocatorStatus": {"$ref": "#/$defs/extensionPayloadValue"},
+        "provenance": {"$ref": "#/$defs/extensionPayloadValue"}, "page": {"$ref": "#/$defs/extensionPayloadValue"},
+        "operands": {"$ref": "#/$defs/extensionPayloadValue"}, "object": {"$ref": "#/$defs/extensionPayloadValue"},
+        "sourceCode": {"$ref": "#/$defs/extensionPayloadValue"}, "baseFont": {"$ref": "#/$defs/extensionPayloadValue"},
+        "mappedCharacterCodes": {"$ref": "#/$defs/extensionPayloadValue"}, "unmappedCharacterCodes": {"$ref": "#/$defs/extensionPayloadValue"},
+        "sourceCodes": {"$ref": "#/$defs/extensionPayloadValue"},
+        "rawStringBytes": {"$ref": "#/$defs/extensionPayloadValue"},
+        "ctm": {"$ref": "#/$defs/extensionPayloadValue"}, "lineWidth": {"$ref": "#/$defs/extensionPayloadValue"},
+        "lineCap": {"$ref": "#/$defs/extensionPayloadValue"}, "lineJoin": {"$ref": "#/$defs/extensionPayloadValue"},
+        "miterLimit": {"$ref": "#/$defs/extensionPayloadValue"}, "dashPattern": {"$ref": "#/$defs/extensionPayloadValue"},
+        "array": {"$ref": "#/$defs/extensionPayloadValue"}, "phase": {"$ref": "#/$defs/extensionPayloadValue"},
+        "renderingIntent": {"$ref": "#/$defs/extensionPayloadValue"}, "extGState": {"$ref": "#/$defs/extensionPayloadValue"},
+        "shading": {"$ref": "#/$defs/extensionPayloadValue"}, "fillColor": {"$ref": "#/$defs/extensionPayloadValue"},
+        "strokeColor": {"$ref": "#/$defs/extensionPayloadValue"},
+        "delimiter": {"$ref": "#/$defs/extensionPayloadValueAllowEmpty"}, "delimiters": {"$ref": "#/$defs/extensionPayloadValue"},
+        "escaping": {"$ref": "#/$defs/extensionPayloadValue"}, "lineBreak": {"$ref": "#/$defs/extensionPayloadValue"},
+        "referenceStyle": {"$ref": "#/$defs/extensionPayloadValueAllowEmpty"}, "referenceLabel": {"$ref": "#/$defs/extensionPayloadValueAllowEmpty"},
+        "referenceDefinitionId": {"$ref": "#/$defs/extensionPayloadValueAllowEmpty"}, "rawHtml": {"$ref": "#/$defs/extensionPayloadValue"},
+        "alignment": {"$ref": "#/$defs/extensionPayloadValue"}, "headerLine": {"$ref": "#/$defs/extensionPayloadValue"},
+        "separatorLine": {"$ref": "#/$defs/extensionPayloadValue"}, "dataRowLines": {"$ref": "#/$defs/extensionPayloadValue"},
+        "opening": {"$ref": "#/$defs/extensionPayloadValue"}, "closing": {"$ref": "#/$defs/extensionPayloadValue"},
+        "syntax": {"$ref": "#/$defs/extensionPayloadValue"}, "fence": {"$ref": "#/$defs/extensionPayloadValue"},
+        "language": {"$ref": "#/$defs/extensionPayloadValueAllowEmpty"}, "content": {"$ref": "#/$defs/extensionPayloadValueAllowEmpty"},
+        "level": {"$ref": "#/$defs/extensionPayloadValue"}, "marker": {"$ref": "#/$defs/extensionPayloadValue"},
+        "count": {"$ref": "#/$defs/extensionPayloadValue"}, "leadingWhitespace": {"$ref": "#/$defs/extensionPayloadValueAllowEmpty"},
+        "label": {"$ref": "#/$defs/extensionPayloadValue"}, "destination": {"$ref": "#/$defs/extensionPayloadValue"},
+        "title": {"$ref": "#/$defs/extensionPayloadValueAllowEmpty"}, "annotationId": {"$ref": "#/$defs/extensionPayloadValueAllowEmpty"},
+        "definitionLine": {"$ref": "#/$defs/extensionPayloadValue"}, "entries": {"$ref": "#/$defs/extensionPayloadValue"},
+        "rawLines": {"$ref": "#/$defs/extensionPayloadValue"}, "key": {"$ref": "#/$defs/extensionPayloadValue"}
+      }
+    },
+    "extensionPayload": {
+      "type": "object",
+      "minProperties": 1,
+      "anyOf": [
+        {"$ref": "#/$defs/extensionPayloadObject"},
+        {"$ref": "#/$defs/opaqueExtensionPayloadObject"}
+      ]
     },
     "sourceMap": {
       "type": "object",

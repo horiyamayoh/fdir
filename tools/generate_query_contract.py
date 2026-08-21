@@ -101,7 +101,7 @@ def _resolve(node: Any, definitions: dict[str, Any]) -> tuple[dict[str, Any], st
         current = definition
 
 
-def _merge_schema_nodes(node: dict[str, Any]) -> dict[str, Any]:
+def _merge_schema_nodes(node: dict[str, Any], definitions: dict[str, Any] | None = None) -> dict[str, Any]:
     """Merge only structural schema keys used for field expansion."""
 
     merged: dict[str, Any] = {}
@@ -112,7 +112,10 @@ def _merge_schema_nodes(node: dict[str, Any]) -> dict[str, Any]:
             branches.extend(value for value in values if isinstance(value, dict))
     if branches:
         for branch in branches:
-            branch_merged = _merge_schema_nodes(branch)
+            branch_node = branch
+            if definitions is not None and _ref_name(branch) is not None:
+                branch_node, _ = _resolve(branch, definitions)
+            branch_merged = _merge_schema_nodes(branch_node, definitions)
             for key, value in branch_merged.items():
                 if key == "properties":
                     merged.setdefault("properties", {}).update(value)
@@ -140,7 +143,7 @@ def _merge_schema_nodes(node: dict[str, Any]) -> dict[str, Any]:
 
 def _schema_type(node: dict[str, Any], definitions: dict[str, Any]) -> tuple[str, str | None]:
     resolved, ref_name = _resolve(node, definitions)
-    merged = _merge_schema_nodes(resolved)
+    merged = _merge_schema_nodes(resolved, definitions)
     if merged.get("type") == "array":
         return "list", ref_name
     if merged.get("type") == "object" or "properties" in merged or "additionalProperties" in merged:
@@ -174,6 +177,8 @@ def _query_type(node: dict[str, Any], definitions: dict[str, Any], path: str) ->
         return "status"
     if ref_name == "typedValue":
         return "typed-value"
+    if ref_name == "formulaValue":
+        return "typed-value"
     value_type, _ = _schema_type(resolved, definitions)
     if value_type == "number" and path.lower().endswith(("/x", "/y", "/width", "/height", "/rotation", "/score")):
         return "number"
@@ -188,14 +193,15 @@ def _walk_schema(
     owner: dict[str, Any],
     add: Any,
     active_refs: tuple[str, ...] = (),
+    closed_union_branch: bool = False,
 ) -> None:
     resolved, ref_name = _resolve(node, definitions)
     if ref_name is not None and ref_name in active_refs:
         return
     refs = active_refs + ((ref_name,) if ref_name is not None else ())
-    merged = _merge_schema_nodes(resolved)
+    merged = _merge_schema_nodes(resolved, definitions)
     branches: list[dict[str, Any]] = []
-    for keyword in ("oneOf", "anyOf"):
+    for keyword in ("allOf", "oneOf", "anyOf"):
         values = resolved.get(keyword)
         if isinstance(values, list):
             branches.extend(value for value in values if isinstance(value, dict))
@@ -208,6 +214,7 @@ def _walk_schema(
                 owner=owner,
                 add=add,
                 active_refs=refs,
+                closed_union_branch=closed_union_branch or merged.get("additionalProperties") is False,
             )
     # A union made only of references has no fields of its own.  Its branches
     # above are the authoritative expansion (for example cellRange versus a
@@ -227,6 +234,7 @@ def _walk_schema(
                 owner={**owner, "requiredParent": name in required},
                 add=add,
                 active_refs=refs,
+                closed_union_branch=False,
             )
     if merged.get("type") == "array" and isinstance(merged.get("items"), dict):
         _walk_schema(
@@ -236,6 +244,7 @@ def _walk_schema(
             owner={**owner, "listItem": True},
             add=add,
             active_refs=refs,
+            closed_union_branch=False,
         )
     additional = merged.get("additionalProperties")
     if isinstance(additional, dict):
@@ -246,10 +255,12 @@ def _walk_schema(
             owner={**owner, "mapValue": True},
             add=add,
             active_refs=refs,
+            closed_union_branch=False,
         )
     elif (
         (merged.get("type") == "object" or "properties" in merged)
         and ("additionalProperties" not in merged or additional is True)
+        and not closed_union_branch
     ):
         # JSON Schema leaves additionalProperties open by default.  Such an
         # object is authoritative even when the current input happens to use
@@ -554,9 +565,32 @@ def generate_contract() -> dict[str, Any]:
                 extension=entry,
                 required=False,
             )
+    # Unknown non-critical extensions are retained through the opaque lane and
+    # therefore have no registry identity with which to select one of the
+    # typed entries above.  Register one identity-free arbitrary-depth field
+    # so preserved opaque facts remain queryable without weakening any closed
+    # known-extension branch.
+    _add_field(
+        extension_fields,
+        extension_seen,
+        collection="extensions",
+        definition="extension",
+        path="/payload/**",
+        node={},
+        definitions=extension_schema.get("$defs", {}),
+        references=[],
+        extension=None,
+        required=False,
+    )
 
     field_paths.sort(key=lambda item: (item["ownerCollection"], item["path"], item["fieldId"]))
-    extension_fields.sort(key=lambda item: (item["extension"]["namespace"], item["extension"]["type"], item["path"]))
+    extension_fields.sort(
+        key=lambda item: (
+            str(item.get("extension", {}).get("namespace", "")),
+            str(item.get("extension", {}).get("type", "")),
+            item["path"],
+        )
+    )
     all_fields = document_fields + field_paths + extension_fields
     profile_ids = sorted(
         item["id"]

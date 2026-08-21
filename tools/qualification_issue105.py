@@ -11,11 +11,13 @@ behavioral assertion by itself.
 from __future__ import annotations
 
 import argparse
+import calendar
 import hashlib
 import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -59,6 +61,18 @@ DECLARED_INPUTS = (
 )
 EVALUATOR_PATH = ROOT / "tools" / "validate_qualification_bundle.py"
 SHARED_EVIDENCE_PATH = ROOT / "tools" / "qualification_evidence.py"
+AUDIT_RECOVERY_ISSUES = tuple(range(87, 106)) + (108, 109, 110, 111, 112, 113)
+AUDIT_RECOVERY_ISSUE_SET = frozenset(AUDIT_RECOVERY_ISSUES)
+ISSUE_STATE_MAX_AGE_SECONDS = 24 * 60 * 60
+CHILD_ENVIRONMENT_ALLOWLIST = frozenset(
+    {
+        "PATH", "PATHEXT", "SYSTEMROOT", "WINDIR", "TEMP", "TMP",
+        "LANG", "LC_ALL", "TZ", "GITHUB_ACTIONS", "GITHUB_REPOSITORY",
+        "GITHUB_SHA", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_JOB",
+        "GITHUB_SERVER_URL", "PLATFORM_PROFILE", "PLATFORM_OS_FAMILY",
+        "PLATFORM_PYTHON",
+    }
+)
 
 
 class QualificationError(RuntimeError):
@@ -81,6 +95,33 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _stable_path_label(path: Path) -> str:
+    """Return a repository-relative label suitable for published evidence."""
+
+    resolved = Path(path).resolve()
+    try:
+        return resolved.relative_to(ROOT.resolve()).as_posix() or "."
+    except ValueError:
+        return f"<external>/{resolved.name}"
+
+
+def _redact_runtime_text(value: Any) -> str:
+    """Remove machine-specific absolute paths from public qualification text.
+
+    Raw stdout/stderr remain private in the in-process result so semantic
+    parsers can consume them.  Only the fields that are serialized into the
+    issue reports use this redacted representation.
+    """
+
+    text = str(value)
+    root = str(ROOT.resolve())
+    for variant in {root, root.replace("\\", "/")}:
+        text = text.replace(variant, "<repo>")
+    # Catch an absolute Windows path outside this checkout without touching
+    # URLs or repository-relative paths.
+    return re.sub(r"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/])[^\r\n\s]+", "<absolute-path>", text)
+
+
 def _producer_input_paths(corpus_path: Path) -> list[Path]:
     paths = [ROOT / relative for relative in DECLARED_INPUTS]
     candidate = Path(corpus_path)
@@ -95,7 +136,7 @@ def _producer_input_digests(corpus_path: Path) -> tuple[list[str], list[str]]:
         if path.is_file():
             digests.append(sha256_file(path))
         else:
-            unavailable.append(str(path))
+            unavailable.append(_stable_path_label(path))
             digests.append(sha256_bytes(f"missing:{path.as_posix()}".encode("utf-8")))
     return sorted(set(digests)), unavailable
 
@@ -134,13 +175,6 @@ def _append_producer_record(report: dict[str, Any], key: str, value: dict[str, A
     return pointer
 
 
-def _stable_path_label(path: Path) -> str:
-    try:
-        return path.resolve().relative_to(ROOT.resolve()).as_posix()
-    except ValueError:
-        return f"<external>/{path.name}"
-
-
 def sha256_paths(paths: list[Path]) -> str:
     entries: list[dict[str, Any]] = []
     for path in sorted(paths, key=lambda item: item.as_posix()):
@@ -156,7 +190,7 @@ def sha256_paths(paths: list[Path]) -> str:
                 ],
             })
         else:
-            entries.append({"path": path.relative_to(ROOT).as_posix(), "missing": True})
+            entries.append({"path": _stable_path_label(path), "missing": True})
     return sha256_bytes(canonical(entries).encode("utf-8"))
 
 
@@ -164,7 +198,7 @@ def load_json(path: Path) -> Any:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise QualificationError(f"cannot read JSON {path}: {exc}") from exc
+        raise QualificationError(f"cannot read JSON {_stable_path_label(path)}: {_redact_runtime_text(exc)}") from exc
 
 
 def write_json(path: Path, value: Any) -> None:
@@ -227,6 +261,16 @@ def validate_corpus(corpus: dict[str, Any]) -> None:
     release_scope = corpus.get("releaseScopeIssues")
     if release_scope != list(range(88, 105)):
         raise QualificationError("issue #105 release scope must enumerate #88-#104")
+    target_issues = corpus.get("targetIssueNumbers")
+    expected_targets = [*range(87, 106), *range(108, 114)]
+    if target_issues != expected_targets:
+        raise QualificationError("issue #105 target scope must enumerate #87-#105 and #108-#113")
+    barrier_issues = corpus.get("barrierIssueNumbers")
+    if barrier_issues != [87, *range(108, 114)]:
+        raise QualificationError("issue #105 barrier scope must enumerate #87 and #108-#113")
+    barrier_coverage = corpus.get("barrierCoverage")
+    if not isinstance(barrier_coverage, dict) or barrier_coverage.get("issue-88-qualification-contract") != list(range(108, 114)) or barrier_coverage.get("issue-105-release-quality") != [87, *range(108, 114)]:
+        raise QualificationError("issue #105 barrier coverage must bind #108-#113 to #88 and #87/#108-#113 to #105")
     release_evidence = corpus.get("releaseEvidence")
     if not isinstance(release_evidence, list) or [item.get("issueNumber") for item in release_evidence] != release_scope:
         raise QualificationError("issue #105 release evidence table is incomplete")
@@ -275,12 +319,16 @@ def run_command(
     input_paths: list[Path] | None = None,
 ) -> dict[str, Any]:
     started = time.monotonic()
-    environment = os.environ.copy()
+    raw_command = [str(item) for item in command]
+    raw_cwd = str(Path(cwd).resolve())
+    environment = {key: value for key, value in os.environ.items() if key in CHILD_ENVIRONMENT_ALLOWLIST}
     environment["PYTHONIOENCODING"] = "utf-8"
     environment["PYTHONHASHSEED"] = "0"
+    environment.pop("GITHUB_TOKEN", None)
+    environment.pop("GH_TOKEN", None)
     try:
         completed = subprocess.run(
-            command,
+            raw_command,
             cwd=cwd,
             capture_output=True,
             text=True,
@@ -303,12 +351,14 @@ def run_command(
         timed_out = False
         return_code = 127
         stdout = ""
-        stderr = f"{type(exc).__name__}: {exc}"
+        stderr = f"{type(exc).__name__}: {_redact_runtime_text(exc)}"
     duration = round((time.monotonic() - started) * 1000, 3)
     status = "passed" if not timed_out and return_code == expected_exit else "failed"
+    public_cwd = "." if Path(cwd).resolve() == ROOT.resolve() else _stable_path_label(Path(cwd))
     return {
-        "command": command,
-        "cwd": "." if cwd.resolve() == ROOT.resolve() else str(cwd.resolve()),
+        "command": [_redact_runtime_text(item) for item in raw_command],
+        "commandSha256": sha256_bytes(canonical({"argv": raw_command, "cwd": raw_cwd}).encode("utf-8")),
+        "cwd": public_cwd,
         "expectedExitCode": expected_exit,
         "returnCode": return_code,
         "timedOut": timed_out,
@@ -316,7 +366,7 @@ def run_command(
         "inputDigest": sha256_paths(input_paths or []),
         "stdoutSha256": sha256_bytes(stdout.encode("utf-8")),
         "stderrSha256": sha256_bytes(stderr.encode("utf-8")),
-        "diagnostics": [line[-500:] for line in (stdout + "\n" + stderr).splitlines() if line.strip()][-12:],
+        "diagnostics": [_redact_runtime_text(line[-500:]) for line in (stdout + "\n" + stderr).splitlines() if line.strip()][-12:],
         "status": status,
         "_stdout": stdout,
         "_stderr": stderr,
@@ -644,18 +694,53 @@ def false_completion_report(corpus: dict[str, Any], source: str, dirty: list[str
 def _live_issue_states() -> dict[str, Any]:
     repository = os.environ.get("GITHUB_REPOSITORY", "horiyamayoh/fdir")
     states: list[dict[str, Any]] = []
-    for issue_number in [87, *range(88, 106)]:
+    retrieved_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    retrieved_epoch = time.time()
+    for issue_number in AUDIT_RECOVERY_ISSUES:
         request = urllib.request.Request(
             f"https://api.github.com/repos/{repository}/issues/{issue_number}",
             headers={"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "fdir-qualification-issue-105/1.0"},
         )
         try:
             with urllib.request.urlopen(request, timeout=15) as response:
-                payload = json.loads(response.read().decode("utf-8"))
+                raw = response.read()
+                payload = json.loads(raw.decode("utf-8"))
+                etag = response.headers.get("ETag")
         except (OSError, urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError) as exc:
-            return {"status": "failed", "error": f"{type(exc).__name__}: {exc}", "retrievedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
-        states.append({"issueNumber": issue_number, "state": payload.get("state"), "stateReason": payload.get("state_reason"), "updatedAt": payload.get("updated_at"), "apiUrl": request.full_url})
-    return {"status": "passed", "repository": repository, "issues": states, "retrievedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+            return {
+                "status": "failed",
+                "error": f"{type(exc).__name__}: {exc}",
+                "repository": repository,
+                "expectedIssueNumbers": list(AUDIT_RECOVERY_ISSUES),
+                "retrievedAt": retrieved_at,
+            }
+        updated_at = payload.get("updated_at")
+        try:
+            updated_epoch = calendar.timegm(time.strptime(str(updated_at), "%Y-%m-%dT%H:%M:%SZ"))
+        except (TypeError, ValueError, OverflowError):
+            updated_epoch = None
+        stale = updated_epoch is None or retrieved_epoch - updated_epoch > ISSUE_STATE_MAX_AGE_SECONDS
+        states.append({
+            "issueNumber": issue_number,
+            "state": payload.get("state"),
+            "stateReason": payload.get("state_reason"),
+            "updatedAt": updated_at,
+            "closedAt": payload.get("closed_at"),
+            "stale": stale,
+            "apiUrl": request.full_url,
+            "responseDigest": sha256_bytes(raw),
+            "etag": etag,
+        })
+    snapshot = {
+        "status": "passed",
+        "repository": repository,
+        "expectedIssueNumbers": list(AUDIT_RECOVERY_ISSUES),
+        "issues": states,
+        "retrievedAt": retrieved_at,
+        "maxAgeSeconds": ISSUE_STATE_MAX_AGE_SECONDS,
+    }
+    snapshot["snapshotDigest"] = sha256_bytes(canonical(snapshot).encode("utf-8"))
+    return snapshot
 
 
 def claim_report(corpus: dict[str, Any], source: str, dirty: list[str]) -> dict[str, Any]:
@@ -664,13 +749,19 @@ def claim_report(corpus: dict[str, Any], source: str, dirty: list[str]) -> dict[
     contract = load_json(ROOT / "machine" / "qualification-contract.json")
     release = claims.get("release", {}) if isinstance(claims, dict) else {}
     live = _live_issue_states()
-    live_open = [item for item in live.get("issues", []) if item.get("state") == "open"] if live.get("status") == "passed" else None
-    expected_blocked = live.get("status") != "passed" or bool(live_open)
+    live_issues = live.get("issues", []) if live.get("status") == "passed" else []
+    live_blockers = [
+        item for item in live_issues
+        if item.get("state") != "closed"
+        or item.get("stateReason") == "reopened"
+        or item.get("stale") is True
+    ]
+    expected_blocked = live.get("status") != "passed" or bool(live_blockers)
     actual_blocked = release.get("releaseBlocked") is True and release.get("status") == "release-blocked"
     required_ids = set(contract.get("scope", {}).get("requiredEvidenceIds", [])) if isinstance(contract, dict) else set()
     binding = release.get("qualificationBinding", {}) if isinstance(release, dict) else {}
     cases = [
-        {"caseId": "RQ-CLAIM-001", "oracle": "live issue state is the release authority and open audit issues keep release blocked", "assertionIds": ["RQ-CLAIM-001-live", "RQ-CLAIM-001-claim"], "target": "#87-#105 live issue state", "expected": {"releaseBlocked": expected_blocked, "claimStatus": "release-blocked"}, "actual": {"liveStateStatus": live.get("status"), "openIssueCount": len(live_open) if live_open is not None else None, "claimBlocked": actual_blocked, "claimStatus": release.get("status")}, "inputDigest": sha256_paths([ROOT / "machine" / "audit-recovery-plan.json", ROOT / "machine" / "release-claim-manifest.json"]), "diagnostics": [live.get("error")] if live.get("error") else [], "status": "passed" if expected_blocked and actual_blocked else "failed"},
+        {"caseId": "RQ-CLAIM-001", "oracle": "live issue state is the release authority and open, reopened, stale, or unavailable audit issues keep release blocked", "assertionIds": ["RQ-CLAIM-001-live", "RQ-CLAIM-001-claim"], "target": "#87-#105 + #108-#113 live issue state", "expected": {"releaseBlocked": expected_blocked, "claimStatus": "release-blocked"}, "actual": {"liveStateStatus": live.get("status"), "blockerCount": len(live_blockers) if live.get("status") == "passed" else None, "claimBlocked": actual_blocked, "claimStatus": release.get("status")}, "inputDigest": sha256_paths([ROOT / "machine" / "audit-recovery-plan.json", ROOT / "machine" / "release-claim-manifest.json"]), "diagnostics": [live.get("error")] if live.get("error") else [], "status": "passed" if expected_blocked and actual_blocked else "failed"},
         {"caseId": "RQ-CLAIM-NEG-001", "oracle": "a release-ready claim cannot be published while the recovery plan is blocked", "assertionIds": ["RQ-CLAIM-NEG-001-blocked"], "target": "machine/release-claim-manifest.json", "expected": True, "actual": bool(recovery.get("releaseBlocked") is True and actual_blocked), "inputDigest": sha256_paths([ROOT / "machine" / "audit-recovery-plan.json", ROOT / "machine" / "release-claim-manifest.json"]), "status": "passed" if recovery.get("releaseBlocked") is True and actual_blocked else "failed"},
         {"caseId": "RQ-CLAIM-NEG-002", "oracle": "qualification binding must enumerate every required Evidence ID even when release is blocked", "assertionIds": ["RQ-CLAIM-NEG-002-scope"], "target": "qualificationBinding.requiredEvidenceIds", "expected": sorted(required_ids), "actual": sorted(binding.get("requiredEvidenceIds", [])), "inputDigest": sha256_paths([ROOT / "machine" / "qualification-contract.json", ROOT / "machine" / "machine/release-claim-manifest.json"] if (ROOT / "machine" / "machine/release-claim-manifest.json").exists() else [ROOT / "machine" / "qualification-contract.json", ROOT / "machine" / "release-claim-manifest.json"]), "status": "passed" if set(binding.get("requiredEvidenceIds", [])) == required_ids else "failed"},
     ]
@@ -1183,7 +1274,7 @@ def main(argv: list[str] | None = None) -> int:
             fallback_dirty = working_tree_status()
         except Exception:
             fallback_dirty = []
-        error = f"{type(exc).__name__}: {exc}"
+        error = f"{type(exc).__name__}: {_redact_runtime_text(exc)}"
         reports = {
             name: _failed_report(name, fallback_source, fallback_dirty, error)
             for name in REPORT_NAMES
@@ -1199,7 +1290,7 @@ def main(argv: list[str] | None = None) -> int:
         for name in REPORT_NAMES:
             write_json(out_dir / name, reports[name])
         write_json(out_dir / PRODUCER_REPORT_NAME, producer)
-        print(f"ISSUE 105 QUALIFICATION ERROR: {type(exc).__name__}: {exc}", file=sys.stderr)
+        print(f"ISSUE 105 QUALIFICATION ERROR: {_redact_runtime_text(type(exc).__name__ + ': ' + str(exc))}", file=sys.stderr)
         return 1
 
     reports: dict[str, dict[str, Any]] = {}
@@ -1253,7 +1344,7 @@ def main(argv: list[str] | None = None) -> int:
         write_json(out_dir / name, reports[name])
     write_json(out_dir / PRODUCER_REPORT_NAME, producer)
     status = "passed" if producer.get("status") == "passed" and all(reports.get(name, {}).get("status") == "passed" for name in REPORT_NAMES) else "failed"
-    summary = {"status": status, "producerStatus": producer.get("status"), "sourceSha": source, "dirtyTree": bool(dirty), "reportCount": len(REPORT_NAMES), "reports": [str((out_dir / name).resolve()) for name in REPORT_NAMES]}
+    summary = {"status": status, "producerStatus": producer.get("status"), "sourceSha": source, "dirtyTree": bool(dirty), "reportCount": len(REPORT_NAMES), "reports": [_stable_path_label(out_dir / name) for name in REPORT_NAMES]}
     print(json.dumps(summary, ensure_ascii=False, sort_keys=True))
     return 0 if status == "passed" else 1
 

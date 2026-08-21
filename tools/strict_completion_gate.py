@@ -10,57 +10,223 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from pathlib import Path
-import subprocess
+from pathlib import Path, PurePosixPath
 import sys
 from typing import Any
 
-try:
-    from qualification_evidence import validate_source_feature_closure
-except ImportError:  # pragma: no cover
-    from tools.qualification_evidence import validate_source_feature_closure
-
-
 ROOT = Path(__file__).resolve().parents[1]
+# Keep the live issue-state scope separate from the qualification-report
+# scope.  #87 is the umbrella and #108--#113 are release-barrier issues; none
+# of them gets a duplicate qualification report.  ``RECOVERY_ISSUES`` remains
+# as a compatibility alias for callers that use the old name for reports.
+LIVE_ISSUES = tuple(range(87, 106)) + tuple(range(108, 114))
+QUALIFICATION_ISSUES = tuple(range(88, 106))
+BARRIER_ISSUES = tuple(range(108, 114))
+RECOVERY_ISSUES = QUALIFICATION_ISSUES
+RECOVERY_ISSUE_SET = set(QUALIFICATION_ISSUES)
+LIVE_ISSUE_SET = set(LIVE_ISSUES)
 CONTRACT_PATH = ROOT / "machine" / "strict-completion-contract.json"
 
 
-def _run(command: list[str]) -> tuple[int, str, str]:
-    child_environment = os.environ.copy()
-    child_environment["PYTHONIOENCODING"] = "utf-8"
-    completed = subprocess.run(
-        [sys.executable, *command],
-        cwd=ROOT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        env=child_environment,
-        capture_output=True,
-        timeout=120,
-        check=False,
-    )
-    return completed.returncode, completed.stdout, completed.stderr
-
-
-def _json_report(command: list[str], blockers: list[dict[str, str]]) -> dict[str, Any] | None:
-    returncode, stdout, stderr = _run(command)
-    if returncode != 0:
-        blockers.append({"code": "COMMAND_FAILED", "command": "python " + " ".join(command), "detail": (stdout + stderr).strip()[-1000:]})
+def _declared_issue_numbers(value: Any) -> list[int] | None:
+    if not isinstance(value, dict):
         return None
+    numbers = value.get("issueNumbers")
+    if not isinstance(numbers, list) or any(isinstance(item, bool) or not isinstance(item, int) for item in numbers):
+        return None
+    return list(numbers)
+
+
+def _load_bundle_scope(
+    manifest: Path,
+) -> tuple[dict[str, Any] | None, list[tuple[str, dict[str, Any]]], list[dict[str, str]]]:
+    """Load the candidate bundle and independently enforce its issue scope.
+
+    ``validate_qualification_bundle.py`` is the authoritative bundle
+    validator, but this gate must not silently trust a validator result that a
+    caller has replaced or that was produced from a stale contract.  The
+    release boundary is therefore checked here as well: the manifest declares
+    exactly #88--#105 and the union of report bindings is neither narrower nor
+    wider than that set.  The umbrella and release-barrier issues are checked
+    from the final GitHub snapshot, not fabricated as report entries.
+    """
+
+    blockers: list[dict[str, str]] = []
+    manifest_path = manifest.resolve()
     try:
-        report = json.loads(stdout)
-    except json.JSONDecodeError as exc:
-        blockers.append({"code": "REPORT_NOT_JSON", "command": "python " + " ".join(command), "detail": str(exc)})
-        return None
-    if not isinstance(report, dict):
-        blockers.append({"code": "REPORT_NOT_OBJECT", "command": "python " + " ".join(command), "detail": "report root is not an object"})
-        return None
-    return report
+        value = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        blockers.append({"code": "BUNDLE_MANIFEST_UNREADABLE", "detail": f"cannot load {manifest_path}: {exc}"})
+        return None, [], blockers
+    if not isinstance(value, dict):
+        blockers.append({"code": "BUNDLE_MANIFEST_SCHEMA", "detail": "bundle manifest root is not an object"})
+        return None, [], blockers
+
+    expected = list(QUALIFICATION_ISSUES)
+    if _declared_issue_numbers(value) != expected:
+        blockers.append({
+            "code": "BUNDLE_ISSUE_SCOPE",
+            "detail": f"bundle manifest issueNumbers must be exactly {expected}",
+        })
+
+    reports: list[tuple[str, dict[str, Any]]] = []
+    reports_dir = manifest_path.parent / "reports"
+    try:
+        report_paths = sorted(path for path in reports_dir.glob("*.json") if path.is_file())
+    except OSError as exc:
+        report_paths = []
+        blockers.append({"code": "BUNDLE_REPORTS_UNREADABLE", "detail": f"cannot enumerate {reports_dir}: {exc}"})
+    if not report_paths:
+        blockers.append({"code": "BUNDLE_REPORTS_MISSING", "detail": f"bundle has no reports/*.json files: {reports_dir}"})
+
+    seen_issue_numbers: set[int] = set()
+    for report_path in report_paths:
+        relative = f"reports/{report_path.name}"
+        try:
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            blockers.append({"code": "BUNDLE_REPORT_UNREADABLE", "detail": f"cannot load {relative}: {exc}"})
+            continue
+        if not isinstance(report, dict):
+            blockers.append({"code": "BUNDLE_REPORT_SCOPE", "detail": f"{relative} is not an object"})
+            continue
+        reports.append((relative, report))
+        numbers = _declared_issue_numbers(report)
+        if not numbers:
+            blockers.append({"code": "BUNDLE_REPORT_SCOPE", "detail": f"{relative} has no valid issueNumbers binding"})
+            continue
+        if len(numbers) != len(set(numbers)):
+            blockers.append({"code": "BUNDLE_REPORT_SCOPE", "detail": f"{relative} repeats an issue number: {numbers}"})
+        unexpected = sorted(set(numbers) - RECOVERY_ISSUE_SET)
+        if unexpected:
+            blockers.append({
+                "code": "BUNDLE_REPORT_SCOPE",
+                "detail": f"{relative} binds out-of-scope issues: {unexpected}; expected only {expected}",
+            })
+        seen_issue_numbers.update(number for number in numbers if number in RECOVERY_ISSUE_SET)
+
+    if seen_issue_numbers != RECOVERY_ISSUE_SET:
+        missing = sorted(RECOVERY_ISSUE_SET - seen_issue_numbers)
+        unexpected = sorted(seen_issue_numbers - RECOVERY_ISSUE_SET)
+        blockers.append({
+            "code": "BUNDLE_REPORT_SCOPE",
+            "detail": f"bundle reports must cover exactly #88-#105; missing={missing}, unexpected={unexpected}",
+        })
+    return value, reports, blockers
 
 
-def _require(condition: bool, code: str, detail: str, blockers: list[dict[str, str]]) -> None:
-    if not condition:
-        blockers.append({"code": code, "detail": detail})
+def _static_release_claim_blockers(label: str, value: Any) -> list[dict[str, str]]:
+    """Reject a candidate artifact that publishes release authority itself."""
+
+    if not isinstance(value, dict):
+        return []
+    locations: list[tuple[str, dict[str, Any]]] = [(label, value)]
+    for key in ("release", "releaseState", "releaseClaim", "finalRelease"):
+        nested = value.get(key)
+        if isinstance(nested, dict):
+            locations.append((f"{label}.{key}", nested))
+
+    blockers: list[dict[str, str]] = []
+    for location, claim in locations:
+        conflict = (
+            claim.get("releaseReady") is True
+            or claim.get("releaseEligible") is True
+            or claim.get("releaseBlocked") is False
+            or claim.get("status") == "release-ready"
+            or claim.get("claimStatus") == "release-ready"
+        )
+        if conflict:
+            blockers.append({
+                "code": "STATIC_RELEASE_READY_CONTRADICTION",
+                "detail": f"{location} contains a release-ready claim; only a final external attestation may claim release readiness",
+            })
+    return blockers
+
+
+def _normalise_command_token(value: Any) -> str:
+    return str(value).strip().strip("\"'").replace("\\", "/").casefold()
+
+
+def _bundle_output_json(bundle_root: Path, report: dict[str, Any], basename: str) -> tuple[Path | None, list[dict[str, str]]]:
+    outputs = report.get("outputs")
+    if not isinstance(outputs, list):
+        return None, [{"code": "CIRCULAR_105_EVIDENCE", "detail": f"#105 report has no outputs list for {basename}"}]
+    matches = [
+        item.get("path")
+        for item in outputs
+        if isinstance(item, dict)
+        and isinstance(item.get("path"), str)
+        and PurePosixPath(item["path"].replace("\\", "/")).name == basename
+    ]
+    if len(matches) != 1:
+        return None, [{
+            "code": "CIRCULAR_105_EVIDENCE",
+            "detail": f"#105 report must bind exactly one {basename}; found {matches}",
+        }]
+    relative = PurePosixPath(str(matches[0]).replace("\\", "/"))
+    if relative.is_absolute() or ".." in relative.parts:
+        return None, [{"code": "CIRCULAR_105_EVIDENCE", "detail": f"#105 output path escapes the bundle: {matches[0]}"}]
+    target = (bundle_root / Path(*relative.parts)).resolve()
+    try:
+        target.relative_to(bundle_root.resolve())
+    except ValueError:
+        return None, [{"code": "CIRCULAR_105_EVIDENCE", "detail": f"#105 output path escapes the bundle: {matches[0]}"}]
+    try:
+        value = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return None, [{"code": "CIRCULAR_105_EVIDENCE", "detail": f"#105 producer report is unreadable: {exc}"}]
+    if not isinstance(value, dict):
+        return None, [{"code": "CIRCULAR_105_EVIDENCE", "detail": "#105 producer report is not a JSON object"}]
+    return target, _static_release_claim_blockers("#105 producer report", value)
+
+
+def _candidate_105_blockers(
+    manifest: dict[str, Any] | None,
+    reports: list[tuple[str, dict[str, Any]]],
+    bundle_root: Path,
+) -> list[dict[str, str]]:
+    """Apply the non-circular candidate rules before any release check runs."""
+
+    blockers = _static_release_claim_blockers("bundle manifest", manifest)
+    for relative, report in reports:
+        blockers.extend(_static_release_claim_blockers(relative, report))
+
+    candidates = [
+        (relative, report)
+        for relative, report in reports
+        if report.get("evidenceId") == "issue-105-release-quality"
+    ]
+    if len(candidates) != 1:
+        blockers.append({
+            "code": "BUNDLE_105_EVIDENCE_MISSING" if not candidates else "BUNDLE_105_EVIDENCE_SCOPE",
+            "detail": f"bundle must contain exactly one issue-105-release-quality report; found {len(candidates)}",
+        })
+        return blockers
+
+    relative, candidate = candidates[0]
+    command = candidate.get("command")
+    if not isinstance(command, list) or any(not isinstance(item, str) for item in command):
+        blockers.append({"code": "CIRCULAR_105_EVIDENCE", "detail": f"{relative} command is not a string array produced by the #105 behavioral runner"})
+    else:
+        tokens = [_normalise_command_token(item) for item in command]
+        has_issue_runner = any(PurePosixPath(token).name == "qualification_issue105.py" for token in tokens)
+        if not has_issue_runner:
+            blockers.append({"code": "CIRCULAR_105_EVIDENCE", "detail": "#105 candidate evidence must be produced by tools/qualification_issue105.py"})
+        forbidden_authorities = {"release_gate.py", "release_attestation.py", "strict_completion_gate.py"}
+        if any(PurePosixPath(token).name in forbidden_authorities for token in tokens):
+            blockers.append({"code": "CIRCULAR_105_EVIDENCE", "detail": "#105 candidate evidence invokes a release or strict-completion authority"})
+        module_command = " ".join(tokens).replace("/", ".")
+        if any(name in module_command for name in ("tools.release_gate", "tools.release_attestation", "tools.strict_completion_gate")):
+            blockers.append({"code": "CIRCULAR_105_EVIDENCE", "detail": "#105 candidate evidence invokes a release or strict-completion module"})
+        if any(token == "--bundle" or token.startswith("--bundle=") or token == "--attestation" or token.startswith("--attestation=") for token in tokens):
+            blockers.append({"code": "CIRCULAR_105_EVIDENCE", "detail": "#105 candidate evidence must not invoke bundle or attestation qualification"})
+        if any(token in {"--release", "--release-ready"} or token.startswith("--release-ready=") for token in tokens):
+            blockers.append({"code": "CIRCULAR_105_EVIDENCE", "detail": "#105 candidate evidence must not request release readiness"})
+
+    producer_path, producer_blockers = _bundle_output_json(bundle_root, candidate, "producer-report.json")
+    del producer_path  # The path is diagnostic material; the JSON claim is what matters here.
+    blockers.extend(producer_blockers)
+    return blockers
 
 
 def _bundle_issue_reports(manifest: Path) -> list[dict[str, Any]]:
@@ -73,7 +239,7 @@ def _bundle_issue_reports(manifest: Path) -> list[dict[str, Any]]:
     material instead of hiding it behind a top-level validator error.
     """
 
-    issue_numbers = list(range(88, 106))
+    issue_numbers = list(RECOVERY_ISSUES)
     try:
         bundle_root = manifest.resolve().parent
         json.loads(manifest.resolve().read_text(encoding="utf-8"))
@@ -114,7 +280,7 @@ def _bundle_issue_reports(manifest: Path) -> list[dict[str, Any]]:
         matching = [
             (report_path, value)
             for report_path, value in parsed_reports
-            if issue in value.get("issueNumbers", [])
+            if issue in (_declared_issue_numbers(value) or [])
         ]
         blockers: list[dict[str, str]] = []
         if not matching:
@@ -180,6 +346,55 @@ def _bundle_issue_reports(manifest: Path) -> list[dict[str, Any]]:
     return entries
 
 
+def _live_issue_state(snapshot: Any) -> dict[str, Any]:
+    """Render live issue scope separately from qualification report scope."""
+
+    if not isinstance(snapshot, dict) or not isinstance(snapshot.get("issues"), list):
+        return {
+            "status": "blocked",
+            "issueNumbers": list(LIVE_ISSUES),
+            "snapshotDigest": snapshot.get("snapshotDigest") if isinstance(snapshot, dict) else None,
+            "blockers": [{"code": "ISSUE_STATE_MISSING", "detail": "final attestation has no verified issue snapshot"}],
+        }
+    issue_numbers = [
+        item.get("issueNumber")
+        for item in snapshot["issues"]
+        if isinstance(item, dict)
+    ]
+    blockers: list[dict[str, str]] = []
+    if issue_numbers != list(LIVE_ISSUES):
+        blockers.append({
+            "code": "ISSUE_STATE_SCOPE",
+            "detail": f"final issue snapshot must be ordered as {list(LIVE_ISSUES)}",
+        })
+    by_number = {
+        item.get("issueNumber"): item
+        for item in snapshot["issues"]
+        if isinstance(item, dict) and isinstance(item.get("issueNumber"), int)
+    }
+    missing = sorted(LIVE_ISSUE_SET - set(by_number))
+    if missing:
+        blockers.append({"code": "ISSUE_STATE_SCOPE", "detail": f"final issue snapshot is missing {missing}"})
+    incomplete = [
+        number
+        for number in LIVE_ISSUES
+        if number in by_number
+        and not (
+            by_number[number].get("state") == "closed"
+            and by_number[number].get("stateReason") == "completed"
+            and by_number[number].get("closedAt") is not None
+        )
+    ]
+    if incomplete:
+        blockers.append({"code": "ISSUE_NOT_COMPLETED", "detail": f"final issue snapshot has incomplete issues: {incomplete}"})
+    return {
+        "status": "verified" if not blockers else "blocked",
+        "issueNumbers": list(LIVE_ISSUES),
+        "snapshotDigest": snapshot.get("snapshotDigest"),
+        "blockers": blockers,
+    }
+
+
 def _attested_issue_reports(bundle: Path | None, snapshot: Any) -> list[dict[str, Any]]:
     """Bind candidate issue evidence to the externally verified live state."""
 
@@ -217,110 +432,15 @@ def _attested_issue_reports(bundle: Path | None, snapshot: Any) -> list[dict[str
     return entries
 
 
-def _check_source_closure(report: dict[str, Any], label: str, blockers: list[dict[str, str]]) -> None:
-    cases = list(report.get("cases", []))
-    cases.extend(item for item in report.get("negativeChecks", []) if isinstance(item, dict))
-    for case in cases:
-        if not isinstance(case, dict):
-            _require(False, "SOURCE_CLOSURE_CASE_MALFORMED", f"{label} contains a malformed case", blockers)
-            continue
-        document_path = case.get("documentPath") or case.get("output")
-        if not isinstance(document_path, str) or not Path(document_path).is_file():
-            _require(False, "SOURCE_CLOSURE_DOCUMENT_MISSING", f"{label}/{case.get('id', case.get('format', '<unknown>'))} does not identify the converted IR document", blockers)
-            continue
-        try:
-            document = json.loads(Path(document_path).read_text(encoding="utf-8"))
-            closure = validate_source_feature_closure(document, case)
-        except Exception as exc:  # pragma: no cover - defensive fail-closed path
-            _require(False, "SOURCE_CLOSURE_EXECUTION", f"{label}/{case.get('id', case.get('format', '<unknown>'))} closure execution failed: {exc}", blockers)
-            continue
-        _require(closure.get("status") == "passed", "SOURCE_CLOSURE_CONTENT", f"{label}/{case.get('id', case.get('format', '<unknown>'))} source occurrence closure failed: {json.dumps(closure.get('mismatches', []), ensure_ascii=False)}", blockers)
-
-
 def run() -> dict[str, Any]:
-    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
-    blockers: list[dict[str, str]] = []
-    reports = contract["reports"]
+    """Compatibility entry point for the old no-bundle development smoke.
 
-    mutation = _json_report(["tools/mutation_qualification.py", "--json"], blockers)
-    if mutation is not None:
-        specification = reports["mutation"]
-        _require(mutation.get("status") == "passed", "MUTATION_STATUS", "mutation report is not marked passed", blockers)
-        _require(mutation.get("schema") == specification["schema"], "MUTATION_SCHEMA", "mutation report schema is not the strict contract schema", blockers)
-        _require(isinstance(mutation.get("coverage"), dict), "MUTATION_COVERAGE_MISSING", "mutation report must identify covered mutation classes", blockers)
-        covered = set(mutation.get("coverage", {}).keys()) if isinstance(mutation.get("coverage"), dict) else set()
-        _require(set(specification["requiredMutationClasses"]).issubset(covered), "MUTATION_CLASSES_INCOMPLETE", "required mutation classes are missing: " + ", ".join(sorted(set(specification["requiredMutationClasses"]) - covered)), blockers)
-        _require(mutation.get("survivors") == [], "MUTATION_SURVIVORS", "strict completion requires zero surviving mutations", blockers)
-        for field in specification.get("requiredFields", []):
-            _require(field in mutation, "MUTATION_FIELD_MISSING", f"mutation report lacks {field}", blockers)
-        _require(isinstance(mutation.get("killed"), int) and isinstance(mutation.get("total"), int) and mutation.get("total", 0) > 0, "MUTATION_COUNTS", "mutation report killed/total counts are invalid", blockers)
-        _require(mutation.get("killed") == mutation.get("total"), "MUTATION_SCORE", "mutation report is not fully killed", blockers)
-        _require(len(mutation.get("survivors", [])) <= specification.get("maximumSurvivors", 0), "MUTATION_SURVIVOR_LIMIT", "mutation survivor limit exceeded", blockers)
+    Completion is intentionally not available through this API.  The only
+    passing paths are ``run_bundle`` (candidate qualification) and
+    ``run_attestation`` (final external authority).
+    """
 
-    corpus = _json_report(["tools/independent_corpus.py", "--json"], blockers)
-    if corpus is not None:
-        specification = reports["independentCorpus"]
-        _require(corpus.get("status") == "passed", "CORPUS_STATUS", "independent corpus report is not marked passed", blockers)
-        _require(corpus.get("schema") == specification["schema"], "CORPUS_SCHEMA", "independent corpus report schema is not the strict contract schema", blockers)
-        formats = {case.get("format") for case in corpus.get("cases", []) if isinstance(case, dict)}
-        _require(formats == set(specification["requiredFormats"]), "CORPUS_FORMAT_MATRIX", "independent corpus does not cover exactly the required formats", blockers)
-        case_classes = {case.get("caseClass") for case in corpus.get("cases", []) if isinstance(case, dict)} | {item.get("id") for item in corpus.get("negativeChecks", []) if isinstance(item, dict)}
-        _require(set(specification["requiredCaseClasses"]).issubset(case_classes), "CORPUS_NEGATIVE_MATRIX", "independent corpus lacks required case classes: " + ", ".join(sorted(set(specification["requiredCaseClasses"]) - case_classes)), blockers)
-        for case in corpus.get("cases", []):
-            if isinstance(case, dict):
-                for field in specification["requiredFieldsPerCase"]:
-                    _require(field in case, "CORPUS_CASE_EVIDENCE", f"{case.get('id', '<unknown>')} lacks {field}", blockers)
-                _require(isinstance(case.get("sourceFeatureIds"), list) and bool(case.get("sourceFeatureIds")), "CORPUS_SOURCE_EVIDENCE", f"{case.get('id', '<unknown>')} source inventory is empty", blockers)
-                _require(case.get("queryParity", {}).get("status") == "passed", "CORPUS_QUERY_PARITY", f"{case.get('id', '<unknown>')} query parity is not passed", blockers)
-                _require(isinstance(case.get("dispositions"), list) and isinstance(case.get("featureInventory"), list), "CORPUS_DISPOSITIONS", f"{case.get('id', '<unknown>')} disposition evidence is malformed", blockers)
-        _check_source_closure(corpus, "independent-corpus", blockers)
-        for negative in corpus.get("negativeChecks", []):
-            if isinstance(negative, dict):
-                _require(isinstance(negative.get("dispositions"), list) and isinstance(negative.get("featureInventory"), list), "CORPUS_NEGATIVE_EVIDENCE", f"{negative.get('id', '<unknown>')} negative evidence is malformed", blockers)
-                _require(isinstance(negative.get("sourceFeatureIds"), list) and bool(negative.get("sourceFeatureIds")), "CORPUS_NEGATIVE_SOURCE_EVIDENCE", f"{negative.get('id', '<unknown>')} source inventory is empty", blockers)
-
-    query = _json_report(["tools/query_qualification.py"], blockers)
-    if query is not None:
-        specification = reports["query"]
-        _require(query.get("status") == "passed", "QUERY_STATUS", "query qualification report is not marked passed", blockers)
-        _require(query.get("schema") == specification["schema"], "QUERY_SCHEMA", "query report schema is not the strict contract schema", blockers)
-        _require(set(specification["requiredSources"]).issubset(set(query.get("sources", []))), "QUERY_SOURCES_INCOMPLETE", "query qualification must include examples, real-input E2E, and independent corpus", blockers)
-        _require(query.get("unqueryableFacts") == [], "QUERY_UNQUERYABLE_FACTS", "strict completion forbids unqueryable authoritative facts", blockers)
-        _require(query.get("parity", {}).get("status") == "passed", "QUERY_PARITY", "direct/index parity must be reported as passed", blockers)
-        for field in specification.get("requiredFields", []):
-            _require(field in query, "QUERY_FIELD_MISSING", f"query report lacks {field}", blockers)
-        _require(isinstance(query.get("operations"), list) and query.get("operations"), "QUERY_OPERATIONS", "query report has no executed operations", blockers)
-
-    real_input = _json_report(["tools/run_e2e.py", "--all", "--json"], blockers)
-    if real_input is not None:
-        specification = reports["realInput"]
-        _require(real_input.get("status") == "passed", "E2E_STATUS", "real-input E2E report is not marked passed", blockers)
-        _require(real_input.get("schema") == specification["schema"], "E2E_SCHEMA", "real-input report schema is not the strict contract schema", blockers)
-        formats = set(real_input.get("formats", []))
-        _require(formats == set(specification["requiredFormats"]), "E2E_FORMAT_MATRIX", "real-input E2E does not cover exactly the required formats", blockers)
-        for case in real_input.get("cases", []):
-            if isinstance(case, dict):
-                for field in specification["requiredFieldsPerCase"]:
-                    _require(field in case, "E2E_CASE_EVIDENCE", f"{case.get('format', '<unknown>')} case lacks {field}", blockers)
-                _require(case.get("queryParity", {}).get("status") == "passed", "E2E_QUERY_PARITY", f"{case.get('format', '<unknown>')} query parity is not passed", blockers)
-                _require(isinstance(case.get("sourceFeatureIds"), list) and bool(case.get("sourceFeatureIds")), "E2E_SOURCE_EVIDENCE", f"{case.get('format', '<unknown>')} source evidence is empty", blockers)
-                _require(isinstance(case.get("dispositions"), list) and isinstance(case.get("residuals"), list), "E2E_DISPOSITIONS", f"{case.get('format', '<unknown>')} disposition evidence is malformed", blockers)
-        _check_source_closure(real_input, "real-input-e2e", blockers)
-
-    issue_evidence = contract.get("issueEvidence", {})
-    _require(set(issue_evidence) == {str(number) for number in contract["scope"]["phase2Issues"]}, "ISSUE_EVIDENCE_MATRIX", "strict contract must define evidence for every phase-2 issue", blockers)
-    for issue_number, evidence_ids in issue_evidence.items():
-        _require(isinstance(evidence_ids, list) and all(isinstance(item, str) and item for item in evidence_ids), "ISSUE_EVIDENCE_EMPTY", f"issue {issue_number} has empty evidence binding", blockers)
-    _require(contract["closurePolicy"].get("closedStateIsNotEvidence") is True, "CLOSURE_POLICY", "closed issue state must never be sufficient evidence", blockers)
-
-    return {
-        "schema": "fdir/strict-completion-gate-report",
-        "version": "1.0.0",
-        "status": "passed" if not blockers else "blocked",
-        "issues": contract["scope"]["phase2Issues"],
-        "blockers": blockers,
-        "reportsChecked": ["mutation", "independentCorpus", "query", "realInput"],
-    }
+    return _legacy_path_report("smoke")
 
 
 def run_bundle(manifest: Path, *, allow_dirty: bool = False) -> dict[str, Any]:
@@ -331,15 +451,35 @@ def run_bundle(manifest: Path, *, allow_dirty: bool = False) -> dict[str, Any]:
     full #88--#105 recovery contract, not just #88.
     """
 
-    try:
-        from validate_qualification_bundle import validate_bundle
-    except ImportError:  # pragma: no cover
-        from tools.validate_qualification_bundle import validate_bundle
+    manifest_value, bundle_reports, scope_blockers = _load_bundle_scope(manifest)
+    blockers: list[dict[str, Any]] = list(scope_blockers)
+    blockers.extend(_candidate_105_blockers(manifest_value, bundle_reports, manifest.resolve().parent))
 
-    validation = validate_bundle(manifest, repo_root=ROOT, allow_dirty=allow_dirty)
-    blockers = list(validation.get("diagnostics", []))
+    try:
+        try:
+            from validate_qualification_bundle import validate_bundle
+        except ImportError:  # pragma: no cover
+            from tools.validate_qualification_bundle import validate_bundle
+        validation = validate_bundle(manifest, repo_root=ROOT, allow_dirty=allow_dirty)
+    except Exception as exc:
+        validation = {
+            "schema": "fdir/qualification-validation-report",
+            "status": "failed",
+            "diagnostics": [{"code": "BUNDLE_VALIDATOR_ERROR", "detail": f"{type(exc).__name__}: {exc}"}],
+        }
+    if not isinstance(validation, dict):
+        validation = {
+            "schema": "fdir/qualification-validation-report",
+            "status": "failed",
+            "diagnostics": [{"code": "BUNDLE_VALIDATOR_REPORT", "detail": "bundle validator did not return an object"}],
+        }
+    diagnostics = validation.get("diagnostics", [])
+    if isinstance(diagnostics, list):
+        blockers.extend(item for item in diagnostics if isinstance(item, dict))
+    else:
+        blockers.append({"code": "BUNDLE_VALIDATOR_REPORT", "detail": "bundle validator diagnostics are not a list"})
     bundle_checks: dict[str, Any] | None = None
-    if validation.get("status") == "passed":
+    if validation.get("status") == "passed" and not blockers:
         try:
             try:
                 from release_gate import check_qualification_bundle
@@ -357,7 +497,7 @@ def run_bundle(manifest: Path, *, allow_dirty: bool = False) -> dict[str, Any]:
                 validate_candidate_bundle(manifest, allow_dirty=allow_dirty)
             except Exception as exc:
                 blockers.append({"code": getattr(exc, "code", "CANDIDATE_BUNDLE_INVALID"), "detail": str(exc)})
-    issues = list(range(88, 106))
+    issues = list(LIVE_ISSUES)
     return {
         "schema": "fdir/strict-completion-gate-report",
         "version": "1.2.0",
@@ -365,54 +505,98 @@ def run_bundle(manifest: Path, *, allow_dirty: bool = False) -> dict[str, Any]:
         "mode": "candidate",
         "releaseReady": False,
         "issues": issues,
+        "qualificationIssues": list(QUALIFICATION_ISSUES),
+        "barrierIssues": list(BARRIER_ISSUES),
         "blockers": blockers,
-        "reportsChecked": ["qualification-bundle", *[f"issue-{issue}" for issue in issues]],
+        "reportsChecked": ["qualification-bundle", *[f"issue-{issue}" for issue in QUALIFICATION_ISSUES]],
         "issueReports": _bundle_issue_reports(manifest),
+        "scope": {
+            "issueNumbers": issues,
+            "qualificationIssueNumbers": list(QUALIFICATION_ISSUES),
+            "barrierIssueNumbers": list(BARRIER_ISSUES),
+            "exact": not any(item.get("code") in {"BUNDLE_ISSUE_SCOPE", "BUNDLE_REPORT_SCOPE"} for item in blockers),
+        },
         "bundleValidation": validation,
         "bundleChecks": bundle_checks,
+    }
+
+
+def _blocked_report(code: str, detail: str, *, mode: str = "final-attestation", bundle: Path | None = None, snapshot: Any = None) -> dict[str, Any]:
+    return {
+        "schema": "fdir/strict-completion-gate-report",
+        "version": "1.2.0",
+        "status": "blocked",
+        "mode": mode,
+        "releaseReady": False,
+        "issues": list(LIVE_ISSUES),
+        "qualificationIssues": list(QUALIFICATION_ISSUES),
+        "barrierIssues": list(BARRIER_ISSUES),
+        "blockers": [{"code": code, "detail": detail}],
+        "reportsChecked": ["final-attestation"],
+        "issueReports": _bundle_issue_reports(bundle) if bundle is not None else [],
+        "liveIssueState": _live_issue_state(snapshot),
     }
 
 
 def run_attestation(attestation: Path, *, bundle: Path | None = None) -> dict[str, Any]:
     """Validate a final attestation without re-entering the legacy gate."""
 
+    if bundle is None:
+        return _blocked_report(
+            "BUNDLE_REQUIRED",
+            "final attestation validation is diagnostic-only without the exact candidate bundle; pass --bundle and --attestation together",
+        )
+    if os.environ.get("GITHUB_ACTIONS", "").casefold() != "true":
+        return _blocked_report(
+            "ATTESTATION_CI_PROVIDER",
+            "final attestation authority must be validated in GitHub Actions",
+            bundle=bundle,
+        )
     try:
         try:
             from release_attestation import load_and_validate_attestation
         except ImportError:  # pragma: no cover
             from tools.release_attestation import load_and_validate_attestation
-        actions = os.environ.get("GITHUB_ACTIONS", "").casefold() == "true"
-        expected_attempt: Any = os.environ.get("GITHUB_RUN_ATTEMPT") if actions else None
+        actions = True
+        try:
+            from release_gate import current_head
+        except ImportError:  # pragma: no cover
+            from tools.release_gate import current_head
+        source_sha = current_head()
+        if os.environ.get("GITHUB_SHA") != source_sha:
+            raise RuntimeError("GITHUB_SHA does not match the inspected checkout HEAD")
+        for name in ("GITHUB_REPOSITORY", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_JOB"):
+            if not os.environ.get(name):
+                raise RuntimeError(f"GitHub Actions identity is missing {name}")
+        expected_attempt: Any = os.environ.get("GITHUB_RUN_ATTEMPT")
         if isinstance(expected_attempt, str) and expected_attempt.isdigit():
             expected_attempt = int(expected_attempt)
         result = load_and_validate_attestation(
             attestation,
             bundle_manifest_path=bundle,
+            expected_source_sha=source_sha,
             expected_run_id=os.environ.get("GITHUB_RUN_ID") if actions else None,
             expected_attempt=expected_attempt,
         )
     except Exception as exc:
-        return {
-            "schema": "fdir/strict-completion-gate-report",
-            "version": "1.2.0",
-            "status": "blocked",
-            "mode": "final-attestation",
-            "releaseReady": False,
-            "issues": list(range(88, 106)),
-            "blockers": [{"code": getattr(exc, "code", "ATTESTATION_INVALID"), "detail": str(exc)}],
-            "reportsChecked": ["final-attestation"],
-            "issueReports": _bundle_issue_reports(bundle) if bundle is not None else [],
-        }
+        return _blocked_report(
+            getattr(exc, "code", "ATTESTATION_INVALID"),
+            str(exc),
+            bundle=bundle,
+        )
     return {
         "schema": "fdir/strict-completion-gate-report",
         "version": "1.2.0",
         "status": "passed",
         "mode": "final-attestation",
         "releaseReady": True,
-        "issues": list(range(88, 106)),
+        "issues": list(LIVE_ISSUES),
+        "qualificationIssues": list(QUALIFICATION_ISSUES),
+        "barrierIssues": list(BARRIER_ISSUES),
         "blockers": [],
-        "reportsChecked": ["qualification-bundle", "final-attestation", *[f"issue-{issue}" for issue in range(88, 106)]],
+        "reportsChecked": ["qualification-bundle", "final-attestation", *[f"issue-{issue}" for issue in QUALIFICATION_ISSUES]],
         "issueReports": _attested_issue_reports(bundle, result.get("snapshot")),
+        "liveIssueState": _live_issue_state(result.get("snapshot")),
         "attestation": result,
     }
 
@@ -426,10 +610,12 @@ def _legacy_path_report(mode: str = "smoke") -> dict[str, Any]:
         "status": "blocked",
         "mode": mode,
         "releaseReady": False,
-        "issues": list(range(88, 106)),
+        "issues": list(LIVE_ISSUES),
+        "qualificationIssues": list(QUALIFICATION_ISSUES),
+        "barrierIssues": list(BARRIER_ISSUES),
         "blockers": [{
             "code": "LEGACY_COMPLETION_PATH_DISABLED",
-            "detail": "strict completion release qualification requires --bundle or --attestation; the legacy report path is development-only",
+            "detail": "strict completion release qualification requires --bundle and --attestation; the bundleless legacy path is diagnostic-only",
         }],
         "reportsChecked": [],
         "issueReports": [],
@@ -453,7 +639,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             report = _legacy_path_report("release" if args.mode == "release" else "smoke")
     except Exception as exc:
-        report = {"schema": "fdir/strict-completion-gate-report", "version": "1.2.0", "status": "blocked", "mode": "release" if args.mode == "release" else "smoke", "releaseReady": False, "issues": list(range(88, 106)), "blockers": [{"code": "GATE_ERROR", "detail": f"{type(exc).__name__}: {exc}"}]}
+        report = {"schema": "fdir/strict-completion-gate-report", "version": "1.2.0", "status": "blocked", "mode": "release" if args.mode == "release" else "smoke", "releaseReady": False, "issues": list(LIVE_ISSUES), "qualificationIssues": list(QUALIFICATION_ISSUES), "barrierIssues": list(BARRIER_ISSUES), "blockers": [{"code": "GATE_ERROR", "detail": f"{type(exc).__name__}: {exc}"}]}
     print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
     return 0 if report.get("status") == "passed" else 1
 

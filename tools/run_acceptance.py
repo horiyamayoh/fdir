@@ -336,7 +336,16 @@ def check_model(ctx: Context, case: int) -> None:
 def check_type(ctx: Context, case: int) -> None:
     defs = ctx.schema["$defs"]
     if case == 1:
-        ensure(all(definition.get("additionalProperties") is False for definition in defs.values() if isinstance(definition, dict) and definition.get("type") == "object"), "open core object found")
+        ensure(
+            all(
+                definition.get("additionalProperties") is False
+                for name, definition in defs.items()
+                if isinstance(definition, dict)
+                and definition.get("type") == "object"
+                and name not in {"extensionPayload", "opaqueExtensionPayloadObject"}
+            ),
+            "open core object found",
+        )
     elif case == 2:
         mutant = copy.deepcopy(example(ctx, "cell-formula.json"))
         mutant["formulas"][0]["values"]["stored"] = {"type": "integer", "value": "not-an-integer", "status": "preserved"}
@@ -470,7 +479,9 @@ def check_ext(ctx: Context, case: int) -> None:
     if case == 1:
         ensure({"namespace", "type", "schemaVersion", "schemaId"} <= set(extension["required"]), "extension identity fields are incomplete")
     elif case == 2:
-        ensure(extension["properties"]["payload"].get("type") == "object", "extension payload is not object-shaped")
+        payload_schema = extension["properties"]["payload"]
+        ensure(payload_schema.get("$ref") == "#/$defs/extensionPayload", "extension payload is not a typed payload boundary")
+        ensure(schema_def(ctx, "extensionPayload").get("type") == "object", "extension payload is not object-shaped")
         ensure(re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", callout_ext["schemaVersion"]), "extension schema version is invalid")
     elif case == 3:
         ensure(set(extension["properties"]["criticality"]["enum"]) == {"critical", "non-critical"}, "criticality is not explicit")

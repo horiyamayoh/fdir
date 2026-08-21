@@ -22,13 +22,14 @@ from typing import Any
 
 try:
     from qualification_evidence import (
-        ARTIFACT_REFERENCE_REQUIRED_FIELDS,
         CLASSIFICATIONS,
         PRODUCER_REPORT_SCHEMA,
         PRODUCER_REPORT_OUTPUT_ROLE,
         PRODUCER_REPORT_VERSION,
         SOURCE_SNAPSHOT_OUTPUT_ROLES,
         allowed_producer_assertion_types,
+        canonical_json_bytes,
+        evaluate_registered_assertion,
         is_forbidden_artifact_role,
         is_producer_report_output,
         selected_artifact_digest,
@@ -37,13 +38,14 @@ try:
     )
 except ImportError:  # pragma: no cover - package-style imports
     from tools.qualification_evidence import (
-        ARTIFACT_REFERENCE_REQUIRED_FIELDS,
         CLASSIFICATIONS,
         PRODUCER_REPORT_SCHEMA,
         PRODUCER_REPORT_OUTPUT_ROLE,
         PRODUCER_REPORT_VERSION,
         SOURCE_SNAPSHOT_OUTPUT_ROLES,
         allowed_producer_assertion_types,
+        canonical_json_bytes,
+        evaluate_registered_assertion,
         is_forbidden_artifact_role,
         is_producer_report_output,
         selected_artifact_digest,
@@ -57,6 +59,39 @@ CONTRACT_PATH = ROOT / "machine" / "qualification-contract.json"
 SCHEMA_PATH = ROOT / "schemas" / "qualification-evidence.schema.json"
 REPOSITORY = "horiyamayoh/fdir"
 VERSION = "1.0.0"
+CHILD_ENVIRONMENT_ALLOWLIST = frozenset(
+    {
+        # Process/runtime plumbing required to start the declared command.
+        "PATH",
+        "PATHEXT",
+        "SYSTEMROOT",
+        "WINDIR",
+        # Windows platform metadata used by platform.machine().  These are
+        # non-secret host descriptors; credentials remain excluded below.
+        "PROCESSOR_ARCHITECTURE",
+        "PROCESSOR_ARCHITEW6432",
+        "PROCESSOR_IDENTIFIER",
+        "PROCESSOR_LEVEL",
+        "PROCESSOR_REVISION",
+        "TEMP",
+        "TMP",
+        "LANG",
+        "LC_ALL",
+        "TZ",
+        # Non-secret GitHub identity used to bind candidate reports.  Tokens
+        # and credential helpers are intentionally not in this list.
+        "GITHUB_ACTIONS",
+        "GITHUB_REPOSITORY",
+        "GITHUB_SHA",
+        "GITHUB_RUN_ID",
+        "GITHUB_RUN_ATTEMPT",
+        "GITHUB_JOB",
+        "GITHUB_SERVER_URL",
+        "PLATFORM_PROFILE",
+        "PLATFORM_OS_FAMILY",
+        "PLATFORM_PYTHON",
+    }
+)
 
 
 class BundleBuildError(RuntimeError):
@@ -134,8 +169,16 @@ def run_qualification_command(command: list[str], timeout_seconds: int) -> tuple
     if not command or any(not isinstance(item, str) or not item for item in command):
         raise BundleBuildError("qualification command must be a non-empty argv array")
     argv = [sys.executable, *command[1:]] if command[0].casefold() in {"python", "python3", "py"} else list(command)
-    child_environment = os.environ.copy()
+    child_environment = {
+        key: value
+        for key, value in os.environ.items()
+        if key in CHILD_ENVIRONMENT_ALLOWLIST
+    }
     child_environment["PYTHONIOENCODING"] = "utf-8"
+    # Keep the exclusion explicit so a future allowlist expansion cannot
+    # accidentally turn a qualification subprocess into a credential sink.
+    child_environment.pop("GITHUB_TOKEN", None)
+    child_environment.pop("GH_TOKEN", None)
     try:
         completed = subprocess.run(
             argv,
@@ -224,6 +267,8 @@ def _artifact_reference(
     target = bundle_root / Path(*path.replace("\\", "/").split("/"))
     if not target.is_file():
         raise BundleBuildError(f"{label} artifact is missing: {path}")
+    if target.stat().st_size == 0:
+        raise BundleBuildError(f"PRODUCER_OUTPUT_CONTENT: {label} artifact has no content: {path}")
     try:
         value = selected_artifact_value(target, selector)
         selected_digest = selected_artifact_digest(value, selector)
@@ -235,6 +280,47 @@ def _artifact_reference(
         "selector": selector,
         "selectedSha256": selected_digest,
     }
+
+
+def _producer_semantic_value(bundle_root: Path, reference: dict[str, Any], *, label: str) -> Any:
+    """Read a producer reference using the same semantic value as validation."""
+
+    target = bundle_root / Path(*str(reference["path"]).replace("\\", "/").split("/"))
+    try:
+        value = selected_artifact_value(target, reference["selector"])
+    except (OSError, UnicodeError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        raise BundleBuildError(f"PRODUCER_OUTPUT_CONTENT: {label} selector cannot be read: {exc}") from exc
+    if reference["selector"].get("kind") == "whole-file":
+        return reference["selectedSha256"]
+    return value
+
+
+def _same_producer_value(left: Any, right: Any) -> bool:
+    try:
+        return canonical_json_bytes(left) == canonical_json_bytes(right)
+    except (TypeError, ValueError):
+        return left == right
+
+
+def _validate_producer_support(
+    support_value: Any,
+    *,
+    assertion_id: str,
+    case_id: str,
+    actual_value: Any,
+    target: Any,
+    label: str,
+) -> None:
+    if not isinstance(support_value, dict):
+        raise BundleBuildError(f"PRODUCER_SUPPORT_CONTENT: {label} must select a structured record")
+    if support_value.get("assertionId") != assertion_id or support_value.get("caseId") != case_id:
+        raise BundleBuildError(f"PRODUCER_SUPPORT_BINDING: {label} is attached to another assertion or case")
+    if not _same_producer_value(support_value.get("actual"), actual_value):
+        raise BundleBuildError(f"PRODUCER_SUPPORT_CONTENT: {label} does not contain the referenced actual value")
+    if not _same_producer_value(support_value.get("target"), target):
+        raise BundleBuildError(f"PRODUCER_SUPPORT_TARGET: {label} does not contain the assertion target")
+    if support_value.get("status", support_value.get("result")) != "passed":
+        raise BundleBuildError(f"PRODUCER_SUPPORT_STATUS: {label} is not a passed structured record")
 
 
 def _validate_producer_report(
@@ -250,9 +336,9 @@ def _validate_producer_report(
 ) -> None:
     """Reject a producer report before it can enter the bundle.
 
-    The builder checks the closed envelope and provenance bindings only.  It
-    does not turn a command exit code, a file's existence, or a producer's
-    expected/actual pair into a requirement assertion.
+    Packaging assertions remain limited to bundle mechanics.  Requirement
+    assertions are accepted only when the typed producer report and every
+    referenced producer artifact are independently recomputed here.
     """
 
     errors = validate_producer_report_shape(report)
@@ -260,7 +346,7 @@ def _validate_producer_report(
         raise BundleBuildError("PRODUCER_REPORT_SCHEMA: " + "; ".join(errors))
     if report.get("evidenceId") != evidence_id:
         raise BundleBuildError("PRODUCER_REPORT_EVIDENCE_ID: producer report evidenceId does not match the contract")
-    if set(report.get("requirementIds", [])) != set(requirement_ids):
+    if report.get("requirementIds") != requirement_ids:
         raise BundleBuildError("PRODUCER_REPORT_REQUIREMENTS: producer report requirementIds do not match the contract")
     if report.get("sourceSha") != source_sha:
         raise BundleBuildError("PRODUCER_REPORT_SOURCE_SHA: producer report sourceSha does not match the current HEAD")
@@ -268,78 +354,131 @@ def _validate_producer_report(
         raise BundleBuildError("PRODUCER_REPORT_INPUT_DIGESTS: producer report does not account for the declared inputs")
     if report.get("status") != "passed":
         raise BundleBuildError("PRODUCER_REPORT_STATUS: producer report is not passed")
+    if report.get("failureCount") != 0:
+        raise BundleBuildError("PRODUCER_REPORT_FAILURE_COUNT: passed producer report must have failureCount=0")
     if report.get("uncoveredItems") or report.get("unsupportedItems") or report.get("waivedItems"):
         raise BundleBuildError("PRODUCER_REPORT_COVERAGE: producer report contains uncovered, unsupported, or waived items")
+
     allowed_types = allowed_producer_assertion_types(issue_numbers)
-    cases = report.get("testCases", [])
-    case_ids: set[str] = set()
+    cases = report["testCases"]
+    case_by_id: dict[str, dict[str, Any]] = {}
     classifications: set[str] = set()
+    actual_values: dict[str, list[Any]] = {"positive": [], "negative": [], "mutation": []}
     for index, case in enumerate(cases):
-        if not isinstance(case, dict):
-            raise BundleBuildError(f"PRODUCER_CASE_ENTRY: test case {index} is not an object")
-        missing = ARTIFACT_REFERENCE_REQUIRED_FIELDS
-        for field in ("inputArtifact", "authorityArtifact", "actualArtifact", "supportingArtifact"):
-            ref = case.get(field)
-            if not isinstance(ref, dict) or not missing.issubset(ref):
-                raise BundleBuildError(f"PRODUCER_CASE_ARTIFACT: {field} is incomplete in case {case.get('caseId')!r}")
-            resolved = _artifact_reference(bundle_root, ref["path"], ref["selector"], output_roles, label=f"case {case.get('caseId')} {field}")
-            if resolved["sha256"] != ref.get("sha256") or resolved["selectedSha256"] != ref.get("selectedSha256"):
-                raise BundleBuildError(f"PRODUCER_CASE_DIGEST: {field} digest is not bound in case {case.get('caseId')!r}")
-        case_id = case.get("caseId")
-        if not isinstance(case_id, str) or not case_id or case_id in case_ids:
+        case_id = case["caseId"]
+        if case_id in case_by_id:
             raise BundleBuildError(f"PRODUCER_CASE_ID: caseId is missing or duplicated: {case_id!r}")
-        case_ids.add(case_id)
-        classification = case.get("classification")
-        if classification not in CLASSIFICATIONS:
-            raise BundleBuildError(f"PRODUCER_CASE_CLASSIFICATION: invalid classification in case {case_id!r}")
+        case_by_id[case_id] = case
+        classification = case["classification"]
         classifications.add(classification)
-        if case.get("requirementId") not in requirement_ids:
+        if case["requirementId"] not in requirement_ids:
             raise BundleBuildError(f"PRODUCER_CASE_REQUIREMENT: case {case_id!r} is not bound to this requirement")
-        if case["authorityArtifact"]["path"] == case["actualArtifact"]["path"]:
+        refs: dict[str, dict[str, Any]] = {}
+        for field in ("inputArtifact", "authorityArtifact", "actualArtifact", "supportingArtifact"):
+            ref = case[field]
+            resolved = _artifact_reference(bundle_root, ref["path"], ref["selector"], output_roles, label=f"case {case_id} {field}")
+            if resolved["sha256"] != ref.get("sha256") or resolved["selectedSha256"] != ref.get("selectedSha256"):
+                raise BundleBuildError(f"PRODUCER_CASE_DIGEST: {field} digest is not bound in case {case_id!r}")
+            refs[field] = ref
+        if refs["authorityArtifact"]["path"] == refs["actualArtifact"]["path"]:
             raise BundleBuildError(f"PRODUCER_CASE_SAME_ARTIFACT: authority and actual are the same artifact in case {case_id!r}")
-        if case["supportingArtifact"]["path"] in {case["authorityArtifact"]["path"], case["actualArtifact"]["path"]}:
+        if refs["supportingArtifact"]["path"] in {refs["authorityArtifact"]["path"], refs["actualArtifact"]["path"]}:
             raise BundleBuildError(f"PRODUCER_CASE_SUPPORT_SAME_ARTIFACT: support is not a separate artifact in case {case_id!r}")
         for field in ("authorityArtifact", "actualArtifact", "inputArtifact"):
-            role = output_roles.get(case[field]["path"], "")
+            role = output_roles.get(refs[field]["path"], "")
             if is_forbidden_artifact_role(role):
                 raise BundleBuildError(f"PRODUCER_CASE_SOURCE_SNAPSHOT: {field} uses forbidden role {role!r} in case {case_id!r}")
+        authority_value = _producer_semantic_value(bundle_root, refs["authorityArtifact"], label=f"case {case_id} authority")
+        actual_value = _producer_semantic_value(bundle_root, refs["actualArtifact"], label=f"case {case_id} actual")
+        _producer_semantic_value(bundle_root, refs["inputArtifact"], label=f"case {case_id} input")
+        support_value = _producer_semantic_value(bundle_root, refs["supportingArtifact"], label=f"case {case_id} support")
+        if not _same_producer_value(case["expected"], authority_value):
+            raise BundleBuildError(f"PRODUCER_CASE_CONTENT: expected value is not read from authority artifact in case {case_id!r}")
+        if not _same_producer_value(case["actual"], actual_value):
+            raise BundleBuildError(f"PRODUCER_CASE_CONTENT: actual value is not read from actual artifact in case {case_id!r}")
+        operator = case["comparison"]["operator"]
+        evaluator_type = {"equal": "json-value-equals", "not-equal": "json-value-not-equals", "contains": "artifact-contains"}[operator]
+        evaluated = evaluate_registered_assertion(evaluator_type, authority_value, actual_value, case["comparison"])
+        if evaluated is None:
+            raise BundleBuildError(f"PRODUCER_CASE_EVALUATOR: case {case_id!r} has no registered evaluator")
+        expected_result = "passed" if evaluated else "failed"
+        if case["result"] != expected_result:
+            raise BundleBuildError(f"PRODUCER_CASE_RESULT_MISMATCH: case {case_id!r} result is not independently recomputed")
+        _validate_producer_support(
+            support_value,
+            assertion_id=case_id,
+            case_id=case_id,
+            actual_value=actual_value,
+            target=case["target"],
+            label=f"case {case_id} supportingArtifact",
+        )
+        if classification in actual_values:
+            actual_values[classification].append(actual_value)
+
     if "positive" not in classifications or not ({"negative", "mutation"} & classifications):
         raise BundleBuildError("PRODUCER_CASE_COVERAGE: producer report must contain positive and negative/mutation cases")
+    positive_values = actual_values["positive"]
+    non_positive_values = actual_values["negative"] + actual_values["mutation"]
+    if not positive_values or not any(not any(_same_producer_value(value, positive) for positive in positive_values) for value in non_positive_values):
+        raise BundleBuildError("PRODUCER_NO_OP: producer output does not demonstrate a behavioral difference for a negative/mutation case")
+
     assertion_ids: set[str] = set()
-    for index, assertion in enumerate(report.get("assertions", [])):
-        if not isinstance(assertion, dict):
-            raise BundleBuildError(f"PRODUCER_ASSERTION_ENTRY: assertion {index} is not an object")
-        assertion_id = assertion.get("assertionId")
-        if not isinstance(assertion_id, str) or not assertion_id or assertion_id in assertion_ids:
+    referenced_cases: set[str] = set()
+    for index, assertion in enumerate(report["assertions"]):
+        assertion_id = assertion["assertionId"]
+        if assertion_id in assertion_ids:
             raise BundleBuildError(f"PRODUCER_ASSERTION_ID: assertionId is missing or duplicated: {assertion_id!r}")
         assertion_ids.add(assertion_id)
-        if assertion.get("assertionType") not in allowed_types:
-            raise BundleBuildError(f"PRODUCER_ASSERTION_TYPE: unknown or non-semantic assertion type: {assertion.get('assertionType')!r}")
-        if assertion.get("testCaseId") not in case_ids:
+        assertion_type = assertion["assertionType"]
+        if assertion_type not in allowed_types:
+            raise BundleBuildError(f"PRODUCER_ASSERTION_TYPE: unknown or non-semantic assertion type: {assertion_type!r}")
+        case_id = assertion["testCaseId"]
+        referenced_cases.add(case_id)
+        if case_id not in case_by_id:
             raise BundleBuildError(f"PRODUCER_ASSERTION_CASE: assertion {assertion_id!r} has no producer test case")
-        if assertion.get("requirementId") not in requirement_ids:
+        if assertion["requirementId"] not in requirement_ids:
             raise BundleBuildError(f"PRODUCER_ASSERTION_REQUIREMENT: assertion {assertion_id!r} is not requirement-specific")
-        if assertion.get("classification") not in CLASSIFICATIONS:
+        if assertion["classification"] not in CLASSIFICATIONS:
             raise BundleBuildError(f"PRODUCER_ASSERTION_CLASSIFICATION: invalid classification: {assertion_id!r}")
+        refs: dict[str, dict[str, Any]] = {}
         for field in ("authorityArtifact", "actualArtifact", "supportingArtifact"):
-            ref = assertion.get(field)
-            if not isinstance(ref, dict) or not ARTIFACT_REFERENCE_REQUIRED_FIELDS.issubset(ref):
-                raise BundleBuildError(f"PRODUCER_ASSERTION_ARTIFACT: {field} is incomplete in {assertion_id!r}")
+            ref = assertion[field]
             resolved = _artifact_reference(bundle_root, ref["path"], ref["selector"], output_roles, label=f"assertion {assertion_id} {field}")
             if resolved["sha256"] != ref.get("sha256") or resolved["selectedSha256"] != ref.get("selectedSha256"):
                 raise BundleBuildError(f"PRODUCER_ASSERTION_DIGEST: {field} digest is not bound in {assertion_id!r}")
-        if assertion["authorityArtifact"]["path"] == assertion["actualArtifact"]["path"]:
+            refs[field] = ref
+        if refs["authorityArtifact"]["path"] == refs["actualArtifact"]["path"]:
             raise BundleBuildError(f"PRODUCER_ASSERTION_SAME_ARTIFACT: authority and actual are the same artifact in {assertion_id!r}")
-        if assertion["supportingArtifact"]["path"] in {assertion["authorityArtifact"]["path"], assertion["actualArtifact"]["path"]}:
+        if refs["supportingArtifact"]["path"] in {refs["authorityArtifact"]["path"], refs["actualArtifact"]["path"]}:
             raise BundleBuildError(f"PRODUCER_ASSERTION_SUPPORT_SAME_ARTIFACT: support is not a separate artifact in {assertion_id!r}")
         for field in ("authorityArtifact", "actualArtifact"):
-            role = output_roles.get(assertion[field]["path"], "")
+            role = output_roles.get(refs[field]["path"], "")
             if is_forbidden_artifact_role(role):
                 raise BundleBuildError(f"PRODUCER_ASSERTION_SOURCE_SNAPSHOT: {field} uses forbidden role {role!r} in {assertion_id!r}")
-        if not isinstance(assertion.get("target"), dict) or not assertion["target"]:
-            raise BundleBuildError(f"PRODUCER_ASSERTION_TARGET: target is required in {assertion_id!r}")
-        if not isinstance(assertion.get("diagnostic"), dict) or not assertion["diagnostic"].get("code") or not assertion["diagnostic"].get("message"):
-            raise BundleBuildError(f"PRODUCER_ASSERTION_DIAGNOSTIC: diagnostic is required in {assertion_id!r}")
+        authority_value = _producer_semantic_value(bundle_root, refs["authorityArtifact"], label=f"assertion {assertion_id} authority")
+        actual_value = _producer_semantic_value(bundle_root, refs["actualArtifact"], label=f"assertion {assertion_id} actual")
+        support_value = _producer_semantic_value(bundle_root, refs["supportingArtifact"], label=f"assertion {assertion_id} support")
+        if not _same_producer_value(assertion["expected"], authority_value):
+            raise BundleBuildError(f"PRODUCER_ASSERTION_CONTENT: expected value is not read from authority artifact in {assertion_id!r}")
+        if not _same_producer_value(assertion["actual"], actual_value):
+            raise BundleBuildError(f"PRODUCER_ASSERTION_CONTENT: actual value is not read from actual artifact in {assertion_id!r}")
+        evaluated = evaluate_registered_assertion(assertion_type, authority_value, actual_value, assertion["comparison"])
+        if evaluated is None:
+            raise BundleBuildError(f"PRODUCER_ASSERTION_EVALUATOR: assertion {assertion_id!r} has no independent evaluator")
+        expected_status = "passed" if evaluated else "failed"
+        if assertion["status"] != expected_status:
+            raise BundleBuildError(f"PRODUCER_ASSERTION_STATUS: assertion {assertion_id!r} status is not independently recomputed")
+        _validate_producer_support(
+            support_value,
+            assertion_id=assertion_id,
+            case_id=case_id,
+            actual_value=actual_value,
+            target=assertion["target"],
+            label=f"assertion {assertion_id} supportingArtifact",
+        )
+
+    if set(case_by_id) != referenced_cases:
+        raise BundleBuildError("PRODUCER_CASE_ASSERTION_COVERAGE: every producer case must be represented by a typed assertion")
 
 
 def _normalise_stream(value: str, empty_label: str) -> str:
@@ -424,7 +563,13 @@ def build_bundle(
         raise BundleBuildError("qualification Evidence schema is not Draft 2020-12")
 
     output = output.resolve()
-    if output == ROOT or (ROOT in output.parents and not allow_repository_output):
+    # Bundles are normally written beneath the checkout (for example
+    # ``qualification/<source-sha>``).  Reject only the checkout itself or an
+    # ancestor that would make the whole repository the bundle; descendants
+    # are the intended local/CI output location.  Keep the compatibility flag
+    # for existing isolated fixture tests that deliberately use a repository
+    # child as their output.
+    if (output == ROOT or output in ROOT.parents) and not allow_repository_output:
         raise BundleBuildError("bundle output must not be the repository root or a repository ancestor")
     if output.exists() and any(output.iterdir()):
         raise BundleBuildError(f"refusing to overwrite a non-empty bundle directory: {output}")
@@ -692,6 +837,14 @@ def build_bundle(
 
     evidence_ids = sorted(str(item["evidenceId"]) for item in reports)
     issue_numbers = sorted(int(item) for item in contract["scope"]["issueNumbers"])
+    production_contract = contract_path.resolve() == CONTRACT_PATH.resolve()
+    target_issue_numbers = contract.get("targetIssueNumbers")
+    barrier_coverage = contract.get("barrierCoverage")
+    if production_contract:
+        if target_issue_numbers != list(range(87, 106)) + list(range(108, 114)):
+            raise BundleBuildError("qualification contract targetIssueNumbers are not #87-#105 and #108-#113")
+        if not isinstance(barrier_coverage, dict):
+            raise BundleBuildError("qualification contract barrierCoverage is missing")
     manifest: dict[str, Any] = {
         "schema": "fdir/qualification-bundle-manifest",
         "version": VERSION,
@@ -704,6 +857,9 @@ def build_bundle(
         "evidenceIds": evidence_ids,
         "issueNumbers": issue_numbers,
     }
+    if production_contract:
+        manifest["targetIssueNumbers"] = list(target_issue_numbers)
+        manifest["barrierCoverage"] = barrier_coverage
     manifest["manifestDigest"] = sha256_bytes(canonical_json({key: value for key, value in manifest.items() if key != "manifestDigest"}))
     write_json(output / "manifest.json", manifest)
     result = dict(manifest)

@@ -3,6 +3,19 @@
   "version": "1.0.0",
   "repository": "horiyamayoh/fdir",
   "evidenceSchema": "schemas/qualification-evidence.schema.json",
+  "targetIssueNumbers": [87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 108, 109, 110, 111, 112, 113],
+  "recoveryChildIssueNumbers": [88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105],
+  "barrierIssueNumbers": [87, 108, 109, 110, 111, 112, 113],
+  "barrierCoverage": {
+    "issue-88-qualification-contract": {
+      "role": "integrity-report",
+      "issueNumbers": [108, 109, 110, 111, 112, 113]
+    },
+    "issue-105-release-quality": {
+      "role": "final-release-report",
+      "issueNumbers": [87, 108, 109, 110, 111, 112, 113]
+    }
+  },
   "scope": {
     "issueNumbers": [88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105],
     "requiredEvidenceIds": [
@@ -45,7 +58,7 @@
     "dependencyLockBasis": "fdir-qualification-dependencies-v1"
   },
   "ciPolicy": {
-    "allowedProviders": ["github-actions", "local"],
+    "allowedProviders": ["github-actions"],
     "releaseStatus": "completed",
     "githubActionsRunUrlPattern": "https://github.com/<repository>/actions/runs/<run-id>",
     "localRunUrlPrefix": "local://"
@@ -169,6 +182,28 @@
         "diagnostic",
         "supportingArtifact"
       ],
+      "behavioralIssueNumbers": [91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105],
+      "requiredBehavioralRequirementFields": [
+        "evidenceId",
+        "requirementId",
+        "producer",
+        "requiredAssertionIds",
+        "requiredCases",
+        "requiredCaseClasses",
+        "minimumIndependenceGrade",
+        "requiredEvaluator",
+        "reports"
+      ],
+      "requiredReportDeclarationFields": [
+        "reportId",
+        "path",
+        "bundlePath",
+        "outputRole",
+        "reportKind",
+        "schema",
+        "schemaVersion"
+      ],
+      "behavioralOutputPolicy": "issue-specific-behavioral-only",
       "requiredOutputRoles": "behavioral-report-only",
       "sourceSnapshotOutputRoles": [
         "source",

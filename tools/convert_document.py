@@ -19,6 +19,7 @@ import importlib
 import inspect
 import json
 from pathlib import Path
+import re
 import sys
 import time
 from typing import Any
@@ -46,6 +47,26 @@ ADAPTERS = {
     "markdown": "adapter_markdown",
 }
 EXTENSIONS = {".docx": "docx", ".xlsx": "xlsx", ".pdf": "pdf", ".md": "markdown", ".markdown": "markdown"}
+
+
+def stable_path_label(path: Path) -> str:
+    """Return a repository-relative path label for published evidence."""
+
+    resolved = Path(path).resolve()
+    try:
+        return resolved.relative_to(ROOT.resolve()).as_posix() or "."
+    except ValueError:
+        return f"<external>/{resolved.name}"
+
+
+def redact_runtime_text(value: Any) -> str:
+    """Keep adapter diagnostics portable and free of local absolute paths."""
+
+    text = str(value)
+    root = str(ROOT.resolve())
+    for variant in {root, root.replace("\\", "/")}:
+        text = text.replace(variant, "<repo>")
+    return re.sub(r"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/])[^\r\n\s]+", "<absolute-path>", text)
 
 
 def detect_format(path: Path, explicit: str | None = None) -> str:
@@ -112,7 +133,7 @@ def convert_path(path: Path, format_name: str | None = None, limits: AdapterLimi
         outcome = "failed" if document.get("conversion", {}).get("status") == "failed" else "success"
     except Exception as exc:  # adapter boundary must return an explicit failed result
         version = {"docx": "ECMA-376", "xlsx": "Office Open XML", "pdf": "1.7", "markdown": "commonmark"}[detected]
-        document = failed_document(path, detected, version, f"DFIR-{detected.upper()}-ADAPTER-FAILED", str(exc))
+        document = failed_document(path, detected, version, f"DFIR-{detected.upper()}-ADAPTER-FAILED", redact_runtime_text(exc))
         validate_document(document)
         outcome = "failed"
     input_bytes: int | None = None
@@ -131,7 +152,7 @@ def convert_path(path: Path, format_name: str | None = None, limits: AdapterLimi
         "schema": "fdir/adapter-execution-evidence",
         "version": "1.0.0",
         "input": {
-            "path": str(path.resolve()),
+            "path": stable_path_label(path),
             "format": detected,
             "bytes": input_bytes,
             "sha256": input_hash,
@@ -221,7 +242,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.evidence:
         args.evidence.parent.mkdir(parents=True, exist_ok=True)
         args.evidence.write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps({"status": evidence["outcome"], "format": evidence["input"]["format"], "output": str(args.out), "evidence": str(args.evidence) if args.evidence else None}, ensure_ascii=False))
+    print(json.dumps({"status": evidence["outcome"], "format": evidence["input"]["format"], "output": stable_path_label(args.out), "evidence": stable_path_label(args.evidence) if args.evidence else None}, ensure_ascii=False))
     return 0 if evidence["outcome"] == "success" else 2
 
 

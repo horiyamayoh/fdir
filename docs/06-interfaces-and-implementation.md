@@ -59,7 +59,7 @@ Query は index が利用できる場合でも canonical IR の entity と一致
 | observation-worker | renderer/OCR observation | adapter-contract | source fact mutation |
 | form-validation | schema/invariant/compatibility checks | form-core、form-canonical | qualification bureaucracy as product model |
 | form-index | rebuildable query projection | form-core | canonical authority mutation |
-| form-cli | inspect/convert/validate/query/export | public modules | direct vendor-specific bypass |
+| form-cli | inspect/convert/validate の bounded entry point | public modules | direct vendor-specific bypass |
 | test-support | fixtures、golden IR、malformed input harness | public contracts | hidden source-byte oracle |
 
 ## 6.4 Parser dependency boundary
@@ -75,32 +75,28 @@ Query は index が利用できる場合でも canonical IR の entity と一致
 
 Renderer/OCR は source-declared structure と同格の権威ではありません。結果は Observation として対象 page/surface/node に関連づけ、engine、version、settings、resource、method、status、precision を記録します。複数 engine の不一致は一つの真値へ平均せず、複数 observation と Diagnostic にします。
 
-## 6.6 CLI / API
+## 6.6 現在の実行可能 CLI
 
-初期 CLI は次の bounded command に限定します。
+リポジトリで現在実行できる bounded CLI entry point は `tools/convert_document.py` の次の command に限定されます。`--format` を省略した場合は入力拡張子から推定し、指定する場合は `docx`、`xlsx`、`pdf`、`markdown` のいずれかです。
 
 ~~~text
-fdir inspect <input>
-fdir convert <input> --format <kind> --out <document-form.json>
-fdir validate <document-form.json>
-fdir query <document-form.json> --kind paragraph
-fdir explain <document-form.json> --node <id>
-fdir export <document-form.json> --target json|markdown|html
+python tools/convert_document.py inspect <input> [--format <kind>] [--profile <id>]
+python tools/convert_document.py convert <input> --out <document-form.json> [--format <kind>] [--profile <id>] [--evidence <execution.json>]
+python tools/convert_document.py validate <document-form.json>
 ~~~
+
+`convert` の wrapper 出力は `status` に `success` または `failed` を使います。生成された IR の `conversion.status` は complete、complete-with-warnings、partial、failed、`validate` の出力 status は valid です。これらは entity/feature の status vocabulary とは別です。
 
 ## 6.7 Executable adapter entry point
 
 The repository contains a bounded reference entry point at
 `tools/convert_document.py`. It has paths for DOCX, XLSX, PDF, and Markdown
-inputs, emits Document Form IR plus an external execution-evidence sidecar,
-and is intended to fail closed on malformed input or configured resource
-limits:
+inputs, emits Document Form IR and can emit an external execution-evidence
+sidecar when requested, and is intended to fail closed on malformed input or
+configured resource limits:
 
-~~~text
-python tools/convert_document.py inspect <input>
-python tools/convert_document.py convert <input> --out <document-form.json> --evidence <execution.json>
-python tools/convert_document.py validate <document-form.json>
-~~~
+The exact command forms are listed in 6.6; this section describes their
+bounded adapter boundary and output semantics.
 
 `tools/run_e2e.py --all` generates bounded real-input cases, invokes that
 public entry point in child processes, and checks source-derived content,

@@ -1,41 +1,1676 @@
 {
-  "schema": "fdir/document-form-extension-registry",
-  "version": "1.0.0",
-  "entries": [
-    {"namespace":"urn:fdir:format:docx","format":"docx","type":"numbering","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:docx-numbering","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/docx-numbering","targetCollections":["nodes"],"targetKinds":["paragraph"],"criticality":"non-critical","semanticRequiredFields":["numId","ilvl"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"docx-numbering-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:docx","format":"docx","type":"drawing","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:docx-drawing","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/docx-drawing","targetCollections":["nodes"],"targetKinds":["shape","textBox","connector","image","chart"],"criticality":"non-critical","semanticRequiredFields":["kind","anchor","extentEmu","transform"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"docx-drawing-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:docx","format":"docx","type":"connector-target","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:docx-connector-target","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/docx-connector-target","targetCollections":["nodes"],"targetKinds":["connector"],"criticality":"non-critical","semanticRequiredFields":["endpoint","sourceId"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[{"pointer":"/sourceId","targetCollections":["nodes"],"targetKinds":["paragraph","shape","textBox","connector","image","chart"],"required":true}],"query":{"exposed":true,"paths":["/payload/sourceId"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"docx-connector-target-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:docx","format":"docx","type":"revision","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:docx-revision","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/docx-revision","targetCollections":["nodes"],"targetKinds":["run","paragraph","table","cell"],"criticality":"non-critical","semanticRequiredFields":["kind","author","revisionId","range"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"docx-revision-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:docx","format":"docx","type":"annotation-body","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:docx-annotation-body","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/docx-annotation-body","targetCollections":["nodes"],"targetKinds":["document"],"criticality":"non-critical","semanticRequiredFields":["part","id","body","status","sourceLocator"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"docx-annotation-body-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:docx","format":"docx","type":"field-sequence","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:docx-field-sequence","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/docx-field-sequence","targetCollections":["nodes"],"targetKinds":["field"],"criticality":"non-critical","semanticRequiredFields":["depth","events"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload/depth","/payload/events"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"docx-field-sequence-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:docx","format":"docx","type":"section-page-properties","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:docx-section-page-properties","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/docx-section-page-properties","targetCollections":["nodes"],"targetKinds":["section"],"criticality":"non-critical","semanticRequiredFields":["pageProperties"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload/pageProperties"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"docx-section-page-properties-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:docx","format":"docx","type":"drawingml-callout","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:docx-callout","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/docx-drawingml-callout","targetCollections":["nodes"],"targetKinds":["shape","textBox"],"criticality":"non-critical","semanticRequiredFields":["presetGeometry"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","readOnly":true,"readOnlyReason":"example and legacy fixture fact; the bounded DOCX adapter has no callout emission site","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"docx-drawingml-callout-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:xlsx","format":"xlsx","type":"table-definition","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:xlsx-table-definition","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/xlsx-table-definition","targetCollections":["nodes"],"targetKinds":["section"],"criticality":"non-critical","semanticRequiredFields":["path","name","range"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"xlsx-table-definition-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:xlsx","format":"xlsx","type":"conditional-formatting","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:xlsx-conditional-formatting","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/xlsx-conditional-formatting","targetCollections":["nodes"],"targetKinds":["section"],"criticality":"non-critical","semanticRequiredFields":["range","rules"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"xlsx-conditional-formatting-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:xlsx","format":"xlsx","type":"rich-text","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:xlsx-rich-text","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/xlsx-rich-text","targetCollections":["nodes"],"targetKinds":["cell"],"criticality":"non-critical","semanticRequiredFields":["runs"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"xlsx-rich-text-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:xlsx","format":"xlsx","type":"view","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:xlsx-view","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/xlsx-view","targetCollections":["nodes"],"targetKinds":["section"],"criticality":"non-critical","semanticRequiredFields":["viewId","pane","selection"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"xlsx-view-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:xlsx","format":"xlsx","type":"data-validation","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:xlsx-data-validation","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/xlsx-data-validation","targetCollections":["nodes"],"targetKinds":["section"],"criticality":"non-critical","semanticRequiredFields":["range","type","operator","formulas"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"xlsx-data-validation-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:xlsx","format":"xlsx","type":"defined-name","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:xlsx-defined-name","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/xlsx-defined-name","targetCollections":["nodes"],"targetKinds":["section"],"criticality":"non-critical","semanticRequiredFields":["name","localSheetId","hidden","formula"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"xlsx-defined-name-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:pdf","format":"pdf","type":"glyph-provenance","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:pdf-glyph-provenance","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/pdf-glyph-provenance","targetCollections":["nodes"],"targetKinds":["glyph"],"criticality":"non-critical","semanticRequiredFields":["characterCode","glyphName","unicode","mappingStatus","fontResource","fontObject","mappingSource","mappingCoverage","sourceLocator","sourceLocatorStatus","provenance"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"pdf-glyph-provenance-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:pdf","format":"pdf","type":"font-cmap","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:pdf-font-cmap","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/pdf-font-cmap","targetCollections":["nodes"],"targetKinds":["document"],"criticality":"non-critical","semanticRequiredFields":["fontObject","mappingStatus","mappings","sourceLocator","provenance"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"pdf-font-cmap-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:pdf","format":"pdf","type":"graphics-state","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:pdf-graphics-state","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/pdf-graphics-state","targetCollections":["nodes"],"targetKinds":["section"],"criticality":"non-critical","semanticRequiredFields":["page","operator","operands","state"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"pdf-graphics-state-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:markdown","format":"markdown","type":"authoring-facts","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:markdown-authoring-facts","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/markdown-authoring-facts","targetCollections":["nodes"],"targetKinds":["run"],"criticality":"non-critical","semanticRequiredFields":["delimiter","delimiters","escaping","lineBreak","referenceStyle"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"markdown-authoring-facts-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:markdown","format":"markdown","type":"raw-html","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:markdown-raw-html","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/markdown-source","targetCollections":["nodes"],"targetKinds":["run"],"criticality":"non-critical","semanticRequiredFields":["source"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload/source"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"markdown-raw-html-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:markdown","format":"markdown","type":"entity-or-escaping","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:markdown-entity-or-escaping","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/markdown-source","targetCollections":["nodes"],"targetKinds":["run"],"criticality":"non-critical","semanticRequiredFields":["source"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload/source"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"markdown-entity-or-escaping-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:markdown","format":"markdown","type":"table-authoring","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:markdown-table-authoring","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/markdown-table-authoring","targetCollections":["nodes"],"targetKinds":["table"],"criticality":"non-critical","semanticRequiredFields":["delimiter","alignment"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"markdown-table-authoring-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:markdown","format":"markdown","type":"unsupported-directive","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:markdown-unsupported-directive","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/markdown-unsupported-directive","targetCollections":["nodes"],"targetKinds":["paragraph"],"criticality":"non-critical","semanticRequiredFields":["opening","body"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"markdown-unsupported-directive-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:markdown","format":"markdown","type":"code-block","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:markdown-code-block","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/markdown-code-block","targetCollections":["nodes"],"targetKinds":["paragraph"],"criticality":"non-critical","semanticRequiredFields":["fence","language","content"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"markdown-code-block-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:markdown","format":"markdown","type":"heading-authoring","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:markdown-heading-authoring","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/markdown-heading-authoring","targetCollections":["nodes"],"targetKinds":["heading"],"criticality":"non-critical","semanticRequiredFields":["level","marker"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"markdown-heading-authoring-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:markdown","format":"markdown","type":"thematic-break-authoring","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:markdown-thematic-break-authoring","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/markdown-thematic-break-authoring","targetCollections":["nodes"],"targetKinds":["thematicBreak"],"criticality":"non-critical","semanticRequiredFields":["marker","count","leadingWhitespace"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"markdown-thematic-break-authoring-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:markdown","format":"markdown","type":"reference-definition","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:markdown-reference-definition","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/markdown-reference-definition","targetCollections":["nodes"],"targetKinds":["document"],"criticality":"non-critical","semanticRequiredFields":["label","destination","title"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"markdown-reference-definition-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:markdown","format":"markdown","type":"list-marker","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:markdown-list-marker","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/markdown-list-marker","targetCollections":["nodes"],"targetKinds":["paragraph"],"criticality":"non-critical","semanticRequiredFields":["marker","level"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"markdown-list-marker-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:markdown","format":"markdown","type":"blockquote","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:markdown-blockquote","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/markdown-blockquote","targetCollections":["nodes"],"targetKinds":["paragraph"],"criticality":"non-critical","semanticRequiredFields":["marker"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","readOnly":true,"readOnlyReason":"the bounded Markdown parser preserves blockquote structure but has no blockquote extension emission site","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"markdown-blockquote-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}},
-    {"namespace":"urn:fdir:format:markdown","format":"markdown","type":"front-matter","schemaVersion":"1.0.0","schemaId":"urn:fdir:schema:markdown-front-matter","schemaPath":"schemas/extensions/format-extensions.schema.json#/$defs/markdown-front-matter","targetCollections":["nodes"],"targetKinds":["document"],"criticality":"non-critical","semanticRequiredFields":["entries"],"schemaDigest":"042c1902052fe7a125d2a69c17209e5ff28bc212e7c4f5eb8294053c3a80aa4a","versionRange":{"current":"1.0.0","policy":"patch-compatible-minor-migratable-major-migration-required"},"consumerCapabilities":["typed-payload","query","canonicalization","migration"],"payloadReferences":[],"query":{"exposed":true,"paths":["/payload"]},"canonicalization":{"ordering":"registry-key","normalization":"canonical-json"},"migration":{"forward":"receipt-required","ruleId":"markdown-front-matter-1.0.0-forward"},"downgrade":{"policy":"reject-or-loss-receipt","receiptRequired":true},"unknownFieldPolicy":{"critical":"reject","nonCritical":"opaque-and-diagnose"}}
-  ],
-  "unknownPolicy": {"critical":"reject-or-partial","nonCritical":"opaque-and-diagnose","completeClaim":"forbidden"},
-  "compatibility": {
-    "patch": {"policy":"accept-if-schema-digest-compatible","sameRequiredVocabulary":true,"requiresSchemaDigest":true},
-    "minor": {"policy":"accept-with-capability-or-migrate","additiveOptionalOnly":true,"breakingChange":"reject-or-migrate"},
-    "major": {"policy":"migration-required","receiptRequired":true,"downgrade":"reject-with-receipt"}
-  }
+    "schema":  "fdir/document-form-extension-registry",
+    "version":  "1.0.0",
+    "entries":  [
+                    {
+                        "namespace":  "urn:fdir:format:docx",
+                        "format":  "docx",
+                        "type":  "numbering",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:docx-numbering",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/docx-numbering",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "paragraph"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "numId",
+                                                       "ilvl"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "docx-numbering-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:docx",
+                        "format":  "docx",
+                        "type":  "drawing",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:docx-drawing",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/docx-drawing",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "shape",
+                                            "textBox",
+                                            "connector",
+                                            "image",
+                                            "chart"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "kind",
+                                                       "anchor",
+                                                       "extentEmu",
+                                                       "transform"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "docx-drawing-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:docx",
+                        "format":  "docx",
+                        "type":  "connector-target",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:docx-connector-target",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/docx-connector-target",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "connector"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "endpoint",
+                                                       "sourceId"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+                                                  {
+                                                      "pointer":  "/sourceId",
+                                                      "targetCollections":  [
+                                                                                "nodes"
+                                                                            ],
+                                                      "targetKinds":  [
+                                                                          "paragraph",
+                                                                          "shape",
+                                                                          "textBox",
+                                                                          "connector",
+                                                                          "image",
+                                                                          "chart"
+                                                                      ],
+                                                      "required":  true
+                                                  }
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload/sourceId"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "docx-connector-target-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:docx",
+                        "format":  "docx",
+                        "type":  "revision",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:docx-revision",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/docx-revision",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "run",
+                                            "paragraph",
+                                            "table",
+                                            "cell"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "kind",
+                                                       "author",
+                                                       "revisionId",
+                                                       "range"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "docx-revision-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:docx",
+                        "format":  "docx",
+                        "type":  "annotation-body",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:docx-annotation-body",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/docx-annotation-body",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "document"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "part",
+                                                       "id",
+                                                       "body",
+                                                       "status",
+                                                       "sourceLocator"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "docx-annotation-body-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:docx",
+                        "format":  "docx",
+                        "type":  "field-sequence",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:docx-field-sequence",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/docx-field-sequence",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "field"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "depth",
+                                                       "events"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload/depth",
+                                                    "/payload/events"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "docx-field-sequence-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:docx",
+                        "format":  "docx",
+                        "type":  "section-page-properties",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:docx-section-page-properties",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/docx-section-page-properties",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "section"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "pageProperties"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload/pageProperties"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "docx-section-page-properties-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:docx",
+                        "format":  "docx",
+                        "type":  "drawingml-callout",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:docx-callout",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/docx-drawingml-callout",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "shape",
+                                            "textBox"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "presetGeometry"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "readOnly":  true,
+                        "readOnlyReason":  "example and legacy fixture fact; the bounded DOCX adapter has no callout emission site",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "docx-drawingml-callout-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:xlsx",
+                        "format":  "xlsx",
+                        "type":  "table-definition",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:xlsx-table-definition",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/xlsx-table-definition",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "section"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "path",
+                                                       "name",
+                                                       "range"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "xlsx-table-definition-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:xlsx",
+                        "format":  "xlsx",
+                        "type":  "conditional-formatting",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:xlsx-conditional-formatting",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/xlsx-conditional-formatting",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "section"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "range",
+                                                       "rules"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "xlsx-conditional-formatting-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:xlsx",
+                        "format":  "xlsx",
+                        "type":  "rich-text",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:xlsx-rich-text",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/xlsx-rich-text",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "cell"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "runs"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "xlsx-rich-text-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:xlsx",
+                        "format":  "xlsx",
+                        "type":  "view",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:xlsx-view",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/xlsx-view",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "section"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "viewId",
+                                                       "pane",
+                                                       "selection"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "xlsx-view-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:xlsx",
+                        "format":  "xlsx",
+                        "type":  "data-validation",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:xlsx-data-validation",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/xlsx-data-validation",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "section"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "range",
+                                                       "type",
+                                                       "operator",
+                                                       "formulas"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "xlsx-data-validation-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:xlsx",
+                        "format":  "xlsx",
+                        "type":  "defined-name",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:xlsx-defined-name",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/xlsx-defined-name",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "section"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "name",
+                                                       "localSheetId",
+                                                       "hidden",
+                                                       "formula"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "xlsx-defined-name-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:pdf",
+                        "format":  "pdf",
+                        "type":  "glyph-provenance",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:pdf-glyph-provenance",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/pdf-glyph-provenance",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "glyph"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "characterCode",
+                                                       "glyphName",
+                                                       "unicode",
+                                                       "mappingStatus",
+                                                       "fontResource",
+                                                       "fontObject",
+                                                       "mappingSource",
+                                                       "mappingCoverage",
+                                                       "sourceLocator",
+                                                       "sourceLocatorStatus",
+                                                       "provenance"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "pdf-glyph-provenance-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:pdf",
+                        "format":  "pdf",
+                        "type":  "font-cmap",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:pdf-font-cmap",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/pdf-font-cmap",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "document"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "fontObject",
+                                                       "mappingStatus",
+                                                       "mappings",
+                                                       "sourceLocator",
+                                                       "provenance"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "pdf-font-cmap-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:pdf",
+                        "format":  "pdf",
+                        "type":  "graphics-state",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:pdf-graphics-state",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/pdf-graphics-state",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "section"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "page",
+                                                       "operator",
+                                                       "operands",
+                                                       "state"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "pdf-graphics-state-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:markdown",
+                        "format":  "markdown",
+                        "type":  "authoring-facts",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:markdown-authoring-facts",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/markdown-authoring-facts",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "run"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "delimiter",
+                                                       "delimiters",
+                                                       "escaping",
+                                                       "lineBreak",
+                                                       "referenceStyle"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "markdown-authoring-facts-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:markdown",
+                        "format":  "markdown",
+                        "type":  "raw-html",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:markdown-raw-html",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/markdown-source",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "run"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "source"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload/source"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "markdown-raw-html-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:markdown",
+                        "format":  "markdown",
+                        "type":  "entity-or-escaping",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:markdown-entity-or-escaping",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/markdown-source",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "run"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "source"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload/source"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "markdown-entity-or-escaping-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:markdown",
+                        "format":  "markdown",
+                        "type":  "table-authoring",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:markdown-table-authoring",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/markdown-table-authoring",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "table"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "delimiter",
+                                                       "alignment"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "markdown-table-authoring-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:markdown",
+                        "format":  "markdown",
+                        "type":  "unsupported-directive",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:markdown-unsupported-directive",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/markdown-unsupported-directive",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "paragraph"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "opening",
+                                                       "body"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "markdown-unsupported-directive-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:markdown",
+                        "format":  "markdown",
+                        "type":  "code-block",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:markdown-code-block",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/markdown-code-block",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "paragraph"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "fence",
+                                                       "language",
+                                                       "content"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "markdown-code-block-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:markdown",
+                        "format":  "markdown",
+                        "type":  "heading-authoring",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:markdown-heading-authoring",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/markdown-heading-authoring",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "heading"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "level",
+                                                       "marker"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "markdown-heading-authoring-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:markdown",
+                        "format":  "markdown",
+                        "type":  "thematic-break-authoring",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:markdown-thematic-break-authoring",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/markdown-thematic-break-authoring",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "thematicBreak"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "marker",
+                                                       "count",
+                                                       "leadingWhitespace"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "markdown-thematic-break-authoring-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:markdown",
+                        "format":  "markdown",
+                        "type":  "reference-definition",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:markdown-reference-definition",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/markdown-reference-definition",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "document"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "label",
+                                                       "destination",
+                                                       "title"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "markdown-reference-definition-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:markdown",
+                        "format":  "markdown",
+                        "type":  "list-marker",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:markdown-list-marker",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/markdown-list-marker",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "paragraph"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "marker",
+                                                       "level"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "markdown-list-marker-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:markdown",
+                        "format":  "markdown",
+                        "type":  "blockquote",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:markdown-blockquote",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/markdown-blockquote",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "paragraph"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "marker"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "readOnly":  true,
+                        "readOnlyReason":  "the bounded Markdown parser preserves blockquote structure but has no blockquote extension emission site",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "markdown-blockquote-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    },
+                    {
+                        "namespace":  "urn:fdir:format:markdown",
+                        "format":  "markdown",
+                        "type":  "front-matter",
+                        "schemaVersion":  "1.0.0",
+                        "schemaId":  "urn:fdir:schema:markdown-front-matter",
+                        "schemaPath":  "schemas/extensions/format-extensions.schema.json#/$defs/markdown-front-matter",
+                        "targetCollections":  [
+                                                  "nodes"
+                                              ],
+                        "targetKinds":  [
+                                            "document"
+                                        ],
+                        "criticality":  "non-critical",
+                        "semanticRequiredFields":  [
+                                                       "entries"
+                                                   ],
+                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "versionRange":  {
+                                             "current":  "1.0.0",
+                                             "policy":  "patch-compatible-minor-migratable-major-migration-required"
+                                         },
+                        "consumerCapabilities":  [
+                                                     "typed-payload",
+                                                     "query",
+                                                     "canonicalization",
+                                                     "migration"
+                                                 ],
+                        "payloadReferences":  [
+
+                                              ],
+                        "query":  {
+                                      "exposed":  true,
+                                      "paths":  [
+                                                    "/payload"
+                                                ]
+                                  },
+                        "canonicalization":  {
+                                                 "ordering":  "registry-key",
+                                                 "normalization":  "canonical-json"
+                                             },
+                        "migration":  {
+                                          "forward":  "receipt-required",
+                                          "ruleId":  "markdown-front-matter-1.0.0-forward"
+                                      },
+                        "downgrade":  {
+                                          "policy":  "reject-or-loss-receipt",
+                                          "receiptRequired":  true
+                                      },
+                        "unknownFieldPolicy":  {
+                                                   "critical":  "reject",
+                                                   "nonCritical":  "opaque-and-diagnose"
+                                               }
+                    }
+                ],
+    "unknownPolicy":  {
+                          "critical":  "reject-or-partial",
+                          "nonCritical":  "opaque-and-diagnose",
+                          "completeClaim":  "forbidden"
+                      },
+    "compatibility":  {
+                          "patch":  {
+                                        "policy":  "accept-if-schema-digest-compatible",
+                                        "sameRequiredVocabulary":  true,
+                                        "requiresSchemaDigest":  true
+                                    },
+                          "minor":  {
+                                        "policy":  "accept-with-capability-or-migrate",
+                                        "additiveOptionalOnly":  true,
+                                        "breakingChange":  "reject-or-migrate"
+                                    },
+                          "major":  {
+                                        "policy":  "migration-required",
+                                        "receiptRequired":  true,
+                                        "downgrade":  "reject-with-receipt"
+                                    }
+                      }
 }

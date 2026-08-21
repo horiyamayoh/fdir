@@ -76,7 +76,7 @@ ConversionResult {
 }
 ~~~
 
-input_handle は adapter 境界の外側で管理される opaque handle です。adapter が raw_bytes を結果へコピーする contract は作りません。parser が認識できない部分は unsupported、入力が壊れて読めない部分は failed または unavailable として report に記録します。
+input_handle は adapter 境界の外側で管理される opaque handle です。adapter が raw_bytes を結果へコピーする contract は作りません。parser が認識できない部分は entity/feature status を unsupported、入力が壊れて読めない場合は failed、条件不足で観測できない場合は unavailable として report に記録します。ConversionReport.status は別に complete、complete-with-warnings、partial、failed を使います。
 
 ## 2.6 隔離境界
 

@@ -62,6 +62,22 @@ def _orchestration_probe(failing_command: str) -> int:
     original_audit = getattr(release_gate, "check_audit_recovery_release_boundary", None)
     original_clean_room = getattr(release_gate, "check_clean_room_replay", None)
     original_bundle_check = release_gate.check_qualification_bundle
+    original_attestation_validator = release_gate.validate_attestation
+    original_check_functions = {
+        name: getattr(release_gate, name)
+        for name in (
+            "check_clean_tree",
+            "check_ci_binding",
+            "check_design_catalog",
+            "check_phase2_contracts",
+            "check_release_claims",
+            "check_traceability",
+            "check_schema",
+            "check_examples",
+            "check_real_input_e2e_assets",
+            "check_documents",
+        )
+    }
     try:
         import validate_qualification_bundle as bundle_validator  # type: ignore
     except ImportError:  # pragma: no cover
@@ -92,7 +108,18 @@ def _orchestration_probe(failing_command: str) -> int:
 
     release_gate.run_command = fake_run_command  # type: ignore[assignment]
     release_gate.check_runtime_evidence = fake_runtime  # type: ignore[assignment]
-    release_gate.check_qualification_bundle = lambda _: {"bundle_evidence": 1, "bundle_named_reports": 1, "bundle_semantic_assertions": 1}  # type: ignore[assignment]
+    release_gate.check_qualification_bundle = lambda *_, **__: {"bundle_evidence": 1, "bundle_named_reports": 1, "bundle_semantic_assertions": 1}  # type: ignore[assignment]
+    # The probe must reach the real release-gate aggregation logic.  Supply a
+    # disposable external-authority result and successful structural checks so
+    # the injected design_validation failure is the only failing check.  This
+    # affects only this isolated defect profile; production release_gate still
+    # validates the real bundle, attestation, CI, and issue state.
+    release_gate.validate_attestation = lambda *_, **__: {  # type: ignore[assignment]
+        "snapshot": {"snapshotDigest": "0" * 64},
+        "attestationDigest": "0" * 64,
+    }
+    for name in original_check_functions:
+        setattr(release_gate, name, lambda *_, **__: {"probe": "passed"})
     bundle_validator.validate_bundle = lambda *_, **__: {"status": "passed"}  # type: ignore[assignment]
     if original_audit is not None:
         release_gate.check_audit_recovery_release_boundary = lambda **_: {"recovery_children": 18, "umbrella_issue": 87}  # type: ignore[assignment]
@@ -107,12 +134,26 @@ def _orchestration_probe(failing_command: str) -> int:
         # when no release authority is supplied.  A disposable bundle path
         # selects the real orchestration path without making this probe a
         # release claim; bundle validation fails closed at the end.
-        result = int(release_gate.main(["--bundle", str(directory / "synthetic-bundle.json")]))
+        attestation = directory / "synthetic-attestation.json"
+        attestation.write_text("{}\n", encoding="utf-8")
+        result = int(
+            release_gate.main(
+                [
+                    "--bundle",
+                    str(directory / "synthetic-bundle.json"),
+                    "--attestation",
+                    str(attestation),
+                ]
+            )
+        )
         return 0 if result != 0 else 1
     finally:
         release_gate.run_command = original_run_command  # type: ignore[assignment]
         release_gate.check_runtime_evidence = original_runtime  # type: ignore[assignment]
         release_gate.check_qualification_bundle = original_bundle_check  # type: ignore[assignment]
+        release_gate.validate_attestation = original_attestation_validator  # type: ignore[assignment]
+        for name, function in original_check_functions.items():
+            setattr(release_gate, name, function)
         bundle_validator.validate_bundle = original_bundle_validator  # type: ignore[assignment]
         if original_audit is not None:
             release_gate.check_audit_recovery_release_boundary = original_audit  # type: ignore[assignment]

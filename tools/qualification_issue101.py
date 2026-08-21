@@ -1123,7 +1123,17 @@ def _pymupdf_differential(fixture_results: list[dict[str, Any]], input_paths: di
     try:
         import fitz  # type: ignore
     except Exception as exc:  # pragma: no cover - environment dependent.
-        return {"status": "failed", "parser": "PyMuPDF", "available": False, "reason": str(exc), "observations": []}
+        # This is a qualification predicate, not a declaration about the
+        # intended parser.  Without an importable secondary parser there is no
+        # independent observation in this run, so do not claim independence.
+        return {
+            "status": "failed",
+            "parser": "PyMuPDF",
+            "available": False,
+            "independentFromAdapter": False,
+            "reason": str(exc),
+            "observations": [],
+        }
     for result in fixture_results:
         path = input_paths[result["fixtureId"]]
         try:
@@ -1221,7 +1231,7 @@ def _requirements(corpus: dict[str, Any], fixture_results: list[dict[str, Any]],
         {"id": "PDF-101-FABRICATION", "status": "passed" if fabricated == 0 else "failed", "evidence": {"fabricatedPreservedCount": fabricated}},
         {"id": "PDF-101-NEGATIVE-DEFECTS", "status": "passed" if negative_failures == 0 else "failed", "evidence": {"undetectedDefectCount": negative_failures}},
         {"id": "PDF-101-REAL-PRODUCERS", "status": "passed" if not required_producer_failures else "failed", "evidence": {"unavailableProducerIds": [item["producerId"] for item in required_producer_failures]}},
-        {"id": "PDF-101-MULTI-PARSER-RENDERER", "status": "passed" if differential.get("status") == "passed" and corpus["bindings"].get("rendererStatus") == "available" else "failed", "evidence": {"differentialStatus": differential.get("status"), "rendererStatus": corpus["bindings"].get("rendererStatus")}},
+        {"id": "PDF-101-MULTI-PARSER-RENDERER", "status": "passed" if differential.get("status") == "passed" and differential.get("independentFromAdapter") is True and corpus["bindings"].get("rendererStatus") == "available" else "failed", "evidence": {"differentialStatus": differential.get("status"), "independentFromAdapter": differential.get("independentFromAdapter"), "rendererStatus": corpus["bindings"].get("rendererStatus")}},
         {"id": "PDF-101-EXACT-SHA", "status": "passed" if source_sha and bindings["sourceTreeClean"] else "failed", "evidence": {"sourceSha": source_sha, "sourceTreeClean": bindings["sourceTreeClean"]}},
         {"id": "PDF-101-EVIDENCE-BUNDLE", "status": "passed" if bindings["evidenceBundle"]["status"] == "passed" else "failed", "evidence": bindings["evidenceBundle"]},
         {"id": "PDF-101-CI-BINDING", "status": "passed" if bindings["ci"]["status"] == "passed" else "failed", "evidence": bindings["ci"]},

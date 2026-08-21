@@ -9,12 +9,12 @@
     "deterministic": true
   },
   "sourceDigestAlgorithm": "sha256(canonical-json(sources))",
-  "sourceDigest": "b2fd731e9919204bd10aa44d44c02481d0a731c16ca891af018ad41fae1d9a77",
+  "sourceDigest": "125c77ca4014af95e1179fac84b18d5835fc3490e0bf576250f76a459d7ae0ee",
   "sources": [
     {
       "role": "schema",
       "path": "schemas/document-form-ir.schema.json",
-      "sha256": "1a74ba673be236ec2428b54a4e82688f6192d94b395a7bc090a499e31bdd4b76"
+      "sha256": "d60b6afc8a793a8bd2fafe2991e36e6ceb1c6b924b586bddea94a7d9bb69a04e"
     },
     {
       "role": "referenceRegistry",
@@ -410,6 +410,21 @@
   "definitions": [
     {
       "name": "id",
+      "collection": null,
+      "idField": null,
+      "kind": {
+        "field": null,
+        "values": null,
+        "closed": false,
+        "policy": "not-defined"
+      },
+      "required": [],
+      "additionalProperties": true,
+      "fields": [],
+      "variants": []
+    },
+    {
+      "name": "nonEmptyString",
       "collection": null,
       "idField": null,
       "kind": {
@@ -4403,6 +4418,578 @@
       "variants": []
     },
     {
+      "name": "annotationAction",
+      "collection": null,
+      "idField": "relationshipId",
+      "kind": {
+        "field": "kind",
+        "values": null,
+        "closed": false,
+        "policy": "schema-open-string",
+        "type": "string"
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false,
+      "fields": [
+        {
+          "name": "kind",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "target",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/nonEmptyString"
+          }
+        },
+        {
+          "name": "name",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/nonEmptyString"
+          }
+        },
+        {
+          "name": "relationshipId",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/id"
+          }
+        }
+      ],
+      "variants": [
+        {
+          "keyword": "oneOf",
+          "index": 0,
+          "when": {
+            "kind": {
+              "enum": [
+                "URI",
+                "GoTo",
+                "GoToR",
+                "JavaScript",
+                "destination",
+                "anchor",
+                "external",
+                "location"
+              ]
+            }
+          },
+          "required": [
+            "target"
+          ],
+          "forbidden": []
+        },
+        {
+          "keyword": "oneOf",
+          "index": 1,
+          "when": {
+            "kind": {
+              "const": "field"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "forbidden": []
+        },
+        {
+          "keyword": "oneOf",
+          "index": 2,
+          "when": {
+            "kind": {
+              "const": "relationship"
+            }
+          },
+          "required": [
+            "relationshipId"
+          ],
+          "forbidden": []
+        },
+        {
+          "keyword": "oneOf",
+          "index": 3,
+          "when": {},
+          "required": [
+            "kind",
+            "target"
+          ],
+          "forbidden": [
+            "kind"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "annotationGeometry",
+      "collection": null,
+      "idField": null,
+      "kind": {
+        "field": null,
+        "values": null,
+        "closed": false,
+        "policy": "not-defined"
+      },
+      "required": [],
+      "additionalProperties": false,
+      "fields": [
+        {
+          "name": "rect",
+          "required": false,
+          "schema": {
+            "type": "array",
+            "items": {
+              "ref": "#/$defs/decimal"
+            },
+            "minItems": 4,
+            "maxItems": 4
+          }
+        },
+        {
+          "name": "quadPoints",
+          "required": false,
+          "schema": {
+            "type": "array",
+            "items": {
+              "ref": "#/$defs/decimal"
+            },
+            "minItems": 8,
+            "maxItems": 8
+          }
+        },
+        {
+          "name": "cellRange",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/nonEmptyString"
+          }
+        }
+      ],
+      "variants": [
+        {
+          "keyword": "anyOf",
+          "index": 0,
+          "when": {},
+          "required": [
+            "rect"
+          ],
+          "forbidden": []
+        },
+        {
+          "keyword": "anyOf",
+          "index": 1,
+          "when": {},
+          "required": [
+            "quadPoints"
+          ],
+          "forbidden": []
+        },
+        {
+          "keyword": "anyOf",
+          "index": 2,
+          "when": {},
+          "required": [
+            "cellRange"
+          ],
+          "forbidden": []
+        }
+      ]
+    },
+    {
+      "name": "annotationAnchor",
+      "collection": null,
+      "idField": "surfaceId",
+      "kind": {
+        "field": "kind",
+        "values": [
+          "content",
+          "range",
+          "cell",
+          "page",
+          "reference",
+          "checkbox",
+          "definition"
+        ],
+        "closed": true,
+        "policy": "schema-enum",
+        "type": "string"
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false,
+      "fields": [
+        {
+          "name": "kind",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "enum": [
+              "content",
+              "range",
+              "cell",
+              "page",
+              "reference",
+              "checkbox",
+              "definition"
+            ]
+          }
+        },
+        {
+          "name": "resolved",
+          "required": false,
+          "schema": {
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "tokens",
+          "required": false,
+          "schema": {
+            "type": "array",
+            "items": {
+              "ref": "#/$defs/nonEmptyString"
+            },
+            "minItems": 1
+          }
+        },
+        {
+          "name": "start",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/nonEmptyString"
+          }
+        },
+        {
+          "name": "end",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/nonEmptyString"
+          }
+        },
+        {
+          "name": "balanced",
+          "required": false,
+          "schema": {
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "address",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/nonEmptyString"
+          }
+        },
+        {
+          "name": "surfaceId",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/id"
+          }
+        },
+        {
+          "name": "label",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/nonEmptyString"
+          }
+        },
+        {
+          "name": "checked",
+          "required": false,
+          "schema": {
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "marker",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/nonEmptyString"
+          }
+        }
+      ],
+      "variants": [
+        {
+          "keyword": "oneOf",
+          "index": 0,
+          "when": {
+            "kind": {
+              "const": "content"
+            }
+          },
+          "required": [
+            "resolved"
+          ],
+          "forbidden": [
+            "address",
+            "end",
+            "start",
+            "surfaceId"
+          ]
+        },
+        {
+          "keyword": "oneOf",
+          "index": 1,
+          "when": {
+            "kind": {
+              "const": "range"
+            }
+          },
+          "required": [
+            "start",
+            "end",
+            "balanced"
+          ],
+          "forbidden": [
+            "address",
+            "resolved",
+            "surfaceId"
+          ]
+        },
+        {
+          "keyword": "oneOf",
+          "index": 2,
+          "when": {
+            "kind": {
+              "const": "cell"
+            }
+          },
+          "required": [
+            "address",
+            "resolved"
+          ],
+          "forbidden": [
+            "end",
+            "start",
+            "surfaceId"
+          ]
+        },
+        {
+          "keyword": "oneOf",
+          "index": 3,
+          "when": {
+            "kind": {
+              "const": "page"
+            }
+          },
+          "required": [
+            "surfaceId"
+          ],
+          "forbidden": [
+            "address",
+            "end",
+            "resolved",
+            "start",
+            "tokens"
+          ]
+        },
+        {
+          "keyword": "oneOf",
+          "index": 4,
+          "when": {
+            "kind": {
+              "const": "reference"
+            }
+          },
+          "required": [
+            "label",
+            "resolved"
+          ],
+          "forbidden": [
+            "address",
+            "balanced",
+            "checked",
+            "end",
+            "marker",
+            "start",
+            "surfaceId",
+            "tokens"
+          ]
+        },
+        {
+          "keyword": "oneOf",
+          "index": 5,
+          "when": {
+            "kind": {
+              "const": "checkbox"
+            }
+          },
+          "required": [
+            "checked",
+            "marker"
+          ],
+          "forbidden": [
+            "address",
+            "balanced",
+            "end",
+            "label",
+            "resolved",
+            "start",
+            "surfaceId",
+            "tokens"
+          ]
+        },
+        {
+          "keyword": "oneOf",
+          "index": 6,
+          "when": {
+            "kind": {
+              "const": "definition"
+            }
+          },
+          "required": [
+            "label",
+            "resolved"
+          ],
+          "forbidden": [
+            "address",
+            "balanced",
+            "checked",
+            "end",
+            "marker",
+            "start",
+            "surfaceId",
+            "tokens"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "formulaExpression",
+      "collection": null,
+      "idField": null,
+      "kind": {
+        "field": null,
+        "values": null,
+        "closed": false,
+        "policy": "not-defined"
+      },
+      "required": [
+        "source",
+        "language",
+        "status"
+      ],
+      "additionalProperties": false,
+      "fields": [
+        {
+          "name": "source",
+          "required": true,
+          "schema": {
+            "ref": "#/$defs/nonEmptyString"
+          }
+        },
+        {
+          "name": "language",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "enum": [
+              "excel-a1",
+              "excel-r1c1",
+              "ooxml-formula",
+              "word-field",
+              "field-instruction"
+            ]
+          }
+        },
+        {
+          "name": "status",
+          "required": true,
+          "schema": {
+            "ref": "#/$defs/status"
+          }
+        }
+      ],
+      "variants": []
+    },
+    {
+      "name": "formulaValue",
+      "collection": null,
+      "idField": null,
+      "kind": {
+        "field": null,
+        "values": null,
+        "closed": false,
+        "policy": "not-defined"
+      },
+      "required": [],
+      "additionalProperties": true,
+      "fields": [],
+      "variants": [
+        {
+          "keyword": "allOf",
+          "index": 1,
+          "when": {},
+          "required": [],
+          "forbidden": [
+            "value"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "formulaDisplayedValue",
+      "collection": null,
+      "idField": null,
+      "kind": {
+        "field": null,
+        "values": null,
+        "closed": false,
+        "policy": "not-defined"
+      },
+      "required": [
+        "text",
+        "status"
+      ],
+      "additionalProperties": false,
+      "fields": [
+        {
+          "name": "text",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "status",
+          "required": true,
+          "schema": {
+            "ref": "#/$defs/status"
+          }
+        }
+      ],
+      "variants": [
+        {
+          "keyword": "oneOf",
+          "index": 1,
+          "when": {
+            "text": {
+              "const": ""
+            },
+            "status": {
+              "enum": [
+                "unavailable",
+                "omitted-by-policy",
+                "failed"
+              ]
+            }
+          },
+          "required": [
+            "text",
+            "status"
+          ],
+          "forbidden": []
+        }
+      ]
+    },
+    {
       "name": "formula",
       "collection": "formulas",
       "idField": "formulaId",
@@ -4488,18 +5075,7 @@
           "name": "expression",
           "required": true,
           "schema": {
-            "type": "object",
-            "properties": [
-              "source",
-              "language",
-              "status"
-            ],
-            "required": [
-              "source",
-              "language",
-              "status"
-            ],
-            "additionalProperties": false
+            "ref": "#/$defs/formulaExpression"
           }
         },
         {
@@ -4557,44 +5133,35 @@
           "name": "raw",
           "required": false,
           "schema": {
-            "ref": "#/$defs/typedValue"
+            "ref": "#/$defs/formulaValue"
           }
         },
         {
           "name": "stored",
           "required": false,
           "schema": {
-            "ref": "#/$defs/typedValue"
+            "ref": "#/$defs/formulaValue"
           }
         },
         {
           "name": "cached",
           "required": false,
           "schema": {
-            "ref": "#/$defs/typedValue"
+            "ref": "#/$defs/formulaValue"
           }
         },
         {
           "name": "computed",
           "required": false,
           "schema": {
-            "ref": "#/$defs/typedValue"
+            "ref": "#/$defs/formulaValue"
           }
         },
         {
           "name": "displayed",
           "required": false,
           "schema": {
-            "type": "object",
-            "properties": [
-              "text",
-              "status"
-            ],
-            "required": [
-              "text",
-              "status"
-            ],
-            "additionalProperties": false
+            "ref": "#/$defs/formulaDisplayedValue"
           }
         },
         {
@@ -4618,7 +5185,53 @@
           }
         }
       ],
-      "variants": []
+      "variants": [
+        {
+          "keyword": "anyOf",
+          "index": 0,
+          "when": {},
+          "required": [
+            "raw"
+          ],
+          "forbidden": []
+        },
+        {
+          "keyword": "anyOf",
+          "index": 1,
+          "when": {},
+          "required": [
+            "stored"
+          ],
+          "forbidden": []
+        },
+        {
+          "keyword": "anyOf",
+          "index": 2,
+          "when": {},
+          "required": [
+            "cached"
+          ],
+          "forbidden": []
+        },
+        {
+          "keyword": "anyOf",
+          "index": 3,
+          "when": {},
+          "required": [
+            "computed"
+          ],
+          "forbidden": []
+        },
+        {
+          "keyword": "anyOf",
+          "index": 4,
+          "when": {},
+          "required": [
+            "displayed"
+          ],
+          "forbidden": []
+        }
+      ]
     },
     {
       "name": "formulaRange",
@@ -4731,8 +5344,7 @@
               "string",
               "boolean",
               "number",
-              "null",
-              "object"
+              "null"
             ]
           }
         },
@@ -5130,21 +5742,21 @@
           "name": "action",
           "required": false,
           "schema": {
-            "type": "object"
+            "ref": "#/$defs/annotationAction"
           }
         },
         {
           "name": "geometry",
           "required": false,
           "schema": {
-            "type": "object"
+            "ref": "#/$defs/annotationGeometry"
           }
         },
         {
           "name": "anchor",
           "required": false,
           "schema": {
-            "type": "object"
+            "ref": "#/$defs/annotationAnchor"
           }
         },
         {
@@ -5718,7 +6330,7 @@
           "name": "payload",
           "required": true,
           "schema": {
-            "type": "object"
+            "ref": "#/$defs/extensionPayload"
           }
         },
         {
@@ -5755,6 +6367,1059 @@
           }
         }
       ],
+      "variants": []
+    },
+    {
+      "name": "extensionPayloadValue",
+      "collection": null,
+      "idField": null,
+      "kind": {
+        "field": null,
+        "values": null,
+        "closed": false,
+        "policy": "not-defined"
+      },
+      "required": [],
+      "additionalProperties": true,
+      "fields": [],
+      "variants": []
+    },
+    {
+      "name": "opaqueExtensionPayloadValue",
+      "collection": null,
+      "idField": null,
+      "kind": {
+        "field": null,
+        "values": null,
+        "closed": false,
+        "policy": "not-defined"
+      },
+      "required": [],
+      "additionalProperties": true,
+      "fields": [],
+      "variants": []
+    },
+    {
+      "name": "opaqueExtensionPayloadObject",
+      "collection": null,
+      "idField": null,
+      "kind": {
+        "field": null,
+        "values": null,
+        "closed": false,
+        "policy": "not-defined"
+      },
+      "required": [],
+      "additionalProperties": {
+        "$ref": "#/$defs/opaqueExtensionPayloadValue"
+      },
+      "fields": [],
+      "variants": []
+    },
+    {
+      "name": "extensionPayloadValueAllowEmpty",
+      "collection": null,
+      "idField": null,
+      "kind": {
+        "field": null,
+        "values": null,
+        "closed": false,
+        "policy": "not-defined"
+      },
+      "required": [],
+      "additionalProperties": true,
+      "fields": [],
+      "variants": []
+    },
+    {
+      "name": "extensionPayloadObject",
+      "collection": null,
+      "idField": null,
+      "kind": {
+        "field": "kind",
+        "values": null,
+        "closed": false,
+        "policy": "schema-open-string",
+        "type": null
+      },
+      "required": [],
+      "additionalProperties": false,
+      "fields": [
+        {
+          "name": "numId",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "ilvl",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "kind",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "anchor",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "extentEmu",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "transform",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "cx",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "cy",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "matrix",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "endpoint",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "sourceId",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "part",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "id",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "body",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValueAllowEmpty"
+          }
+        },
+        {
+          "name": "author",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "revisionId",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "status",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "sourceLocator",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "depth",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "events",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "pageProperties",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "pgSz",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "pgMar",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "columns",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "lineNumbering",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "w",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "h",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "orient",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "top",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "right",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "bottom",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "left",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "header",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "footer",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "gutter",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "num",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "space",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValueAllowEmpty"
+          }
+        },
+        {
+          "name": "countBy",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "presetGeometry",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "path",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "name",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "range",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "mappings",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "source",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "rules",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "runs",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "value",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValueAllowEmpty"
+          }
+        },
+        {
+          "name": "priority",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "text",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "bold",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "italic",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "underline",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "phonetic",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "viewId",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "pane",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "selection",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "xSplit",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "ySplit",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "topLeftCell",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "activePane",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "state",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "activeCell",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "sqref",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "type",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "operator",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "allowBlank",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "formulas",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "localSheetId",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValueAllowEmpty"
+          }
+        },
+        {
+          "name": "hidden",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "formula",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "rawStringBytesHex",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "rawBytes",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "characterCode",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "characterCodes",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "fontResource",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "fontObject",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "glyphIdentity",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "glyphName",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValueAllowEmpty"
+          }
+        },
+        {
+          "name": "encoding",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValueAllowEmpty"
+          }
+        },
+        {
+          "name": "unicode",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValueAllowEmpty"
+          }
+        },
+        {
+          "name": "mappingStatus",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "mappingSource",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "mappingCoverage",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "sourceLocatorStatus",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "provenance",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "page",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "operands",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "object",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "sourceCode",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "baseFont",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "mappedCharacterCodes",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "unmappedCharacterCodes",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "sourceCodes",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "rawStringBytes",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "ctm",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "lineWidth",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "lineCap",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "lineJoin",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "miterLimit",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "dashPattern",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "array",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "phase",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "renderingIntent",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "extGState",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "shading",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "fillColor",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "strokeColor",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "delimiter",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValueAllowEmpty"
+          }
+        },
+        {
+          "name": "delimiters",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "escaping",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "lineBreak",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "referenceStyle",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValueAllowEmpty"
+          }
+        },
+        {
+          "name": "referenceLabel",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValueAllowEmpty"
+          }
+        },
+        {
+          "name": "referenceDefinitionId",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValueAllowEmpty"
+          }
+        },
+        {
+          "name": "rawHtml",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "alignment",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "headerLine",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "separatorLine",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "dataRowLines",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "opening",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "closing",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "syntax",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "fence",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "language",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValueAllowEmpty"
+          }
+        },
+        {
+          "name": "content",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValueAllowEmpty"
+          }
+        },
+        {
+          "name": "level",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "marker",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "count",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "leadingWhitespace",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValueAllowEmpty"
+          }
+        },
+        {
+          "name": "label",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "destination",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "title",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValueAllowEmpty"
+          }
+        },
+        {
+          "name": "annotationId",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValueAllowEmpty"
+          }
+        },
+        {
+          "name": "definitionLine",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "entries",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "rawLines",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        },
+        {
+          "name": "key",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/extensionPayloadValue"
+          }
+        }
+      ],
+      "variants": []
+    },
+    {
+      "name": "extensionPayload",
+      "collection": null,
+      "idField": null,
+      "kind": {
+        "field": null,
+        "values": null,
+        "closed": false,
+        "policy": "not-defined"
+      },
+      "required": [],
+      "additionalProperties": true,
+      "fields": [],
       "variants": []
     },
     {
@@ -17079,9 +18744,9 @@
       "featureInventoryEntry.status",
       "featureResult.status",
       "field.status",
-      "formula.expression.status",
       "formula.status",
-      "formulaValues.displayed.status",
+      "formulaDisplayedValue.status",
+      "formulaExpression.status",
       "geometry.status",
       "layout.status",
       "node.status",
@@ -17172,7 +18837,7 @@
   },
   "coverage": {
     "registryReferenceCount": 52,
-    "schemaReferenceFieldCount": 162,
+    "schemaReferenceFieldCount": 166,
     "registryReferencePaths": [
       "annotation.targetIds",
       "coordinateSpace.parentSpaceId",
@@ -17231,8 +18896,12 @@
       "anchor.gridId",
       "anchor.nodeId",
       "anchor.surfaceId",
+      "annotation.action.relationshipId",
+      "annotation.anchor.surfaceId",
       "annotation.bodyNodeId",
       "annotation.bodyTextId",
+      "annotationAction.relationshipId",
+      "annotationAnchor.surfaceId",
       "borders.bottom.color.themeId",
       "borders.left.color.themeId",
       "borders.right.color.themeId",

@@ -3,27 +3,30 @@
   "$id": "https://github.com/horiyamayoh/fdir/schema/extensions/format-extensions/1.0.0",
   "type": "object",
   "$defs": {
-    "docx-numbering": {"type":"object","additionalProperties":false,"properties":{"numId":{"type":"string"},"ilvl":{"type":"string"}},"required":["numId","ilvl"]},
-    "docx-drawing": {"type":"object","additionalProperties":false,"properties":{"kind":{"type":"string","enum":["shape","textBox","connector","image","chart"]},"anchor":{"type":"string","enum":["inline","floating","page","paragraph"]},"extentEmu":{"type":"object","additionalProperties":false,"properties":{"cx":{"type":"string"},"cy":{"type":"string"}},"required":["cx","cy"]},"transform":{"type":"object","additionalProperties":false,"properties":{"kind":{"type":"string"},"matrix":{"type":"array","items":{"type":"string"},"minItems":6,"maxItems":6}},"required":["kind","matrix"]}},"required":["kind","anchor","extentEmu","transform"]},
-    "docx-connector-target": {"type":"object","additionalProperties":false,"properties":{"endpoint":{"type":"string","enum":["start","to"]},"sourceId":{"type":"string"}},"required":["endpoint","sourceId"]},
-    "docx-revision": {"type":"object","additionalProperties":false,"properties":{"kind":{"type":"string","enum":["insert","delete","move"]},"author":{"type":"string"},"revisionId":{"type":"string"},"range":{"type":"string"}},"required":["kind","author","revisionId","range"]},
-    "docx-annotation-body": {"type":"object","additionalProperties":false,"properties":{"part":{"type":"string"},"id":{"type":"string"},"body":{"type":"string"},"status":{"type":"string","enum":["preserved","partial","unavailable"]},"sourceLocator":{"type":"object","additionalProperties":false,"properties":{"part":{"type":"string"},"id":{"type":"string"}},"required":["part","id"]}},"required":["part","id","body","status","sourceLocator"]},
+    "nonEmptyString": {"type":"string","minLength":1},
+    "hexToken": {"type":"string","pattern":"^(?:[0-9A-Fa-f]{2})*$","maxLength":4096},
+    "nonEmptyHexToken": {"type":"string","pattern":"^(?:[0-9A-Fa-f]{2})+$","minLength":2,"maxLength":4096},
+    "docx-numbering": {"type":"object","additionalProperties":false,"properties":{"numId":{"$ref":"#/$defs/nonEmptyString"},"ilvl":{"$ref":"#/$defs/nonEmptyString"}},"required":["numId","ilvl"]},
+    "docx-drawing": {"type":"object","additionalProperties":false,"properties":{"kind":{"type":"string","enum":["shape","textBox","connector","image","chart"]},"anchor":{"type":"string","enum":["inline","floating","page","paragraph"]},"extentEmu":{"type":"object","additionalProperties":false,"properties":{"cx":{"$ref":"#/$defs/nonEmptyString"},"cy":{"$ref":"#/$defs/nonEmptyString"}},"required":["cx","cy"]},"transform":{"type":"object","additionalProperties":false,"properties":{"kind":{"$ref":"#/$defs/nonEmptyString"},"matrix":{"type":"array","items":{"$ref":"#/$defs/nonEmptyString"},"minItems":6,"maxItems":6}},"required":["kind","matrix"]}},"required":["kind","anchor","extentEmu","transform"]},
+    "docx-connector-target": {"type":"object","additionalProperties":false,"properties":{"endpoint":{"type":"string","enum":["start","to"]},"sourceId":{"$ref":"#/$defs/nonEmptyString"}},"required":["endpoint","sourceId"]},
+    "docx-revision": {"type":"object","additionalProperties":false,"properties":{"kind":{"type":"string","enum":["insert","delete","move"]},"author":{"$ref":"#/$defs/nonEmptyString"},"revisionId":{"$ref":"#/$defs/nonEmptyString"},"range":{"$ref":"#/$defs/nonEmptyString"}},"required":["kind","author","revisionId","range"]},
+    "docx-annotation-body": {"type":"object","additionalProperties":false,"properties":{"part":{"$ref":"#/$defs/nonEmptyString"},"id":{"$ref":"#/$defs/nonEmptyString"},"body":{"type":"string"},"status":{"type":"string","enum":["preserved","partial","unavailable"]},"sourceLocator":{"type":"object","additionalProperties":false,"properties":{"part":{"$ref":"#/$defs/nonEmptyString"},"id":{"$ref":"#/$defs/nonEmptyString"}},"required":["part","id"]}},"required":["part","id","body","status","sourceLocator"]},
     "docx-field-sequence": {"type":"object","additionalProperties":false,"properties":{"depth":{"type":"integer","minimum":0},"events":{"type":"array","items":{"type":"object","additionalProperties":false,"properties":{"type":{"type":"string","enum":["begin","instruction","result","separate","end"]},"depth":{"type":"integer","minimum":0},"value":{"type":"string"}},"required":["type","depth"]}}},"required":["depth","events"]},
     "docx-section-page-properties": {"type":"object","additionalProperties":false,"properties":{"pageProperties":{"type":"object","additionalProperties":false,"properties":{"pgSz":{"type":"object","additionalProperties":false,"properties":{"w":{"type":"string"},"h":{"type":"string"},"orient":{"type":"string"}},"required":["w","h","orient"]},"pgMar":{"type":"object","additionalProperties":false,"properties":{"top":{"type":"string"},"right":{"type":"string"},"bottom":{"type":"string"},"left":{"type":"string"},"header":{"type":"string"},"footer":{"type":"string"},"gutter":{"type":"string"}}},"columns":{"type":"object","additionalProperties":false,"properties":{"num":{"type":"string"},"space":{"type":"string"}},"required":["num","space"]},"lineNumbering":{"type":"object","additionalProperties":false,"properties":{"countBy":{"type":"string"}}}},"required":["pgSz","pgMar","columns","lineNumbering"]}},"required":["pageProperties"]},
-    "docx-drawingml-callout": {"type":"object","additionalProperties":false,"properties":{"presetGeometry":{"type":"string"}},"required":["presetGeometry"]},
-    "xlsx-table-definition": {"type":"object","additionalProperties":false,"properties":{"path":{"type":"string"},"name":{"type":"string"},"range":{"type":"string"}},"required":["path","name","range"]},
-    "xlsx-conditional-formatting": {"type":"object","additionalProperties":false,"properties":{"range":{"type":"string"},"rules":{"type":"array","items":{"type":"object","additionalProperties":false,"properties":{"type":{"type":"string"},"operator":{"type":"string"},"priority":{"type":"string"},"formula":{"type":"array","items":{"type":"string"}}},"required":["type","operator","priority","formula"]}}},"required":["range","rules"]},
-    "xlsx-rich-text": {"type":"object","additionalProperties":false,"properties":{"runs":{"type":"array","items":{"type":"object","additionalProperties":false,"properties":{"text":{"type":"string"},"bold":{"type":"boolean"},"italic":{"type":"boolean"},"underline":{"type":"string"},"phonetic":{"type":"string"}},"required":["text"]}},"phonetic":{"type":"array","items":{"type":"string"}}},"required":["runs"]},
-    "xlsx-view": {"type":"object","additionalProperties":false,"properties":{"viewId":{"type":"string"},"pane":{"type":"object","additionalProperties":false,"properties":{"xSplit":{"type":"string"},"ySplit":{"type":"string"},"topLeftCell":{"type":"string"},"activePane":{"type":"string"},"state":{"type":"string"}}},"selection":{"type":"array","items":{"type":"object","additionalProperties":false,"properties":{"pane":{"type":"string"},"activeCell":{"type":"string"},"sqref":{"type":"string"}},"required":["pane","activeCell","sqref"]}}},"required":["viewId","pane","selection"]},
-    "xlsx-data-validation": {"type":"object","additionalProperties":false,"properties":{"range":{"type":"string"},"type":{"type":"string"},"operator":{"type":"string"},"allowBlank":{"type":"boolean"},"formulas":{"type":"array","items":{"type":"string"}}},"required":["range","type","operator","formulas"]},
-    "xlsx-defined-name": {"type":"object","additionalProperties":false,"properties":{"name":{"type":"string"},"localSheetId":{"type":"string"},"hidden":{"type":"boolean"},"formula":{"type":"string"}},"required":["name","localSheetId","hidden","formula"]},
+    "docx-drawingml-callout": {"type":"object","additionalProperties":false,"properties":{"presetGeometry":{"$ref":"#/$defs/nonEmptyString"}},"required":["presetGeometry"]},
+    "xlsx-table-definition": {"type":"object","additionalProperties":false,"properties":{"path":{"$ref":"#/$defs/nonEmptyString"},"name":{"$ref":"#/$defs/nonEmptyString"},"range":{"$ref":"#/$defs/nonEmptyString"}},"required":["path","name","range"]},
+    "xlsx-conditional-formatting": {"type":"object","additionalProperties":false,"properties":{"range":{"$ref":"#/$defs/nonEmptyString"},"rules":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"properties":{"type":{"$ref":"#/$defs/nonEmptyString"},"operator":{"$ref":"#/$defs/nonEmptyString"},"priority":{"$ref":"#/$defs/nonEmptyString"},"formula":{"type":"array","minItems":1,"items":{"$ref":"#/$defs/nonEmptyString"}}},"required":["type","operator","priority","formula"]}}},"required":["range","rules"]},
+    "xlsx-rich-text": {"type":"object","additionalProperties":false,"properties":{"runs":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"properties":{"text":{"type":"string"},"bold":{"type":"boolean"},"italic":{"type":"boolean"},"underline":{"type":"string"},"phonetic":{"type":"string"}},"required":["text"]}},"phonetic":{"type":"array","items":{"type":"string"}}},"required":["runs"]},
+    "xlsx-view": {"type":"object","additionalProperties":false,"properties":{"viewId":{"$ref":"#/$defs/nonEmptyString"},"pane":{"type":"object","additionalProperties":false,"properties":{"xSplit":{"$ref":"#/$defs/nonEmptyString"},"ySplit":{"$ref":"#/$defs/nonEmptyString"},"topLeftCell":{"$ref":"#/$defs/nonEmptyString"},"activePane":{"$ref":"#/$defs/nonEmptyString"},"state":{"$ref":"#/$defs/nonEmptyString"}}},"selection":{"type":"array","items":{"type":"object","additionalProperties":false,"properties":{"pane":{"$ref":"#/$defs/nonEmptyString"},"activeCell":{"$ref":"#/$defs/nonEmptyString"},"sqref":{"$ref":"#/$defs/nonEmptyString"}},"required":["pane","activeCell","sqref"]}}},"required":["viewId","pane","selection"]},
+    "xlsx-data-validation": {"type":"object","additionalProperties":false,"properties":{"range":{"$ref":"#/$defs/nonEmptyString"},"type":{"$ref":"#/$defs/nonEmptyString"},"operator":{"$ref":"#/$defs/nonEmptyString"},"allowBlank":{"type":"boolean"},"formulas":{"type":"array","minItems":1,"items":{"$ref":"#/$defs/nonEmptyString"}}},"required":["range","type","operator","formulas"]},
+    "xlsx-defined-name": {"type":"object","additionalProperties":false,"properties":{"name":{"$ref":"#/$defs/nonEmptyString"},"localSheetId":{"type":"string"},"hidden":{"type":"boolean"},"formula":{"$ref":"#/$defs/nonEmptyString"}},"required":["name","localSheetId","hidden","formula"]},
     "pdf-glyph-provenance": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "rawStringBytesHex": {"type": "string", "pattern": "^[0-9A-F]*$"},
-        "characterCode": {"type": "string", "pattern": "^[0-9A-F]*$"},
-        "characterCodes": {"type": "array", "items": {"type": "string", "pattern": "^[0-9A-F]*$"}},
+        "rawStringBytesHex": {"$ref": "#/$defs/nonEmptyHexToken", "description": "A single bounded PDF text-token observation in hex; this is not a source-byte archive."},
+        "characterCode": {"$ref": "#/$defs/hexToken", "description": "The bounded character-code token for one PDF text occurrence; an empty value is permitted only for unsupported mapping status."},
+        "characterCodes": {"type": "array", "items": {"$ref": "#/$defs/nonEmptyHexToken"}},
         "fontResource": {"type": "string"},
         "fontObject": {"type": "string"},
         "glyphIdentity": {
@@ -35,7 +38,7 @@
             "fontResource": {"type": "string"},
             "fontObject": {"type": "string"},
             "baseFont": {"type": "string"},
-            "sourceCodes": {"type": "array", "items": {"type": "string", "pattern": "^[0-9A-F]*$"}},
+            "sourceCodes": {"type": "array", "items": {"$ref": "#/$defs/nonEmptyHexToken"}},
             "glyphName": {"type": "string"}
           },
           "required": ["kind", "status", "fontResource", "fontObject", "baseFont", "sourceCodes", "glyphName"]
@@ -47,15 +50,19 @@
         "mappingSource": {
           "type": "object",
           "additionalProperties": false,
-          "properties": {"kind": {"type": "string", "enum": ["ToUnicode", "unavailable"]}, "object": {"type": "string"}},
-          "required": ["kind"]
+          "properties": {"kind": {"type": "string", "enum": ["ToUnicode", "unavailable"]}, "object": {"$ref": "#/$defs/nonEmptyString"}},
+          "required": ["kind"],
+          "oneOf": [
+            {"properties": {"kind": {"const": "ToUnicode"}}, "required": ["object"]},
+            {"properties": {"kind": {"const": "unavailable"}}, "not": {"required": ["object"]}}
+          ]
         },
         "mappingCoverage": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "mappedCharacterCodes": {"type": "array", "items": {"type": "string", "pattern": "^[0-9A-F]*$"}},
-            "unmappedCharacterCodes": {"type": "array", "items": {"type": "string", "pattern": "^[0-9A-F]*$"}}
+            "mappedCharacterCodes": {"type": "array", "items": {"$ref": "#/$defs/nonEmptyHexToken"}},
+            "unmappedCharacterCodes": {"type": "array", "items": {"$ref": "#/$defs/nonEmptyHexToken"}}
           },
           "required": ["mappedCharacterCodes", "unmappedCharacterCodes"]
         },
@@ -69,24 +76,43 @@
         "provenance": {
           "type": "object",
           "additionalProperties": false,
-          "properties": {"rawStringBytes": {"type": "string"}, "characterCodes": {"type": "string"}, "glyphIdentity": {"type": "string"}, "unicode": {"type": "string"}},
+          "properties": {
+            "rawStringBytes": {"type": "string", "const": "pdf-content-stream", "description": "Provenance label only; no source bytes are stored."},
+            "characterCodes": {"type": "string", "const": "pdf-content-stream"},
+            "glyphIdentity": {"type": "string", "const": "font-resource-and-character-code"},
+            "unicode": {"type": "string", "enum": ["ToUnicode", "unavailable"]}
+          },
           "required": ["rawStringBytes", "characterCodes", "glyphIdentity", "unicode"]
         }
       },
-      "required":["characterCode", "glyphName", "unicode", "mappingStatus", "fontResource", "fontObject", "mappingSource", "mappingCoverage", "sourceLocator", "sourceLocatorStatus", "provenance"]
+      "required":["characterCode", "glyphName", "unicode", "mappingStatus", "fontResource", "fontObject", "mappingSource", "mappingCoverage", "sourceLocator", "sourceLocatorStatus", "provenance"],
+      "allOf": [
+        {
+          "if": {"properties": {"mappingStatus": {"enum": ["preserved", "approximated", "unavailable"]}}, "required": ["mappingStatus"]},
+          "then": {"properties": {"characterCode": {"$ref": "#/$defs/nonEmptyHexToken"}, "characterCodes": {"minItems": 1}, "fontResource": {"$ref": "#/$defs/nonEmptyString"}, "fontObject": {"$ref": "#/$defs/nonEmptyString"}}}
+        },
+        {
+          "if": {"properties": {"mappingStatus": {"enum": ["preserved", "approximated"]}}, "required": ["mappingStatus"]},
+          "then": {"properties": {"unicode": {"$ref": "#/$defs/nonEmptyString"}}}
+        },
+        {
+          "if": {"properties": {"mappingStatus": {"const": "preserved"}}, "required": ["mappingStatus"]},
+          "then": {"properties": {"glyphIdentity": {"required": ["sourceCodes"]}}}
+        }
+      ]
     },
-    "pdf-font-cmap": {"type":"object","additionalProperties":false,"properties":{"fontObject":{"type":"string"},"mappingStatus":{"type":"string","enum":["preserved","unavailable"]},"mappings":{"type":"array","items":{"type":"object","additionalProperties":false,"properties":{"sourceCode":{"type":"string"},"unicode":{"type":"string"}},"required":["sourceCode","unicode"]}},"sourceLocator":{"type":"object","additionalProperties":false,"properties":{"kind":{"type":"string"},"object":{"type":"integer","minimum":0}},"required":["kind"]},"provenance":{"type":"object","additionalProperties":false,"properties":{"mappingSource":{"type":"string"},"rawBytes":{"type":"string"}},"required":["mappingSource","rawBytes"]}},"required":["fontObject","mappingStatus","mappings","sourceLocator","provenance"]},
-    "pdf-graphics-state": {"type":"object","additionalProperties":false,"properties":{"page":{"type":"integer","minimum":1},"operator":{"type":"string","enum":["q","Q","cm","rg","RG","g","G","k","K","w","J","j","M","d","ri","gs","sh"]},"operands":{"type":"array","items":{"type":["string","array"]}},"state":{"type":"object","additionalProperties":false,"properties":{"ctm":{"type":"array","items":{"type":"string"},"minItems":6,"maxItems":6},"lineWidth":{"type":"string"},"lineCap":{"type":"integer","minimum":0,"maximum":2},"lineJoin":{"type":"integer","minimum":0,"maximum":2},"miterLimit":{"type":"string"},"dashPattern":{"type":"object","additionalProperties":false,"properties":{"array":{"type":"array","items":{"type":"string"}},"phase":{"type":"string"}},"required":["array","phase"]},"renderingIntent":{"type":["string","null"]},"extGState":{"type":["string","null"]},"shading":{"type":["string","null"]},"fillColor":{"type":"array","items":{"type":"string"}},"strokeColor":{"type":"array","items":{"type":"string"}}},"required":["ctm","lineWidth","lineCap","lineJoin","miterLimit","dashPattern","renderingIntent","extGState","shading","fillColor","strokeColor"]}},"required":["page","operator","operands","state"]},
+    "pdf-font-cmap": {"type":"object","additionalProperties":false,"properties":{"fontObject":{"$ref":"#/$defs/nonEmptyString"},"mappingStatus":{"type":"string","enum":["preserved","unavailable"]},"mappings":{"type":"array","items":{"type":"object","additionalProperties":false,"properties":{"sourceCode":{"$ref":"#/$defs/nonEmptyHexToken"},"unicode":{"$ref":"#/$defs/nonEmptyString"}},"required":["sourceCode","unicode"]}},"sourceLocator":{"type":"object","additionalProperties":false,"properties":{"kind":{"type":"string","const":"pdf"},"object":{"type":"integer","minimum":0}},"required":["kind"]},"provenance":{"type":"object","additionalProperties":false,"properties":{"mappingSource":{"type":"string","enum":["ToUnicode","unavailable"]},"rawBytes":{"type":"string","pattern":"^(?:pdf-cmap|pdf-tounicode-stream|unavailable)$","minLength":1,"description":"Provenance label only; no source bytes are stored."}},"required":["mappingSource","rawBytes"]}},"required":["fontObject","mappingStatus","mappings","sourceLocator","provenance"]},
+    "pdf-graphics-state": {"type":"object","additionalProperties":false,"properties":{"page":{"type":"integer","minimum":1},"operator":{"type":"string","enum":["q","Q","cm","rg","RG","g","G","k","K","w","J","j","M","d","ri","gs","sh"]},"operands":{"type":"array","items":{"type":["string","array"]}},"state":{"type":"object","additionalProperties":false,"properties":{"ctm":{"type":"array","items":{"$ref":"#/$defs/nonEmptyString"},"minItems":6,"maxItems":6},"lineWidth":{"$ref":"#/$defs/nonEmptyString"},"lineCap":{"type":"integer","minimum":0,"maximum":2},"lineJoin":{"type":"integer","minimum":0,"maximum":2},"miterLimit":{"$ref":"#/$defs/nonEmptyString"},"dashPattern":{"type":"object","additionalProperties":false,"properties":{"array":{"type":"array","items":{"type":"string"}},"phase":{"$ref":"#/$defs/nonEmptyString"}},"required":["array","phase"]},"renderingIntent":{"type":["string","null"]},"extGState":{"type":["string","null"]},"shading":{"type":["string","null"]},"fillColor":{"type":"array","items":{"$ref":"#/$defs/nonEmptyString"}},"strokeColor":{"type":"array","items":{"$ref":"#/$defs/nonEmptyString"}}},"required":["ctm","lineWidth","lineCap","lineJoin","miterLimit","dashPattern","renderingIntent","extGState","shading","fillColor","strokeColor"]}},"required":["page","operator","operands","state"]},
     "markdown-authoring-facts": {"type":"object","additionalProperties":false,"properties":{"delimiter":{"type":"string"},"delimiters":{"type":"array","items":{"type":"string"}},"escaping":{"type":"array","items":{"type":"string"}},"lineBreak":{"type":"string","enum":["soft","hard"]},"referenceStyle":{"type":"string"},"referenceLabel":{"type":"string"},"referenceDefinitionId":{"type":"string"},"rawHtml":{"type":"boolean"}},"required":["delimiter","delimiters","escaping","lineBreak","referenceStyle"]},
-    "markdown-source": {"type":"object","additionalProperties":false,"properties":{"source":{"type":"string"}},"required":["source"]},
-    "markdown-table-authoring": {"type":"object","additionalProperties":false,"properties":{"delimiter":{"type":"string"},"alignment":{"type":"array","items":{"type":"string"}},"headerLine":{"type":"integer","minimum":1},"separatorLine":{"type":"integer","minimum":1},"dataRowLines":{"type":"array","items":{"type":"integer","minimum":1}}},"required":["delimiter","alignment"]},
-    "markdown-unsupported-directive": {"type":"object","additionalProperties":false,"properties":{"opening":{"type":"string"},"body":{"type":"array","items":{"type":"string"}}},"required":["opening","body"]},
-    "markdown-code-block": {"type":"object","additionalProperties":false,"properties":{"fence":{"type":"string"},"language":{"type":"string"},"content":{"type":"string"}},"required":["fence","language","content"]},
-    "markdown-heading-authoring": {"type":"object","additionalProperties":false,"properties":{"level":{"type":"integer","minimum":1,"maximum":6},"marker":{"type":"string"}},"required":["level","marker"]},
+    "markdown-source": {"type":"object","additionalProperties":false,"properties":{"source":{"$ref":"#/$defs/nonEmptyString"}},"required":["source"]},
+    "markdown-table-authoring": {"type":"object","additionalProperties":false,"properties":{"delimiter":{"$ref":"#/$defs/nonEmptyString"},"alignment":{"type":"array","minItems":1,"items":{"$ref":"#/$defs/nonEmptyString"}},"headerLine":{"type":"integer","minimum":1},"separatorLine":{"type":"integer","minimum":1},"dataRowLines":{"type":"array","items":{"type":"integer","minimum":1}}},"required":["delimiter","alignment"]},
+    "markdown-unsupported-directive": {"type":"object","additionalProperties":false,"properties":{"opening":{"$ref":"#/$defs/nonEmptyString"},"body":{"type":"array","minItems":1,"items":{"type":"string"}}},"required":["opening","body"]},
+    "markdown-code-block": {"type":"object","additionalProperties":false,"properties":{"fence":{"$ref":"#/$defs/nonEmptyString"},"language":{"type":"string"},"content":{"type":"string"}},"required":["fence","language","content"]},
+    "markdown-heading-authoring": {"type":"object","additionalProperties":false,"properties":{"level":{"type":"integer","minimum":1,"maximum":6},"marker":{"$ref":"#/$defs/nonEmptyString"}},"required":["level","marker"]},
     "markdown-thematic-break-authoring": {"type":"object","additionalProperties":false,"properties":{"marker":{"type":"string","enum":["*","-","_"]},"count":{"type":"integer","minimum":3},"leadingWhitespace":{"type":"string"}},"required":["marker","count","leadingWhitespace"]},
-    "markdown-reference-definition": {"type":"object","additionalProperties":false,"properties":{"label":{"type":"string"},"destination":{"type":"string"},"title":{"type":"string"},"annotationId":{"type":"string"},"definitionLine":{"type":"integer","minimum":1}},"required":["label","destination","title"]},
-    "markdown-list-marker": {"type":"object","additionalProperties":false,"properties":{"marker":{"type":"string"},"level":{"type":"integer","minimum":0}},"required":["marker","level"]},
+    "markdown-reference-definition": {"type":"object","additionalProperties":false,"properties":{"label":{"$ref":"#/$defs/nonEmptyString"},"destination":{"$ref":"#/$defs/nonEmptyString"},"title":{"type":"string"},"annotationId":{"type":"string"},"definitionLine":{"type":"integer","minimum":1}},"required":["label","destination","title"]},
+    "markdown-list-marker": {"type":"object","additionalProperties":false,"properties":{"marker":{"$ref":"#/$defs/nonEmptyString"},"level":{"type":"integer","minimum":0}},"required":["marker","level"]},
     "markdown-blockquote": {"type":"object","additionalProperties":false,"properties":{"marker":{"type":"string","const":">"}},"required":["marker"]},
-    "markdown-front-matter": {"type":"object","additionalProperties":false,"properties":{"syntax":{"type":"string","enum":["yaml-scalar"]},"opening":{"type":"string"},"closing":{"type":"string"},"status":{"type":"string","enum":["preserved","ambiguous","unsupported"]},"entries":{"type":"array","items":{"type":"object","additionalProperties":false,"properties":{"key":{"type":"string"},"value":{"type":"string"}},"required":["key","value"]}},"rawLines":{"type":"array","items":{"type":"string"}}},"required":["entries"]}
+    "markdown-front-matter": {"type":"object","additionalProperties":false,"properties":{"syntax":{"type":"string","enum":["yaml-scalar"]},"opening":{"type":"string"},"closing":{"type":"string"},"status":{"type":"string","enum":["preserved","ambiguous","unsupported"]},"entries":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"properties":{"key":{"$ref":"#/$defs/nonEmptyString"},"value":{"type":"string"}},"required":["key","value"]}},"rawLines":{"type":"array","items":{"type":"string"}}},"required":["entries"]}
   }
 }

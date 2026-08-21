@@ -15,9 +15,11 @@ from typing import Any
 try:
     from ir_validation import validate_document
     from qualification_evidence import case_evidence, source_digest, validate_source_feature_closure
+    from occurrence_qualification import profile_for_format
 except ImportError:  # pragma: no cover
     from tools.ir_validation import validate_document
     from tools.qualification_evidence import case_evidence, source_digest, validate_source_feature_closure
+    from tools.occurrence_qualification import profile_for_format
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -72,8 +74,55 @@ def _convert(case: dict[str, Any], input_path: Path, workspace: Path) -> dict[st
     document = json.loads(output.read_text(encoding="utf-8"))
     warnings = validate_document(document)
     actual_status = document.get("conversion", {}).get("status")
-    if actual_status != expected_status:
-        raise CorpusFailure(f"{case['id']} status mismatch: expected {expected_status}, got {actual_status}")
+    adapter_expected_status = case.get("adapterExpectedStatus")
+    if isinstance(adapter_expected_status, str) and actual_status != adapter_expected_status:
+        raise CorpusFailure(
+            f"{case['id']} adapter status mismatch: expected {adapter_expected_status}, got {actual_status}"
+        )
+    qualification_status = actual_status
+    occurrence_qualification: dict[str, Any] = {
+        "status": "passed",
+        "profileBound": None,
+        "blockers": [],
+    }
+    if case.get("caseClass") in {"positive", "unsupported"}:
+        profile = profile_for_format(case["format"])
+        policy = profile.get("occurrenceAccounting") if isinstance(profile, dict) else None
+        profile_bound = isinstance(policy, dict) and policy.get("profileBound") is True
+        occurrence_qualification["profileBound"] = profile_bound
+        if not profile_bound:
+            blocker = {
+                "code": "CAPABILITY_PROFILE_NOT_CONSTRUCT_CLOSED",
+                "message": "independent corpus cannot claim complete until occurrence policy is construct-closed",
+            }
+            occurrence_qualification["blockers"] = [blocker]
+            occurrence_qualification["status"] = "blocked"
+            if actual_status in {"complete", "complete-with-warnings"}:
+                # The adapter's self-reported status is retained separately;
+                # the corpus qualification status remains fail-closed.
+                qualification_status = "partial"
+        elif (
+            expected_status == "partial"
+            and adapter_expected_status in {"complete", "complete-with-warnings"}
+            and actual_status == adapter_expected_status
+        ):
+            # The manifest explicitly distinguishes the adapter's local
+            # status from the independent qualification status.  Keep that
+            # distinction visible: #91 occurrence accounting has already
+            # shown that these cases contain non-complete source occurrences,
+            # so this lane must not promote them to complete.
+            occurrence_qualification["status"] = "blocked"
+            occurrence_qualification["blockers"] = [
+                {
+                    "code": "NON_COMPLETE_SOURCE_OCCURRENCES",
+                    "message": "issue-91 occurrence accounting keeps this independent case partial",
+                }
+            ]
+            qualification_status = "partial"
+    if qualification_status != expected_status:
+        raise CorpusFailure(
+            f"{case['id']} status mismatch: expected {expected_status}, got {qualification_status}"
+        )
     source_text = _all_strings(document)
     if case.get("caseClass") not in {"malformed", "unsupported"}:
         missing = [token for token in case.get("expected", []) if token not in source_text]
@@ -109,7 +158,9 @@ def _convert(case: dict[str, Any], input_path: Path, workspace: Path) -> dict[st
     return {
         "id": case["id"],
         "format": case["format"],
-        "status": actual_status,
+        "status": qualification_status,
+        "adapterReportedStatus": actual_status,
+        "occurrenceQualification": occurrence_qualification,
         "documentId": document["documentId"],
         "canonicalDigest": digest,
         "nodes": len(document.get("nodes", [])),

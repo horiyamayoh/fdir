@@ -49,7 +49,7 @@ commit-bound, live-state qualification program in Issues #88–#105. A closed
 Issue, a file’s existence, a field or enum being present, or a command exiting
 zero is not sufficient release evidence.
 
-この変更は製品実装のリセットです。旧 assertion-first／evidence／accounting／source-byte storage 実装は退役させ、上記文書・スキーマ・要件を新しい開発の権威にします。現時点で四形式の変換器が完成したことは主張しません。実装は新 Issue 群を順に完了した時点で追加します。
+この変更は製品実装のリセットから始まりました。旧 assertion-first／evidence／accounting／source-byte storage 実装は退役させ、上記文書・スキーマ・要件を開発の権威にしています。現在は四形式向けの bounded standard-library adapter paths が実装されていますが、完全な形式対応や release qualification が完了したことは主張しません。
 
 設計成果物の整合性は次で確認できます。
 
@@ -92,12 +92,13 @@ satisfy that plan.
 
 The public bounded adapter entry point is:
 
-    python tools/convert_document.py inspect <input>
-    python tools/convert_document.py convert <input> --out document-form.json --evidence execution.json
+    python tools/convert_document.py inspect <input> [--format <kind>] [--profile <id>]
+    python tools/convert_document.py convert <input> --out document-form.json [--format <kind>] [--profile <id>] [--evidence execution.json]
+    python tools/convert_document.py validate document-form.json
 
-The evidence sidecar is ingestion metadata outside the IR. It records the
-input path, size, SHA-256, adapter module, and whether the file was consumed;
-source bytes are never copied into the IR.
+When requested, the evidence sidecar is ingestion metadata outside the IR. It
+records the input path, size, SHA-256, adapter module, and whether the file was
+consumed; source bytes are never copied into the IR.
 
 GitHub issue key/number mapping is recorded in [machine/github-issue-map.json](machine/github-issue-map.json). The disposition of superseded legacy issues is recorded in [machine/legacy-issue-map.json](machine/legacy-issue-map.json). Those maps are traceability inputs, not release qualification evidence.
 

@@ -83,7 +83,12 @@ class QualificationIssue101Tests(unittest.TestCase):
             self.assertIn("PDF-101-REAL-PRODUCERS", report["unmetRequirements"])
             self.assertIn("PDF-101-EVIDENCE-BUNDLE", report["unmetRequirements"])
             self.assertIn("PDF-101-CI-BINDING", report["unmetRequirements"])
-        self.assertTrue(all(report["independentParserDifferential"].get("independentFromAdapter") is True for report in reports))
+            differential = report["independentParserDifferential"]
+            self.assertIn("independentFromAdapter", differential)
+            self.assertEqual(differential["independentFromAdapter"], differential.get("available") is True)
+            if differential.get("available") is not True:
+                self.assertEqual(differential["status"], "failed")
+                self.assertIn("PDF-101-MULTI-PARSER-RENDERER", report["unmetRequirements"])
 
 
 if __name__ == "__main__":

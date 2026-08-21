@@ -15,6 +15,7 @@ class DesignWorkflowEvidenceTests(unittest.TestCase):
             self.assertIn(f"profile: {profile}", self.text)
         self.assertIn("fail-fast: false", self.text)
         self.assertIn("runs-on: ${{ matrix.runner }}", self.text)
+        self.assertNotIn("concurrency:", self.text)
 
     def test_required_uploads_are_success_gated(self) -> None:
         self.assertIn("- name: Upload qualification bundle\n        if: ${{ success() }}", self.text)
@@ -47,6 +48,11 @@ class DesignWorkflowEvidenceTests(unittest.TestCase):
         self.assertIn("base.candidateReady = runSuccess && diagnostics.length === 0", self.text)
         self.assertIn("base.releaseReady = false", self.text)
         self.assertIn('core.setOutput("candidate-ready", base.candidateReady ? "true" : "false")', self.text)
+
+    def test_qualification_jobs_do_not_export_credentials_to_children(self) -> None:
+        platform_and_qualification = self.text.split("  evidence:", 1)[0]
+        self.assertNotIn("GITHUB_TOKEN:", platform_and_qualification)
+        self.assertIn("GITHUB_TOKEN:", self.text.split("  evidence:", 1)[1])
 
 
 if __name__ == "__main__":

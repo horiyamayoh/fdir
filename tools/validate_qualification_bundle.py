@@ -23,7 +23,6 @@ from typing import Any
 
 try:
     from qualification_evidence import (
-        ASSERTION_EVALUATOR_REGISTRY,
         ARTIFACT_REFERENCE_ALLOWED_FIELDS,
         ARTIFACT_REFERENCE_REQUIRED_FIELDS,
         CLASSIFICATIONS,
@@ -37,7 +36,6 @@ try:
         PRODUCER_REPORT_SCHEMA,
         PRODUCER_REPORT_VERSION,
         allowed_producer_assertion_types,
-        canonical_json_bytes as evidence_canonical_json_bytes,
         is_forbidden_artifact_role,
         selected_artifact_digest,
         selected_artifact_value,
@@ -45,7 +43,6 @@ try:
     )
 except ImportError:  # pragma: no cover - package-style imports
     from tools.qualification_evidence import (
-        ASSERTION_EVALUATOR_REGISTRY,
         ARTIFACT_REFERENCE_ALLOWED_FIELDS,
         ARTIFACT_REFERENCE_REQUIRED_FIELDS,
         CLASSIFICATIONS,
@@ -59,7 +56,6 @@ except ImportError:  # pragma: no cover - package-style imports
         PRODUCER_REPORT_SCHEMA,
         PRODUCER_REPORT_VERSION,
         allowed_producer_assertion_types,
-        canonical_json_bytes as evidence_canonical_json_bytes,
         is_forbidden_artifact_role,
         selected_artifact_digest,
         selected_artifact_value,
@@ -78,6 +74,15 @@ SHA40 = re.compile(r"^[0-9a-f]{40}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 REPOSITORY = "horiyamayoh/fdir"
+# A release bundle has a broader live-issue scope than its materialized
+# behavioral reports.  #87 is the parent state gate; #108-#113 are release
+# barriers represented through barrierCoverage.  Only #88-#105 may be report
+# owners, so a bundle cannot pass by inventing one report per blocker.
+TARGET_ISSUES = tuple(range(87, 106)) + tuple(range(108, 114))
+BEHAVIORAL_ISSUES = tuple(range(88, 106))
+PARENT_ISSUE = 87
+RELEASE_BLOCKER_ISSUES = tuple(range(108, 114))
+BARRIER_ISSUES = (PARENT_ISSUE,) + RELEASE_BLOCKER_ISSUES
 
 SCHEMA_REQUIRED = {
     "schema",
@@ -194,6 +199,84 @@ def _date_time(value: Any) -> bool:
     return parsed.tzinfo is not None
 
 
+def _normalise_barrier_entries(value: Any, label: str, diagnostics: list[dict[str, str]]) -> list[dict[str, Any]]:
+    """Normalise the closed barrierCoverage array/map representation."""
+
+    if isinstance(value, list):
+        raw_entries = value
+    elif isinstance(value, dict) and isinstance(value.get("entries"), list):
+        raw_entries = value["entries"]
+    elif isinstance(value, dict) and value and all(str(key).isdigit() for key in value):
+        raw_entries = []
+        for key, item in value.items():
+            if isinstance(item, dict):
+                entry = dict(item)
+                entry.setdefault("issueNumber", int(key))
+                raw_entries.append(entry)
+            else:
+                raw_entries.append({"issueNumber": int(key), "evidenceIds": item})
+    elif isinstance(value, dict) and value:
+        projected: dict[int, set[str]] = {}
+        for evidence_id, item in value.items():
+            if not isinstance(evidence_id, str) or not evidence_id:
+                _add(diagnostics, "BARRIER_COVERAGE_EVIDENCE", f"{label} evidence keys must be non-empty Evidence IDs")
+                continue
+            if not isinstance(item, dict):
+                _add(diagnostics, "BARRIER_COVERAGE_ENTRY", f"{label}[{evidence_id}] must be an object")
+                continue
+            if not isinstance(item.get("role"), str) or not item["role"]:
+                _add(diagnostics, "BARRIER_COVERAGE_ROLE", f"{label}[{evidence_id}].role must be a non-empty string")
+            issue_numbers = item.get("issueNumbers")
+            if (
+                not isinstance(issue_numbers, list)
+                or not issue_numbers
+                or not all(isinstance(issue, int) and not isinstance(issue, bool) for issue in issue_numbers)
+                or len(issue_numbers) != len(set(issue_numbers))
+            ):
+                _add(diagnostics, "BARRIER_COVERAGE_ISSUE", f"{label}[{evidence_id}].issueNumbers must be a unique non-empty integer array")
+                continue
+            for issue in issue_numbers:
+                projected.setdefault(issue, set()).add(evidence_id)
+        raw_entries = [
+            {"issueNumber": issue, "evidenceIds": sorted(evidence_ids), "_representation": "evidence-id-map"}
+            for issue, evidence_ids in sorted(projected.items())
+        ]
+    else:
+        _add(diagnostics, "BARRIER_COVERAGE_REQUIRED", f"{label} must be an entries array or numeric issue map")
+        return []
+
+    result: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    for index, entry in enumerate(raw_entries):
+        entry_path = f"{label}[{index}]"
+        if not isinstance(entry, dict):
+            _add(diagnostics, "BARRIER_COVERAGE_ENTRY", f"{entry_path} must be an object")
+            continue
+        issue = entry.get("issueNumber")
+        if not isinstance(issue, int) or isinstance(issue, bool):
+            _add(diagnostics, "BARRIER_COVERAGE_ISSUE", f"{entry_path}.issueNumber must be an integer")
+        elif issue in seen:
+            _add(diagnostics, "BARRIER_COVERAGE_DUPLICATE", f"barrier issue is repeated: {issue}")
+        else:
+            seen.add(issue)
+        evidence_ids = entry.get("evidenceIds")
+        if (
+            not isinstance(evidence_ids, list)
+            or not evidence_ids
+            or not all(isinstance(item, str) and item for item in evidence_ids)
+            or len(evidence_ids) != len(set(evidence_ids))
+        ):
+            _add(diagnostics, "BARRIER_COVERAGE_EVIDENCE", f"{entry_path}.evidenceIds must be a unique non-empty string array")
+        for field in ("reportIds", "assertionIds"):
+            if field not in entry:
+                continue
+            values = entry.get(field)
+            if not isinstance(values, list) or not all(isinstance(item, str) and item for item in values) or len(values) != len(set(values)):
+                _add(diagnostics, "BARRIER_COVERAGE_BINDING", f"{entry_path}.{field} must be a unique string array")
+        result.append(entry)
+    return result
+
+
 def _line_count(path: Path) -> int:
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
@@ -272,7 +355,7 @@ def validate_schema_document(schema: Any) -> list[dict[str, str]]:
     return diagnostics
 
 
-def _validate_contract_shape(contract: Any) -> list[dict[str, str]]:
+def _validate_contract_shape(contract: Any, *, strict_scope: bool = True) -> list[dict[str, str]]:
     diagnostics: list[dict[str, str]] = []
     if not isinstance(contract, dict):
         return [_diagnostic("CONTRACT_ROOT", "qualification contract root must be an object")]
@@ -288,6 +371,13 @@ def _validate_contract_shape(contract: Any) -> list[dict[str, str]]:
             values = scope.get(field)
             if not isinstance(values, list) or not values:
                 _add(diagnostics, "CONTRACT_SCOPE", f"qualification contract scope.{field} must be a non-empty array")
+        if strict_scope:
+            if scope.get("issueNumbers") != list(BEHAVIORAL_ISSUES):
+                _add(diagnostics, "CONTRACT_SCOPE", f"qualification contract scope.issueNumbers must be exactly behavioral issues {list(BEHAVIORAL_ISSUES)}")
+        if strict_scope and contract.get("targetIssueNumbers") != list(TARGET_ISSUES):
+            _add(diagnostics, "CONTRACT_TARGET_SCOPE", f"qualification contract targetIssueNumbers must be exactly {list(TARGET_ISSUES)}")
+        if strict_scope and contract.get("barrierIssueNumbers") != list(BARRIER_ISSUES):
+            _add(diagnostics, "CONTRACT_BARRIER_SCOPE", f"qualification contract barrierIssueNumbers must be exactly {list(BARRIER_ISSUES)}")
     source_policy = contract.get("sourcePolicy")
     if not isinstance(source_policy, dict) or source_policy.get("shaFormat") != "git-40-lowercase-hex":
         _add(diagnostics, "CONTRACT_SOURCE_POLICY", "qualification contract source policy is invalid")
@@ -297,9 +387,53 @@ def _validate_contract_shape(contract: Any) -> list[dict[str, str]]:
     defaults = contract.get("defaultEvidence")
     if not isinstance(defaults, list) or not defaults:
         _add(diagnostics, "CONTRACT_EVIDENCE", "qualification contract has no default evidence definition")
+    elif strict_scope:
+        default_issues = {
+            item.get("issueNumbers", [None])[0]
+            for item in defaults
+            if isinstance(item, dict) and isinstance(item.get("issueNumbers"), list) and len(item["issueNumbers"]) == 1
+        }
+        if default_issues != set(BEHAVIORAL_ISSUES):
+            _add(diagnostics, "CONTRACT_EVIDENCE_SCOPE", f"defaultEvidence must cover exactly behavioral issues {list(BEHAVIORAL_ISSUES)}")
+        if default_issues.intersection(set(TARGET_ISSUES) - set(BEHAVIORAL_ISSUES)):
+            _add(diagnostics, "CONTRACT_EVIDENCE_SCOPE", "parent/barrier issues must not have duplicate Evidence reports")
     negative = contract.get("negativeFixtures")
     if not isinstance(negative, list) or not negative:
         _add(diagnostics, "CONTRACT_NEGATIVE_FIXTURES", "qualification contract has no negative fixture definitions")
+    if strict_scope:
+        barrier_entries = _normalise_barrier_entries(contract.get("barrierCoverage"), "contract.barrierCoverage", diagnostics)
+        barrier_by_issue = {
+            item.get("issueNumber"): item
+            for item in barrier_entries
+            if isinstance(item.get("issueNumber"), int) and not isinstance(item.get("issueNumber"), bool)
+        }
+        if set(barrier_by_issue) != set(BARRIER_ISSUES):
+            _add(diagnostics, "CONTRACT_BARRIER_SCOPE", f"contract.barrierCoverage must cover exactly {list(BARRIER_ISSUES)}")
+        defaults_by_issue = {
+            item.get("issueNumbers", [None])[0]: item
+            for item in defaults or []
+            if isinstance(item, dict) and isinstance(item.get("issueNumbers"), list) and len(item["issueNumbers"]) == 1
+        }
+        owner_ids = {
+            defaults_by_issue.get(issue, {}).get("evidenceId")
+            for issue in (88, 105)
+            if isinstance(defaults_by_issue.get(issue, {}).get("evidenceId"), str)
+        }
+        if len(owner_ids) != 2:
+            _add(diagnostics, "CONTRACT_BARRIER_OWNERS", "barrierCoverage requires Evidence owners for #88 and #105")
+        for issue, entry in sorted(barrier_by_issue.items()):
+            evidence_ids = entry.get("evidenceIds")
+            if isinstance(evidence_ids, list) and not owner_ids.issubset(set(evidence_ids)):
+                _add(diagnostics, "CONTRACT_BARRIER_OWNERS", f"contract.barrierCoverage[{issue}] must bind #88 and #105 Evidence IDs")
+        ci_policy = contract.get("ciPolicy")
+        if not isinstance(ci_policy, dict) or ci_policy.get("allowedProviders") != ["github-actions"]:
+            _add(diagnostics, "CONTRACT_CI_PROVIDER", "release qualification allows only github-actions; local is diagnostic-only")
+        if not isinstance(ci_policy, dict) or ci_policy.get("releaseStatus") != "completed":
+            _add(diagnostics, "CONTRACT_CI_POLICY", "release qualification ciPolicy.releaseStatus must be completed")
+        behavioral = contract.get("behavioralReportContract")
+        policies = behavioral.get("policies") if isinstance(behavioral, dict) else None
+        if not isinstance(policies, dict) or policies.get("behavioralIssueNumbers") != list(BEHAVIORAL_ISSUES):
+            _add(diagnostics, "CONTRACT_BEHAVIORAL_SCOPE", f"behavioralReportContract must declare exactly {list(BEHAVIORAL_ISSUES)}")
     return diagnostics
 
 
@@ -312,13 +446,15 @@ def _contract_evidence_spec(contract: dict[str, Any], evidence_id: str | None) -
     return None
 
 
-def _validate_manifest_header(manifest: Any, diagnostics: list[dict[str, str]]) -> None:
+def _validate_manifest_header(manifest: Any, diagnostics: list[dict[str, str]], *, strict_scope: bool = True) -> None:
     if not isinstance(manifest, dict):
         _add(diagnostics, "MANIFEST_ROOT", "manifest root must be an object")
         return
     if manifest.get("schema") != BUNDLE_SCHEMA_NAME or manifest.get("version") != VERSION:
         _add(diagnostics, "MANIFEST_SCHEMA", "bundle manifest schema/version is invalid")
     required = {"schema", "version", "repository", "sourceSha", "dirtyTree", "generatedAt", "manifestDigest", "files", "evidenceIds", "issueNumbers"}
+    if strict_scope:
+        required.update({"targetIssueNumbers", "barrierCoverage"})
     missing = sorted(required - set(manifest))
     if missing:
         _add(diagnostics, "MANIFEST_REQUIRED_FIELDS", "manifest is missing: " + ", ".join(missing))
@@ -332,6 +468,12 @@ def _validate_manifest_header(manifest: Any, diagnostics: list[dict[str, str]]) 
         _add(diagnostics, "MANIFEST_GENERATED_AT", "manifest generatedAt must be an RFC 3339 date-time")
     if not SHA256.fullmatch(str(manifest.get("manifestDigest", ""))):
         _add(diagnostics, "MANIFEST_DIGEST", "manifestDigest is not 64 lowercase hex characters")
+    if strict_scope:
+        declared = manifest.get("issueNumbers")
+        if declared != list(BEHAVIORAL_ISSUES):
+            _add(diagnostics, "MANIFEST_ISSUE_SCOPE", f"manifest issueNumbers must be exactly behavioral issues {list(BEHAVIORAL_ISSUES)}")
+        if manifest.get("targetIssueNumbers") != list(TARGET_ISSUES):
+            _add(diagnostics, "MANIFEST_TARGET_SCOPE", f"manifest targetIssueNumbers must be exactly {list(TARGET_ISSUES)}")
 
 
 def _validate_manifest_digest(manifest: dict[str, Any], diagnostics: list[dict[str, str]]) -> None:
@@ -412,7 +554,15 @@ def _validate_environment(environment: Any, diagnostics: list[dict[str, str]], r
         _add(diagnostics, "DEPENDENCY_LOCK_DIGEST", "environment dependencyLockDigest is invalid", report_path)
 
 
-def _validate_ci(ci: Any, report: dict[str, Any], contract: dict[str, Any], diagnostics: list[dict[str, str]], report_path: str) -> None:
+def _validate_ci(
+    ci: Any,
+    report: dict[str, Any],
+    contract: dict[str, Any],
+    diagnostics: list[dict[str, str]],
+    report_path: str,
+    *,
+    release_required: bool = False,
+) -> None:
     if not isinstance(ci, dict):
         _add(diagnostics, "CI_OBJECT", "ci must be an object", report_path)
         return
@@ -427,6 +577,8 @@ def _validate_ci(ci: Any, report: dict[str, Any], contract: dict[str, Any], diag
     allowed = contract.get("ciPolicy", {}).get("allowedProviders", ["github-actions", "local"])
     if provider not in allowed:
         _add(diagnostics, "CI_PROVIDER", f"ci provider is not allowed: {provider!r}", report_path)
+    if release_required and provider != "github-actions":
+        _add(diagnostics, "CI_PROVIDER_RELEASE_REQUIRED", "release evidence must use GitHub Actions; local evidence is diagnostic-only", report_path)
     if ci.get("repository") != contract.get("repository", REPOSITORY):
         _add(diagnostics, "CI_REPOSITORY_MISMATCH", "ci repository does not match the qualification repository", report_path)
     source_sha = report.get("sourceSha")
@@ -438,15 +590,19 @@ def _validate_ci(ci: Any, report: dict[str, Any], contract: dict[str, Any], diag
         _add(diagnostics, "CI_RUN_ID", "ci runId and jobId are required", report_path)
     if not isinstance(ci.get("attempt"), int) or ci["attempt"] < 1:
         _add(diagnostics, "CI_ATTEMPT", "ci attempt must be a positive integer", report_path)
-    if ci.get("status") != contract.get("ciPolicy", {}).get("releaseStatus", "completed"):
+    if release_required and ci.get("status") != "completed":
+        _add(diagnostics, "CI_STATUS", "release CI evidence must be completed", report_path)
+    elif ci.get("status") != contract.get("ciPolicy", {}).get("releaseStatus", "completed"):
         _add(diagnostics, "CI_STATUS", "ci status is not a completed release result", report_path)
     run_url = ci.get("runUrl")
     if provider == "local" and (not isinstance(run_url, str) or not run_url.startswith("local://")):
         _add(diagnostics, "CI_URL_MISMATCH", "local CI evidence must use a local:// runUrl", report_path)
     if provider == "github-actions":
         prefix = f"https://github.com/{contract.get('repository', REPOSITORY)}/actions/runs/"
-        if not isinstance(run_url, str) or not run_url.startswith(prefix):
+        if not isinstance(run_url, str) or not re.fullmatch(re.escape(prefix) + r"[0-9]+", run_url):
             _add(diagnostics, "CI_URL_MISMATCH", "GitHub Actions runUrl belongs to another repository or URL shape", report_path)
+        if release_required and (not isinstance(ci.get("runId"), str) or not re.fullmatch(r"[0-9]+", ci["runId"])):
+            _add(diagnostics, "CI_RUN_ID", "release GitHub Actions runId must be a numeric run identifier", report_path)
 
 
 PACKAGING_ASSERTION_TYPES = {
@@ -528,6 +684,46 @@ def _semantic_value(value: Any, ref: dict[str, Any]) -> Any:
     return ref.get("selectedSha256") if isinstance(ref, dict) and isinstance(ref.get("selector"), dict) and ref["selector"].get("kind") == "whole-file" else value
 
 
+def _same_artifact(
+    bundle_root: Path,
+    left: Any,
+    right: Any,
+) -> bool:
+    """Return whether two references identify one underlying artifact.
+
+    Content equality is intentionally not considered here: an authority and a
+    behavioral output are allowed to contain the same value for a positive
+    case.  The validator must reject only aliasing of the same file, including
+    path-case aliases and hardlinks, so a producer cannot use one artifact as
+    both sides of an assertion under two spellings.
+    """
+
+    if not isinstance(left, dict) or not isinstance(right, dict):
+        return False
+    left_path = left.get("path")
+    right_path = right.get("path")
+    if not isinstance(left_path, str) or not isinstance(right_path, str):
+        return False
+    if left_path == right_path:
+        return True
+    if not _safe_relative(left_path) or not _safe_relative(right_path):
+        return False
+    left_target = _resolve_relative(bundle_root, left_path)
+    right_target = _resolve_relative(bundle_root, right_path)
+    try:
+        left_key = os.path.normcase(str(left_target.resolve(strict=False)))
+        right_key = os.path.normcase(str(right_target.resolve(strict=False)))
+    except OSError:
+        left_key = os.path.normcase(os.path.abspath(str(left_target)))
+        right_key = os.path.normcase(os.path.abspath(str(right_target)))
+    if left_key == right_key:
+        return True
+    try:
+        return left_target.is_file() and right_target.is_file() and os.path.samefile(left_target, right_target)
+    except OSError:
+        return False
+
+
 def _support_record(
     support_value: Any,
     *,
@@ -537,29 +733,103 @@ def _support_record(
     target: Any,
     diagnostics: list[dict[str, str]],
     report_path: str,
-) -> None:
+) -> bool:
+    valid = True
+    if isinstance(support_value, list):
+        _add(diagnostics, "SUPPORT_RANGE_REPLACEMENT", f"support for {assertion_id} selects a range instead of one record", report_path)
+        valid = False
     if not isinstance(support_value, dict):
         _add(diagnostics, "SUPPORT_SELECTOR_MISMATCH", f"support for {assertion_id} does not select a structured record", report_path)
-        return
+        return False
     if support_value.get("assertionId") != assertion_id or support_value.get("caseId") != case_id:
         _add(diagnostics, "SUPPORT_SELECTOR_MISMATCH", f"support for {assertion_id} is attached to another assertion or case", report_path)
+        valid = False
     if not _same_json(support_value.get("actual"), actual_value):
         _add(diagnostics, "SUPPORT_CONTENT_MISMATCH", f"support for {assertion_id} does not contain the recomputed actual value", report_path)
+        valid = False
     if not _same_json(support_value.get("target"), target):
         _add(diagnostics, "SUPPORT_TARGET_MISMATCH", f"support for {assertion_id} does not contain the assertion target", report_path)
+        valid = False
     if support_value.get("status", support_value.get("result")) != "passed":
         _add(diagnostics, "SUPPORT_STATUS_MISMATCH", f"support for {assertion_id} is not a passed structured record", report_path)
+        valid = False
+    return valid
+
+
+def _independent_equal(expected: Any, actual: Any, comparison: dict[str, Any]) -> bool:
+    return comparison.get("operator") == "equal" and _same_json(expected, actual)
+
+
+def _independent_not_equal(expected: Any, actual: Any, comparison: dict[str, Any]) -> bool:
+    return comparison.get("operator") == "not-equal" and not _same_json(expected, actual)
+
+
+def _independent_contains(expected: Any, actual: Any, comparison: dict[str, Any]) -> bool:
+    if comparison.get("operator") != "contains":
+        return False
+    if isinstance(expected, list):
+        return isinstance(actual, list) and all(item in actual for item in expected)
+    if isinstance(expected, dict):
+        return isinstance(actual, dict) and all(
+            key in actual and _same_json(actual[key], value)
+            for key, value in expected.items()
+        )
+    if isinstance(expected, str):
+        return isinstance(actual, str) and expected in actual
+    return False
+
+
+# Keep the evaluator used for producer claims in this module.  The producer
+# and the validator may share canonical JSON, but a producer-controlled
+# assertion type must never make the validator fall back to ``expected ==
+# actual`` or execute an evaluator that was not explicitly reviewed here.
+_INDEPENDENT_ASSERTION_EVALUATORS = {
+    **{
+        assertion_type: _independent_equal
+        for assertion_type in {
+            "json-value-equals",
+            "metamorphic-equality",
+            "differential-equality",
+            "source-occurrence-accounting",
+            "capability-coverage",
+            "status-aggregation",
+            "schema-differential",
+            "graph-invariant",
+            "status-contract",
+            "defect-injection",
+            "style-provenance",
+            "geometry-order",
+            "topology",
+            "relationship-closure",
+            "extension-closure",
+            "canonical-identity",
+            "format-profile",
+            "query-index-parity",
+            "corpus-independence",
+            "release-claim-conformance",
+            "artifact-digest-equals",
+        }
+    },
+    "json-value-not-equals": _independent_not_equal,
+    "negative-rejection": _independent_not_equal,
+    "mutation-killed": _independent_not_equal,
+    "artifact-contains": _independent_contains,
+}
 
 
 def _evaluate_registered_assertion(assertion_type: Any, expected: Any, actual: Any, comparison: Any) -> bool | None:
-    if not isinstance(assertion_type, str) or assertion_type not in ASSERTION_EVALUATOR_REGISTRY:
+    if not isinstance(assertion_type, str):
+        return None
+    evaluator = _INDEPENDENT_ASSERTION_EVALUATORS.get(assertion_type)
+    if evaluator is None:
         return None
     if not isinstance(comparison, dict) or set(comparison) != {"operator"}:
         return None
     try:
-        return bool(ASSERTION_EVALUATOR_REGISTRY[assertion_type](expected, actual, comparison))
+        result = evaluator(expected, actual, comparison)
     except (TypeError, ValueError, KeyError):
-        return False
+        return None
+    return result if isinstance(result, bool) else None
 
 
 def _comparison_operator(value: Any) -> Any:
@@ -650,11 +920,11 @@ def _validate_producer_report(
             refs[field] = (value, path)
         authority_ref = case.get("authorityArtifact")
         actual_ref = case.get("actualArtifact")
-        if isinstance(authority_ref, dict) and isinstance(actual_ref, dict) and authority_ref.get("path") == actual_ref.get("path"):
+        if _same_artifact(bundle_root, authority_ref, actual_ref):
             _add(diagnostics, "PRODUCER_CASE_SAME_ARTIFACT", f"case {case_id} uses the same authority and actual artifact", case_path)
             case_failures += 1
         support_ref = case.get("supportingArtifact")
-        if isinstance(support_ref, dict) and isinstance(authority_ref, dict) and isinstance(actual_ref, dict) and support_ref.get("path") in {authority_ref.get("path"), actual_ref.get("path")}:
+        if _same_artifact(bundle_root, support_ref, authority_ref) or _same_artifact(bundle_root, support_ref, actual_ref):
             _add(diagnostics, "PRODUCER_CASE_SUPPORT_SAME_ARTIFACT", f"case {case_id} support is not a separate artifact", case_path)
             case_failures += 1
         expected_value = _semantic_value(refs["authorityArtifact"][0], authority_ref if isinstance(authority_ref, dict) else {})
@@ -673,7 +943,8 @@ def _validate_producer_report(
         if case.get("result") != expected_result:
             _add(diagnostics, "PRODUCER_CASE_RESULT_MISMATCH", f"case {case_id} result is self-attested and does not match recomputation", case_path)
             case_failures += 1
-        _support_record(refs["supportingArtifact"][0], assertion_id=case_id, case_id=case_id, actual_value=actual_value, target=case.get("target"), diagnostics=diagnostics, report_path=case_path)
+        if not _support_record(refs["supportingArtifact"][0], assertion_id=case_id, case_id=case_id, actual_value=actual_value, target=case.get("target"), diagnostics=diagnostics, report_path=case_path):
+            case_failures += 1
 
     if "positive" not in classifications or not ({"negative", "mutation"} & classifications):
         _add(diagnostics, "PRODUCER_CASE_COVERAGE", "producer report requires positive and negative/mutation cases", report_path)
@@ -705,7 +976,7 @@ def _validate_producer_report(
             continue
         assertion_ids.add(assertion_id)
         assertion_type = assertion.get("assertionType")
-        if assertion_type not in ASSERTION_EVALUATOR_REGISTRY or assertion_type not in allowed_types:
+        if assertion_type not in _INDEPENDENT_ASSERTION_EVALUATORS or assertion_type not in allowed_types:
             _add(diagnostics, "PRODUCER_ASSERTION_TYPE", f"unknown or disallowed assertion evaluator: {assertion_type!r}", assertion_path)
             assertion_failures += 1
         case_id = assertion.get("testCaseId")
@@ -725,11 +996,11 @@ def _validate_producer_report(
             refs[field] = (value, path)
         authority_ref = assertion.get("authorityArtifact")
         actual_ref = assertion.get("actualArtifact")
-        if isinstance(authority_ref, dict) and isinstance(actual_ref, dict) and authority_ref.get("path") == actual_ref.get("path"):
+        if _same_artifact(bundle_root, authority_ref, actual_ref):
             _add(diagnostics, "PRODUCER_ASSERTION_SAME_ARTIFACT", f"assertion {assertion_id} uses the same authority and actual artifact", assertion_path)
             assertion_failures += 1
         support_ref = assertion.get("supportingArtifact")
-        if isinstance(support_ref, dict) and isinstance(authority_ref, dict) and isinstance(actual_ref, dict) and support_ref.get("path") in {authority_ref.get("path"), actual_ref.get("path")}:
+        if _same_artifact(bundle_root, support_ref, authority_ref) or _same_artifact(bundle_root, support_ref, actual_ref):
             _add(diagnostics, "PRODUCER_ASSERTION_SUPPORT_SAME_ARTIFACT", f"assertion {assertion_id} support is not a separate artifact", assertion_path)
             assertion_failures += 1
         expected_value = _semantic_value(refs["authorityArtifact"][0], authority_ref if isinstance(authority_ref, dict) else {})
@@ -742,13 +1013,17 @@ def _validate_producer_report(
             assertion_failures += 1
         evaluated = _evaluate_registered_assertion(assertion_type, expected_value, actual_value, assertion.get("comparison"))
         expected_status = "passed" if evaluated is True else "failed"
-        if evaluated is None:
+        if assertion_type not in _INDEPENDENT_ASSERTION_EVALUATORS:
             _add(diagnostics, "ASSERTION_EVALUATOR_MISSING", f"assertion {assertion_id} has no independent evaluator", assertion_path)
+            assertion_failures += 1
+        elif evaluated is None:
+            _add(diagnostics, "ASSERTION_EVALUATOR_INVALID", f"assertion {assertion_id} evaluator could not recompute its result", assertion_path)
             assertion_failures += 1
         if assertion.get("status") != expected_status:
             _add(diagnostics, "ASSERTION_STATUS_MISMATCH", f"assertion {assertion_id} status is self-attested and does not match recomputation", assertion_path)
             assertion_failures += 1
-        _support_record(refs["supportingArtifact"][0], assertion_id=assertion_id, case_id=str(case_id), actual_value=actual_value, target=assertion.get("target"), diagnostics=diagnostics, report_path=assertion_path)
+        if not _support_record(refs["supportingArtifact"][0], assertion_id=assertion_id, case_id=str(case_id), actual_value=actual_value, target=assertion.get("target"), diagnostics=diagnostics, report_path=assertion_path):
+            assertion_failures += 1
 
     if set(case_by_id) != referenced_cases:
         _add(diagnostics, "PRODUCER_CASE_ASSERTION_COVERAGE", "every producer case must be represented by a requirement assertion", report_path)
@@ -771,6 +1046,7 @@ def _validate_evidence(
     diagnostics: list[dict[str, str]],
     *,
     allow_dirty: bool,
+    release_required: bool = False,
 ) -> str | None:
     if report == {}:
         _add(diagnostics, "EVIDENCE_REPORT_EMPTY", "Evidence report is an empty object", report_path)
@@ -797,6 +1073,8 @@ def _validate_evidence(
     allowed_issues = set(contract.get("scope", {}).get("issueNumbers", []))
     if allowed_issues and not set(issue_numbers).issubset(allowed_issues):
         _add(diagnostics, "ISSUE_BINDING_MISMATCH", "Evidence binds an issue outside the qualification contract", report_path)
+    if release_required and not set(issue_numbers).issubset(set(BEHAVIORAL_ISSUES)):
+        _add(diagnostics, "EVIDENCE_REPORT_SCOPE", "release Evidence reports may bind only behavioral issues #88-#105; parent/barrier issues use barrierCoverage", report_path)
     required_evidence_ids = set(contract.get("scope", {}).get("requiredEvidenceIds", []))
     requirement_ids = report.get("requirementIds")
     if not isinstance(requirement_ids, list) or not requirement_ids or any(not isinstance(item, str) or not ID.fullmatch(item) for item in requirement_ids) or len(requirement_ids) != len(set(requirement_ids)):
@@ -1102,7 +1380,7 @@ def _validate_evidence(
         _add(diagnostics, "FAILURE_COUNT", f"failureCount is {report.get('failureCount')!r}; recomputed count is {expected_failure_count}", report_path)
     if report.get("status") != "passed" or report.get("failureCount") != 0:
         _add(diagnostics, "EVIDENCE_STATUS", "release Evidence must be passed with zero failures", report_path)
-    _validate_ci(report.get("ci"), report, contract, diagnostics, report_path)
+    _validate_ci(report.get("ci"), report, contract, diagnostics, report_path, release_required=release_required)
     return evidence_id
 
 
@@ -1148,6 +1426,97 @@ def _validate_issue_indexes(
             _add(diagnostics, "ISSUE_INDEX_SCOPE", f"issue indexes {sorted(seen)} do not match contract issues {sorted(expected_issues)}")
 
 
+def _validate_manifest_barrier_coverage(
+    manifest: dict[str, Any],
+    contract: dict[str, Any],
+    report_by_id: dict[str, tuple[str, dict[str, Any]]],
+    diagnostics: list[dict[str, str]],
+    *,
+    strict_scope: bool,
+) -> None:
+    """Bind #108-#113 to existing #88/#105 evidence without new reports."""
+
+    if not strict_scope:
+        return
+    entries = _normalise_barrier_entries(manifest.get("barrierCoverage"), "manifest.barrierCoverage", diagnostics)
+    by_issue = {
+        item.get("issueNumber"): item
+        for item in entries
+        if isinstance(item.get("issueNumber"), int) and not isinstance(item.get("issueNumber"), bool)
+    }
+    if set(by_issue) != set(BARRIER_ISSUES):
+        _add(diagnostics, "MANIFEST_BARRIER_SCOPE", f"manifest.barrierCoverage must cover exactly {list(BARRIER_ISSUES)}")
+
+    defaults = contract.get("defaultEvidence", [])
+    defaults_by_issue = {
+        item.get("issueNumbers", [None])[0]: item
+        for item in defaults
+        if isinstance(item, dict) and isinstance(item.get("issueNumbers"), list) and len(item["issueNumbers"]) == 1
+    }
+    owner_ids = {
+        defaults_by_issue.get(issue, {}).get("evidenceId")
+        for issue in (88, 105)
+        if isinstance(defaults_by_issue.get(issue, {}).get("evidenceId"), str)
+    }
+    raw_coverage = manifest.get("barrierCoverage")
+    if isinstance(raw_coverage, dict) and "entries" not in raw_coverage and not all(str(key).isdigit() for key in raw_coverage):
+        owner_by_issue = {
+            defaults_by_issue.get(issue, {}).get("evidenceId"): issue
+            for issue in (88, 105)
+            if isinstance(defaults_by_issue.get(issue, {}).get("evidenceId"), str)
+        }
+        if set(raw_coverage) != set(owner_by_issue):
+            _add(diagnostics, "MANIFEST_BARRIER_OWNERS", "manifest.barrierCoverage evidence keys must be exactly the #88 and #105 Evidence IDs")
+        expected_roles = {88: "integrity-report", 105: "final-release-report"}
+        expected_issue_lists = {88: list(RELEASE_BLOCKER_ISSUES), 105: list(BARRIER_ISSUES)}
+        for evidence_id, owner_issue in owner_by_issue.items():
+            item = raw_coverage.get(evidence_id)
+            if not isinstance(item, dict):
+                continue
+            if item.get("role") != expected_roles[owner_issue]:
+                _add(diagnostics, "MANIFEST_BARRIER_ROLE", f"manifest.barrierCoverage[{evidence_id}].role must be {expected_roles[owner_issue]}")
+            if item.get("issueNumbers") != expected_issue_lists[owner_issue]:
+                _add(diagnostics, "MANIFEST_BARRIER_ISSUES", f"manifest.barrierCoverage[{evidence_id}].issueNumbers must be exactly {expected_issue_lists[owner_issue]}")
+    declared_report_ids: set[str] = set()
+    behavioral = contract.get("behavioralReportContract")
+    if isinstance(behavioral, dict):
+        for requirement in behavioral.get("requirements", []):
+            if not isinstance(requirement, dict) or requirement.get("ownerIssue") not in BEHAVIORAL_ISSUES:
+                continue
+            for report in requirement.get("reports", []):
+                if isinstance(report, dict) and isinstance(report.get("reportId"), str):
+                    declared_report_ids.add(report["reportId"])
+
+    for issue, entry in sorted(by_issue.items()):
+        evidence_ids = entry.get("evidenceIds")
+        if isinstance(evidence_ids, list):
+            expected_evidence = {defaults_by_issue.get(105, {}).get("evidenceId")} if issue == PARENT_ISSUE else owner_ids
+            expected_evidence.discard(None)
+            if set(evidence_ids) != expected_evidence:
+                _add(diagnostics, "MANIFEST_BARRIER_OWNERS", f"manifest.barrierCoverage[{issue}] must bind exactly {sorted(expected_evidence)}")
+            for evidence_id in evidence_ids:
+                resolved = report_by_id.get(evidence_id)
+                if resolved is None:
+                    _add(diagnostics, "BARRIER_EVIDENCE_MISSING", f"barrier issue #{issue} references unresolved Evidence ID: {evidence_id}")
+                    continue
+                report = resolved[1]
+                report_issues = report.get("issueNumbers", [])
+                if not isinstance(report_issues, list) or not set(report_issues).issubset(set(BEHAVIORAL_ISSUES)):
+                    _add(diagnostics, "BARRIER_EVIDENCE_SCOPE", f"barrier issue #{issue} is bound to a non-behavioral Evidence report: {evidence_id}")
+        report_ids = entry.get("reportIds", [])
+        if isinstance(report_ids, list):
+            for report_id in report_ids:
+                if report_id not in declared_report_ids:
+                    _add(diagnostics, "BARRIER_REPORT_REFERENCE", f"barrier issue #{issue} references an undeclared report: {report_id}")
+                if isinstance(report_id, str) and any(report_id.startswith(f"issue-{barrier}.") for barrier in BARRIER_ISSUES):
+                    _add(diagnostics, "BARRIER_REPORT_FORBIDDEN", f"barrier issue #{issue} must not have a duplicate report: {report_id}")
+
+    for evidence_id, (_, report) in report_by_id.items():
+        issue_numbers = report.get("issueNumbers", [])
+        if isinstance(issue_numbers, list) and set(issue_numbers).intersection(BARRIER_ISSUES):
+            _add(diagnostics, "BARRIER_REPORT_FORBIDDEN", f"Evidence {evidence_id} binds a barrier issue instead of barrierCoverage")
+
+
 def _validate_recovery_report_catalog(
     bundle_root: Path,
     report_by_id: dict[str, tuple[str, dict[str, Any]]],
@@ -1166,7 +1535,7 @@ def _validate_recovery_report_catalog(
     # issue-specific catalog applies only to the production #88-#105 scope;
     # otherwise the positive tamper-resistance fixture would be rejected for
     # reports it deliberately does not exercise.
-    if set(contract.get("scope", {}).get("issueNumbers", [])) != set(range(88, 106)):
+    if set(contract.get("scope", {}).get("issueNumbers", [])) != set(BEHAVIORAL_ISSUES):
         return
     try:
         catalog = load_json(RECOVERY_REPORT_CONTRACT_PATH)
@@ -1375,7 +1744,7 @@ def _validate_behavioral_report_declarations(
     """
 
     scope = contract.get("scope", {}) if isinstance(contract, dict) else {}
-    if set(scope.get("issueNumbers", [])) != set(range(88, 106)):
+    if set(scope.get("issueNumbers", [])) != set(BEHAVIORAL_ISSUES):
         # The evidence-integrity tests intentionally use a one-lane disposable
         # contract.  Their positive fixture must remain focused on packaging
         # integrity rather than the production recovery catalog.
@@ -1389,6 +1758,11 @@ def _validate_behavioral_report_declarations(
     if not isinstance(requirements, list) or not isinstance(policies, dict):
         _add(diagnostics, "BEHAVIORAL_CONTRACT_INVALID", "behavioralReportContract requirements or policies are invalid")
         return
+
+    strict_traceability = contract.get("targetIssueNumbers") == list(TARGET_ISSUES)
+    seen_owners: set[int] = set()
+    seen_report_ids: dict[str, int] = {}
+    seen_bundle_paths: dict[str, int] = {}
 
     required_fields = policies.get("requiredReportFields")
     if not isinstance(required_fields, list) or not all(isinstance(field, str) and field for field in required_fields):
@@ -1415,16 +1789,28 @@ def _validate_behavioral_report_declarations(
         if not isinstance(issue, int) or not isinstance(evidence_id, str) or not isinstance(requirement_id, str):
             _add(diagnostics, "BEHAVIORAL_REQUIREMENT_BINDING", "behavioral requirement has invalid owner/evidence/requirement binding")
             continue
+        if strict_traceability:
+            if issue not in BEHAVIORAL_ISSUES:
+                _add(diagnostics, "BEHAVIORAL_REQUIREMENT_SCOPE", f"behavioral requirement ownerIssue is not in #88-#105: {issue}")
+            elif issue in seen_owners:
+                _add(diagnostics, "BEHAVIORAL_REQUIREMENT_DUPLICATE", f"behavioral requirement ownerIssue is duplicated: {issue}")
+            else:
+                seen_owners.add(issue)
         evidence_entry = report_by_id.get(evidence_id)
         if evidence_entry is None:
             _add(diagnostics, "BEHAVIORAL_EVIDENCE_MISSING", f"behavioral evidence report is unresolved: {evidence_id}")
             continue
         _, evidence_report = evidence_entry
+        if strict_traceability:
+            evidence_issues = evidence_report.get("issueNumbers")
+            if not isinstance(evidence_issues, list) or set(evidence_issues) != {issue}:
+                _add(diagnostics, "BEHAVIORAL_EVIDENCE_SCOPE", f"Evidence {evidence_id} must bind exactly to behavioral issue #{issue}")
         outputs = [item for item in evidence_report.get("outputs", []) if isinstance(item, dict)]
         declarations = requirement.get("reports")
         if not isinstance(declarations, list) or not declarations:
             _add(diagnostics, "BEHAVIORAL_REPORT_DECLARATIONS", f"issue #{issue} has no report declarations")
             continue
+        declared_bindings: set[str] = set()
         for declaration in declarations:
             if not isinstance(declaration, dict):
                 _add(diagnostics, "BEHAVIORAL_REPORT_DECLARATION", f"issue #{issue} contains a non-object report declaration")
@@ -1435,10 +1821,33 @@ def _validate_behavioral_report_declarations(
             if not all(isinstance(value, str) and value for value in (bundle_path, output_role, report_id)):
                 _add(diagnostics, "BEHAVIORAL_REPORT_DECLARATION", f"issue #{issue} has an incomplete report declaration")
                 continue
+            if strict_traceability:
+                if not report_id.startswith(f"issue-{issue}."):
+                    _add(diagnostics, "BEHAVIORAL_REPORT_ID_SCOPE", f"{report_id} is not owned by issue #{issue}")
+                previous_issue = seen_report_ids.get(report_id)
+                if previous_issue is not None:
+                    _add(diagnostics, "BEHAVIORAL_REPORT_DUPLICATE", f"{report_id} is declared by issues #{previous_issue} and #{issue}")
+                else:
+                    seen_report_ids[report_id] = issue
+                previous_path_issue = seen_bundle_paths.get(bundle_path)
+                if previous_path_issue is not None:
+                    _add(diagnostics, "BEHAVIORAL_REPORT_DUPLICATE", f"{bundle_path} is declared by issues #{previous_path_issue} and #{issue}")
+                else:
+                    seen_bundle_paths[bundle_path] = issue
+                declared_bindings.add(bundle_path)
             matches = [
                 item for item in outputs
                 if item.get("path") == bundle_path and item.get("role") == output_role
             ]
+            if not matches:
+                path_matches = [item for item in outputs if item.get("path") == bundle_path]
+                snapshot_roles = {
+                    item.casefold()
+                    for item in policies.get("sourceSnapshotOutputRoles", [])
+                    if isinstance(item, str)
+                }
+                if len(path_matches) == 1 and output_role != PRODUCER_REPORT_OUTPUT_ROLE and output_role.casefold() not in snapshot_roles:
+                    matches = path_matches
             if len(matches) != 1:
                 code = "BEHAVIORAL_OUTPUT_MISSING" if not matches else "BEHAVIORAL_OUTPUT_DUPLICATE"
                 _add(diagnostics, code, f"{report_id} resolves to {len(matches)} declared outputs", bundle_path)
@@ -1492,20 +1901,38 @@ def _validate_behavioral_report_declarations(
             if not isinstance(value.get("assertions"), list) or not value.get("assertions"):
                 _add(diagnostics, "BEHAVIORAL_REPORT_ASSERTIONS", f"{report_id} has no assertions", bundle_path)
             else:
+                assertion_ids: set[str] = set()
                 for index, assertion in enumerate(value["assertions"]):
                     if not isinstance(assertion, dict):
                         _add(diagnostics, "BEHAVIORAL_ASSERTION_ENTRY", f"{report_id} assertion {index} is not an object", bundle_path)
                         continue
+                    assertion_id = assertion.get("assertionId")
+                    if strict_traceability:
+                        if not isinstance(assertion_id, str) or not assertion_id:
+                            _add(diagnostics, "BEHAVIORAL_ASSERTION_ID", f"{report_id} assertion {index} has no assertionId", bundle_path)
+                        elif assertion_id in assertion_ids:
+                            _add(diagnostics, "BEHAVIORAL_ASSERTION_DUPLICATE", f"{report_id} repeats assertionId {assertion_id}", bundle_path)
+                        else:
+                            assertion_ids.add(assertion_id)
                     missing_assertion_fields = sorted(set(required_assertion_fields) - set(assertion))
                     if missing_assertion_fields:
                         _add(diagnostics, "BEHAVIORAL_ASSERTION_FIELDS", f"{report_id} assertion {index} is missing: {', '.join(missing_assertion_fields)}", bundle_path)
             if not isinstance(value.get("cases"), list) or not value.get("cases"):
                 _add(diagnostics, "BEHAVIORAL_REPORT_CASES", f"{report_id} has no cases", bundle_path)
             else:
+                case_ids: set[str] = set()
                 for index, case in enumerate(value["cases"]):
                     if not isinstance(case, dict):
                         _add(diagnostics, "BEHAVIORAL_CASE_ENTRY", f"{report_id} case {index} is not an object", bundle_path)
                         continue
+                    case_id = case.get("caseId")
+                    if strict_traceability:
+                        if not isinstance(case_id, str) or not case_id:
+                            _add(diagnostics, "BEHAVIORAL_CASE_ID", f"{report_id} case {index} has no caseId", bundle_path)
+                        elif case_id in case_ids:
+                            _add(diagnostics, "BEHAVIORAL_CASE_DUPLICATE", f"{report_id} repeats caseId {case_id}", bundle_path)
+                        else:
+                            case_ids.add(case_id)
                     missing_case_fields = sorted(set(required_case_fields) - set(case))
                     if missing_case_fields:
                         _add(diagnostics, "BEHAVIORAL_CASE_FIELDS", f"{report_id} case {index} is missing: {', '.join(missing_case_fields)}", bundle_path)
@@ -1521,6 +1948,52 @@ def _validate_behavioral_report_declarations(
             if value.get("waivers") != []:
                 _add(diagnostics, "BEHAVIORAL_WAIVER", f"{report_id} contains a waiver; release waivers are forbidden", bundle_path)
 
+            if strict_traceability:
+                # Every non-producer report must expose a case inventory and
+                # bind each assertion to one of those cases.  Supporting
+                # artifacts alone are not a substitute for this edge.
+                report_case_ids = {
+                    item.get("caseId")
+                    for item in value.get("cases", [])
+                    if isinstance(item, dict) and isinstance(item.get("caseId"), str)
+                }
+                assertion_case_ids: set[str] = set()
+                for assertion in value.get("assertions", []):
+                    if not isinstance(assertion, dict):
+                        continue
+                    case_id = assertion.get("testCaseId", assertion.get("caseId"))
+                    if not isinstance(case_id, str) or not case_id:
+                        _add(diagnostics, "BEHAVIORAL_ASSERTION_CASE_BINDING", f"{report_id} assertion is not bound to a case", bundle_path)
+                    else:
+                        assertion_case_ids.add(case_id)
+                        if case_id not in report_case_ids:
+                            _add(diagnostics, "BEHAVIORAL_ASSERTION_CASE_MAPPING", f"{report_id} assertion references an unaccounted case: {case_id}", bundle_path)
+                if report_case_ids and assertion_case_ids != report_case_ids:
+                    _add(diagnostics, "BEHAVIORAL_CASE_ASSERTION_COVERAGE", f"{report_id} assertions and cases are not one-to-one", bundle_path)
+
+        if strict_traceability:
+            snapshot_roles = {
+                item.casefold()
+                for item in policies.get("sourceSnapshotOutputRoles", [])
+                if isinstance(item, str)
+            }
+            ignored_roles = {"producer-input", "producer-case-artifact", "campaign-artifacts"}
+            expected_bindings = {
+                (item.get("path"), item.get("role"))
+                for item in outputs
+                if isinstance(item, dict)
+                and isinstance(item.get("path"), str)
+                and isinstance(item.get("role"), str)
+                and item.get("role", "").casefold() not in snapshot_roles
+                and item.get("role") not in ignored_roles
+                and item.get("sourceDirectory") is None
+            }
+            if expected_bindings != declared_bindings:
+                _add(diagnostics, "BEHAVIORAL_REPORT_TRACEABILITY", f"issue #{issue} report declarations do not exactly cover behavioral outputs")
+
+    if strict_traceability and seen_owners != set(BEHAVIORAL_ISSUES):
+        _add(diagnostics, "BEHAVIORAL_REQUIREMENT_SCOPE", f"behavioral requirements must cover exactly {list(BEHAVIORAL_ISSUES)}")
+
 
 def validate_bundle(
     manifest_path: Path,
@@ -1532,6 +2005,7 @@ def validate_bundle(
     diagnostics: list[dict[str, str]] = []
     manifest_path = manifest_path.resolve()
     bundle_root = manifest_path.parent
+    strict_scope = contract_path.resolve() == CONTRACT_PATH.resolve()
     try:
         schema = load_json(repo_root / "schemas" / "qualification-evidence.schema.json")
     except (OSError, json.JSONDecodeError) as exc:
@@ -1544,7 +2018,7 @@ def validate_bundle(
     except (OSError, json.JSONDecodeError) as exc:
         _add(diagnostics, "CONTRACT_LOAD", f"cannot load qualification contract: {exc}")
         contract = {}
-    diagnostics.extend(_validate_contract_shape(contract))
+    diagnostics.extend(_validate_contract_shape(contract, strict_scope=strict_scope))
     try:
         manifest = load_json(manifest_path)
     except FileNotFoundError:
@@ -1553,7 +2027,7 @@ def validate_bundle(
     except (OSError, json.JSONDecodeError) as exc:
         _add(diagnostics, "MANIFEST_JSON", f"cannot load manifest: {exc}")
         return _result(manifest_path, None, diagnostics)
-    _validate_manifest_header(manifest, diagnostics)
+    _validate_manifest_header(manifest, diagnostics, strict_scope=strict_scope)
     if not isinstance(manifest, dict):
         return _result(manifest_path, None, diagnostics)
     _validate_manifest_digest(manifest, diagnostics)
@@ -1586,7 +2060,18 @@ def validate_bundle(
         except (OSError, json.JSONDecodeError) as exc:
             _add(diagnostics, "EVIDENCE_REPORT_EMPTY" if path.stat().st_size == 0 else "EVIDENCE_REPORT_JSON", f"cannot load Evidence report {relative}: {exc}", relative)
             continue
-        evidence_id = _validate_evidence(report, relative, bundle_root, repo_root, manifest, contract, file_table, diagnostics, allow_dirty=allow_dirty)
+        evidence_id = _validate_evidence(
+            report,
+            relative,
+            bundle_root,
+            repo_root,
+            manifest,
+            contract,
+            file_table,
+            diagnostics,
+            allow_dirty=allow_dirty,
+            release_required=strict_scope,
+        )
         if evidence_id is not None:
             if evidence_id in report_by_id:
                 _add(diagnostics, "DUPLICATE_EVIDENCE_ID", f"Evidence ID is defined by more than one report: {evidence_id}", relative)
@@ -1609,6 +2094,7 @@ def validate_bundle(
     declared_issue_numbers = set(manifest.get("issueNumbers", [])) if isinstance(manifest.get("issueNumbers"), list) else set()
     if declared_issue_numbers != expected_issue_numbers:
         _add(diagnostics, "MANIFEST_ISSUE_SCOPE", f"manifest issueNumbers {sorted(declared_issue_numbers)} do not match contract {sorted(expected_issue_numbers)}")
+    _validate_manifest_barrier_coverage(manifest, contract, report_by_id, diagnostics, strict_scope=strict_scope)
     _validate_issue_indexes(bundle_root, manifest, contract, report_by_id, diagnostics)
     _validate_recovery_report_catalog(bundle_root, report_by_id, diagnostics, contract)
     _validate_behavioral_report_declarations(bundle_root, report_by_id, manifest, diagnostics, contract)

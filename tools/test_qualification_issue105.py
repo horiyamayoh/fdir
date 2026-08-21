@@ -17,6 +17,10 @@ class Issue105ContractTests(unittest.TestCase):
         corpus = issue105.load_json(ROOT / "machine" / "qualification-issue-105-corpus.json")
         issue105.validate_corpus(corpus)
         self.assertEqual(corpus["releaseScopeIssues"], list(range(88, 105)))
+        self.assertEqual(corpus["targetIssueNumbers"], [*range(87, 106), *range(108, 114)])
+        self.assertEqual(corpus["barrierIssueNumbers"], [87, *range(108, 114)])
+        self.assertEqual(corpus["barrierCoverage"]["issue-88-qualification-contract"], list(range(108, 114)))
+        self.assertEqual(corpus["barrierCoverage"]["issue-105-release-quality"], [87, *range(108, 114)])
         self.assertEqual(len(corpus["releaseEvidence"]), 17)
         self.assertEqual(tuple(corpus["reportNames"]), issue105.REPORT_NAMES)
 
@@ -62,6 +66,19 @@ class Issue105ContractTests(unittest.TestCase):
             input_paths=[ROOT / "tools" / "convert_document.py"],
         )
         self.assertEqual(result["status"], "passed")
+
+    def test_published_command_metadata_redacts_machine_paths(self) -> None:
+        result = issue105.run_command(
+            [sys.executable, "-c", f"print({str(ROOT)!r})"],
+            expected_exit=0,
+            timeout=30,
+            cwd=ROOT / "e2e" / ".run",
+            input_paths=[ROOT / "tools" / "qualification_issue105.py"],
+        )
+        public_text = json.dumps({"command": result["command"], "cwd": result["cwd"], "diagnostics": result["diagnostics"]})
+        self.assertNotIn(str(ROOT), public_text)
+        self.assertNotIn(str(ROOT).replace("\\", "/"), public_text)
+        self.assertRegex(result["commandSha256"], r"^[0-9a-f]{64}$")
 
 
 if __name__ == "__main__":

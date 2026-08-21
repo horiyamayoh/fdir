@@ -16,7 +16,7 @@ canonical order は readability のための配列順であり、document の so
 
 ## 5.2 Schema version と ID stability
 
-- schema version は major.minor。major は意味を変える破壊的変更、minor は additive field/entity/extension registry の追加。
+- schema version は major.minor.patch 形式（現行の IR schema の version は 1.0.0）。major は意味を変える破壊的変更、minor は additive field/entity/extension registry の追加、patch は互換性を保つ修正に使います。
 - Entity ID は canonical serialization の配列位置ではなく、adapter が作る deterministic scoped identifier とする。
 - 同じ conversion profile で同じ source construct を再度変換できる場合、ID は source map の path だけに依存せず、親・kind・local key から安定化する。
 - source map が欠落した場合も、core entity の ID と canonical identity は有効でなければならない。
@@ -33,7 +33,7 @@ canonical order は readability のための配列順であり、document の so
 | extension schema version | schema registry の compatibility を検査 | exact schema id/version を出す | policy に従う |
 | field rename / unit change | migration が必要 | old version を直接上書きしない | major または explicit migration |
 
-未知 extension は namespace と schemaId を見て解釈できる場合だけ読みます。critical extension を読めない場合、core 部分を返しても conversion status は unsupported または partial であり、成功へ丸めません。non-critical は payload を保留できるが、解釈済みとは称しません。
+未知 extension は namespace と schemaId を見て解釈できる場合だけ読みます。critical extension を読めない場合、core 部分を返しても conversion status は partial または failed とし、成功へ丸めません。non-critical は payload を保留できるが、解釈済みとは称しません。
 
 ## 5.4 Extension contract
 
@@ -46,7 +46,7 @@ Extension は最低限次を持ちます。
   "namespace": "urn:fdir:format:docx",
   "type": "drawingml.shape-properties",
   "schemaId": "urn:fdir:schema/docx/drawingml-shape",
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.0.0",
   "criticality": "non-critical",
   "compatibility": {"unknownVersion": "preserve-and-mark"},
   "payload": {
@@ -73,13 +73,13 @@ SourceMap は UI jump、debug、issue investigation 用の任意 metadata です
 
 ### Entity status
 
-preserved は source fact を共通表現へ直接保持、normalized は明示規則で単位・順序・表現を整えた状態、approximated は安全な近似、ambiguous は複数解釈が残る状態、unsupported は機能を理解できない状態、omitted は policy 上除外、unavailable は入力・権限・resource の制約、failed は変換処理の失敗です。
+preserved は source fact を共通表現へ直接保持、normalized は明示規則で単位・順序・表現を整えた状態、approximated は安全な近似、ambiguous は複数解釈が残る状態、unsupported は機能を理解できない状態、omitted-by-policy は policy 上除外、unavailable は入力・権限・resource の制約、failed は変換処理の失敗です。
 
 ### Diagnostic
 
 Diagnostic は code、severity、target、message、action、sourceMapId?、relatedIds? を持ちます。confidence、accepted、rejected、semantic equivalence、lineage を Diagnostic の名前だけ変えて再導入しません。
 
-一つの未対応 shape があっても document 全体を失敗にせず、shape node に unsupported、feature に partial、document に partial と report します。入力が読めず root を生成できない場合だけ document status は failed です。
+一つの未対応 shape があっても document 全体を失敗にせず、shape node と feature に unsupported 等の状態と Diagnostic を付け、document の conversion.status は partial と report します。入力が読めず root を生成できない場合だけ document status は failed です。
 
 ## 5.7 Index
 

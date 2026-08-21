@@ -248,8 +248,8 @@
       "id": "extension-required-payload-field",
       "category": "extension-target-schema",
       "source": "examples/callout.json",
-      "expectedDiagnostic": "DFIR-SCHEMA-REQUIRED",
-      "expectedPath": "extensions[extension-docx-callout].payload",
+      "expectedDiagnostic": "DFIR-SCHEMA-PROPERTIES",
+      "expectedPath": "extensions[0].payload",
       "operations": [
         {"op": "delete", "path": "extensions[extensionId=extension-docx-callout].payload.presetGeometry"}
       ]

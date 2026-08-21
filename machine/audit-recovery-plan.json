@@ -5,6 +5,9 @@
   "auditBaseSha": "1fd948402500e088c7453aee0743c5e10521a14c",
   "umbrellaIssue": 87,
   "releaseBlocked": true,
+  "targetIssueNumbers": [87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 108, 109, 110, 111, 112, 113],
+  "recoveryChildIssueNumbers": [88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105],
+  "barrierIssueNumbers": [87, 108, 109, 110, 111, 112, 113],
   "auditedClosedIssues": [
     47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61,
     62, 63, 64, 65, 66, 67, 68, 71, 74, 75, 76, 77, 78, 79, 83, 85
@@ -178,6 +181,8 @@
     "status": "blocked",
     "manifestPath": "qualification/<source-sha>/manifest.json",
     "sourceShaPolicy": "exact-bundle-manifest",
+    "targetIssueNumbers": [87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 108, 109, 110, 111, 112, 113],
+    "barrierIssueNumbers": [87, 108, 109, 110, 111, 112, 113],
     "requiredEvidenceIds": [
       "issue-88-qualification-contract", "issue-89-defect-injection", "issue-90-model-contract",
       "issue-91-occurrence-accounting", "issue-92-exact-values", "issue-93-style-provenance",
@@ -185,7 +190,17 @@
       "issue-97-extension-registry", "issue-98-canonical-identity", "issue-99-docx-profile",
       "issue-100-xlsx-profile", "issue-101-pdf-profile", "issue-102-markdown-profile",
       "issue-103-query-index", "issue-104-independent-corpus", "issue-105-release-quality"
-    ]
+    ],
+    "barrierCoverage": {
+      "issue-88-qualification-contract": {
+        "role": "integrity-report",
+        "issueNumbers": [108, 109, 110, 111, 112, 113]
+      },
+      "issue-105-release-quality": {
+        "role": "final-release-report",
+        "issueNumbers": [87, 108, 109, 110, 111, 112, 113]
+      }
+    }
   },
   "closePolicy": {
     "requiredEvidence": "commit-bound qualification bundle",

@@ -26,10 +26,6 @@ permissions:
   actions: read
   issues: read
 
-concurrency:
-  group: fdir-qualification-${{ github.workflow }}-${{ github.ref }}-${{ github.sha }}
-  cancel-in-progress: false
-
 jobs:
   platform:
     name: Platform ${{ matrix.profile }}
@@ -52,19 +48,18 @@ jobs:
             osFamily: Darwin
             python: "3.12"
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       PLATFORM_PROFILE: ${{ matrix.profile }}
       PLATFORM_OS_FAMILY: ${{ matrix.osFamily }}
       PLATFORM_PYTHON: ${{ matrix.python }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ matrix.python }}
       - name: Install qualification dependencies
-        run: python -m pip install --disable-pip-version-check --requirement requirements-qualification.txt
+        run: python -m pip install --disable-pip-version-check --no-cache-dir --force-reinstall --require-hashes --only-binary=:all: --requirement requirements-qualification.txt
       - name: Validate platform identity
         shell: python
         run: |
@@ -129,7 +124,7 @@ jobs:
           Path(os.environ["OUTPUT"]).write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
       - name: Upload platform candidate evidence
         if: ${{ success() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: fdir-platform-evidence-${{ matrix.profile }}-${{ github.sha }}-attempt-${{ github.run_attempt }}
           path: ${{ runner.temp }}/platform-evidence.json
@@ -141,17 +136,15 @@ jobs:
     if: ${{ always() && github.event_name != 'workflow_dispatch' }}
     needs: [platform]
     runs-on: ubuntu-latest
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
       - name: Install qualification dependencies
-        run: python -m pip install --disable-pip-version-check --requirement requirements-qualification.txt
+        run: python -m pip install --disable-pip-version-check --no-cache-dir --force-reinstall --require-hashes --only-binary=:all: --requirement requirements-qualification.txt
       - name: Validate workflow identity
         shell: bash
         run: |
@@ -209,7 +202,7 @@ jobs:
       - name: Upload qualification bundle
         if: ${{ success() }}
         id: upload-bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: fdir-qualification-bundle-${{ github.sha }}-attempt-${{ github.run_attempt }}
           path: ${{ runner.temp }}/qualification
@@ -259,7 +252,7 @@ jobs:
           Path(os.environ["OUTPUT"]).write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
       - name: Upload qualification upload receipt
         if: ${{ success() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: fdir-qualification-receipt-${{ github.sha }}-attempt-${{ github.run_attempt }}
           path: ${{ runner.temp }}/qualification-upload-receipt.json
@@ -280,18 +273,18 @@ jobs:
       EVIDENCE_PATH: ${{ runner.temp }}/fdir-release-evidence/actions-evidence.json
     steps:
       - name: Checkout evidence source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ inputs.attest_sha || github.sha }}
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
       - name: Install qualification dependencies
-        run: python -m pip install --disable-pip-version-check --requirement requirements-qualification.txt
+        run: python -m pip install --disable-pip-version-check --no-cache-dir --force-reinstall --require-hashes --only-binary=:all: --requirement requirements-qualification.txt
       - name: Inspect completed run, jobs, steps, and artifacts
         id: inspect
-        uses: actions/github-script@v7
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         env:
           REQUIRED_PROFILES: '["ubuntu-py3.12", "windows-py3.12", "macos-py3.12"]'
         with:
@@ -542,7 +535,7 @@ jobs:
       - name: Upload GitHub Actions evidence
         if: ${{ success() }}
         id: upload-evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: fdir-ci-evidence-${{ env.EVIDENCE_SHA }}-attempt-${{ env.EVIDENCE_ATTEMPT }}
           path: ${{ env.EVIDENCE_PATH }}
@@ -574,7 +567,7 @@ jobs:
           fi
       - name: Download qualification bundle for attestation
         if: ${{ env.EVIDENCE_MANUAL == 'true' && steps.inspect.outputs.candidate-ready == 'true' }}
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: fdir-qualification-bundle-${{ env.EVIDENCE_SHA }}-attempt-${{ env.EVIDENCE_ATTEMPT }}
           path: ${{ runner.temp }}/candidate-bundle
@@ -583,7 +576,7 @@ jobs:
           run-id: ${{ env.EVIDENCE_RUN_ID }}
       - name: Download qualification upload receipt
         if: ${{ env.EVIDENCE_MANUAL == 'true' && steps.inspect.outputs.candidate-ready == 'true' }}
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: fdir-qualification-receipt-${{ env.EVIDENCE_SHA }}-attempt-${{ env.EVIDENCE_ATTEMPT }}
           path: ${{ runner.temp }}/candidate-receipt
@@ -677,7 +670,7 @@ jobs:
       - name: Upload release attestation
         if: ${{ success() && env.EVIDENCE_MANUAL == 'true' && steps.inspect.outputs.candidate-ready == 'true' }}
         id: upload-attestation
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: fdir-release-attestation-${{ env.EVIDENCE_SHA }}-attempt-${{ env.EVIDENCE_ATTEMPT }}
           path: |
@@ -725,7 +718,7 @@ jobs:
           Path(os.environ["OUTPUT"]).write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
       - name: Upload release attestation publication receipt
         if: ${{ success() && steps.upload-attestation.outcome == 'success' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: fdir-release-attestation-receipt-${{ env.EVIDENCE_SHA }}-attempt-${{ env.EVIDENCE_ATTEMPT }}
           path: ${{ runner.temp }}/fdir-release-evidence/release-attestation-publication.json

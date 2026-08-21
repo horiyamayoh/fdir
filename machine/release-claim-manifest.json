@@ -1,6 +1,9 @@
 {
   "schema": "fdir/document-form-release-claim-manifest",
   "version": "1.0.0",
+  "targetIssueNumbers": [87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 108, 109, 110, 111, 112, 113],
+  "recoveryChildIssueNumbers": [88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105],
+  "barrierIssueNumbers": [87, 108, 109, 110, 111, 112, 113],
   "release": {
     "id": "fdir-document-form-ir-1.0.0",
     "policy": "fail-closed",
@@ -10,7 +13,9 @@
       "path": "machine/audit-recovery-plan.json",
       "schema": "fdir/audit-recovery-plan",
       "umbrellaIssue": 87,
-      "requiredRecoveryIssues": [88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105],
+      "requiredRecoveryIssues": [87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 108, 109, 110, 111, 112, 113],
+      "recoveryChildIssueNumbers": [88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105],
+      "barrierIssueNumbers": [87, 108, 109, 110, 111, 112, 113],
       "requiredEvidence": "commit-bound qualification bundle",
       "requiredLiveState": "GitHub issue API or captured response with retrieval metadata"
     },
@@ -26,6 +31,16 @@
         "issue-100-xlsx-profile", "issue-101-pdf-profile", "issue-102-markdown-profile",
         "issue-103-query-index", "issue-104-independent-corpus", "issue-105-release-quality"
       ],
+      "barrierCoverage": {
+        "issue-88-qualification-contract": {
+          "role": "integrity-report",
+          "issueNumbers": [108, 109, 110, 111, 112, 113]
+        },
+        "issue-105-release-quality": {
+          "role": "final-release-report",
+          "issueNumbers": [87, 108, 109, 110, 111, 112, 113]
+        }
+      },
       "requiredCiProvider": "github-actions"
     },
     "claimBoundary": "typed source-form facts, provenance, relationships, and explicit unavailable or unsupported states",
@@ -56,7 +71,8 @@
   "issueClaimsPolicy": {
     "interpretation": "historical implementation or qualification scope only; not a qualified result",
     "releaseEligible": false,
-    "requiredRecoveryIssues": [88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105],
+    "requiredRecoveryIssues": [87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 108, 109, 110, 111, 112, 113],
+    "barrierIssueNumbers": [87, 108, 109, 110, 111, 112, 113],
     "evidencePolicy": "requires resolvable commit-bound evidence and current live Issue state"
   },
   "capabilityClaimsPolicy": {
@@ -105,6 +121,7 @@
   "independentEvidence": {
     "status": "not-qualified",
     "releaseEligible": false,
+    "targetIssueNumbers": [87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 108, 109, 110, 111, 112, 113],
     "requiredRecoveryIssues": [88, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105],
     "manifest": "e2e/corpus/manifest.json",
     "runner": "tools/independent_corpus.py",

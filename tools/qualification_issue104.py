@@ -61,6 +61,18 @@ REQUIRED_REPORT_NAMES = tuple(REPORT_NAMES.values())
 VALID_FORMATS = {"docx", "xlsx", "pdf", "markdown"}
 VALID_GRADES = {"A", "B", "C", "D", "unavailable"}
 QUALIFYING_GRADES = {"A", "B", "C"}
+FORBIDDEN_FACT_KINDS = {
+    "file-exists",
+    "file-existence",
+    "path-exists",
+    "suite",
+    "exit-code",
+    "stdout",
+    "stderr",
+    "source-snapshot",
+    "token-presence",
+}
+REQUIRED_HOSTILE_STATUS = "failed"
 
 PRODUCER_REPORT_NAME = "producer-report.json"
 PRODUCER_REPORT_SCHEMA = "fdir/qualification-producer-report"
@@ -125,6 +137,83 @@ def _sha256_file(path: Path) -> str:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def _artifact_binding(path: Path | str, role: str) -> dict[str, Any]:
+    """Return an immutable binding for an artifact actually present on disk.
+
+    A path string or a successful subprocess result is not evidence by itself.
+    Every artifact used by an issue #104 lane must have a byte digest and size,
+    or be explicitly marked unavailable.  This keeps a generic suite report or
+    a file-existence check from being promoted into producer evidence.
+    """
+
+    candidate = Path(path)
+    binding: dict[str, Any] = {"role": role, "path": str(candidate), "status": "unavailable"}
+    try:
+        if not candidate.is_file():
+            binding["reason"] = "artifact is not a regular file"
+            return binding
+        binding.update({
+            "status": "bound",
+            "bytes": candidate.stat().st_size,
+            "sha256": _sha256_file(candidate),
+        })
+    except OSError as exc:
+        binding["reason"] = f"{type(exc).__name__}: {exc}"
+    return binding
+
+
+def _execution_binding(input_path: Path, run: dict[str, Any]) -> dict[str, Any]:
+    """Verify that the public converter consumed the exact lane input.
+
+    The converter evidence is an observation, not an authority value.  A
+    positive binding requires the evidence path to resolve to the materialized
+    input and ``consumed`` to be true.  A pre-parse resource rejection may not
+    have a hash, so that one case is accepted only when the evidence explicitly
+    records the rejection.
+    """
+
+    evidence = run.get("evidence") if isinstance(run.get("evidence"), dict) else {}
+    observed = evidence.get("input") if isinstance(evidence.get("input"), dict) else {}
+    reasons: list[str] = []
+    expected_path = input_path.resolve()
+    observed_path = observed.get("path")
+    path_matches = False
+    if isinstance(observed_path, str) and observed_path:
+        try:
+            path_matches = Path(observed_path).resolve() == expected_path
+        except OSError:
+            path_matches = False
+    if not path_matches:
+        reasons.append("converter evidence input path is not the materialized lane input")
+    consumed = observed.get("consumed") is True
+    if not consumed:
+        reasons.append("converter evidence does not record input consumption")
+
+    input_binding = _artifact_binding(input_path, "lane-input")
+    declared_hash = observed.get("sha256")
+    preparse_rejected = observed.get("limitRejectedBeforeParse") is True
+    hash_matches = False
+    if isinstance(declared_hash, str) and isinstance(input_binding.get("sha256"), str):
+        hash_matches = declared_hash == input_binding["sha256"]
+        if not hash_matches:
+            reasons.append("converter evidence input digest does not match the lane input")
+    elif not preparse_rejected:
+        reasons.append("converter evidence has no input digest")
+    if input_binding.get("status") != "bound":
+        reasons.append("lane input artifact is unavailable")
+
+    return {
+        "status": "passed" if not reasons else "failed",
+        "pathMatches": path_matches,
+        "consumed": consumed,
+        "preParseLimitRejected": preparse_rejected,
+        "declaredSha256": declared_hash,
+        "actualSha256": input_binding.get("sha256"),
+        "hashMatches": hash_matches if declared_hash is not None else None,
+        "reasons": reasons,
+    }
 
 
 def _producer_input_paths(corpus_path: Path) -> list[Path]:
@@ -361,11 +450,31 @@ def _load_corpus(path: Path = DEFAULT_CORPUS_PATH) -> dict[str, Any]:
             if fact["factId"] in fact_ids:
                 raise QualificationError(f"fixture {fixture_id} has duplicate fact {fact['factId']}")
             fact_ids.add(fact["factId"])
+            kind = fact.get("kind")
+            if not isinstance(kind, str) or not kind.strip() or kind.casefold() in FORBIDDEN_FACT_KINDS:
+                raise QualificationError(f"fixture {fixture_id} fact {fact['factId']} is not a behavioral fact")
             if fact.get("sourceContains") is not True:
                 raise QualificationError(f"fixture {fixture_id} fact {fact['factId']} is not source-authored")
+            if fact.get("outputContains") is not True:
+                raise QualificationError(f"fixture {fixture_id} fact {fact['factId']} is not required at the output boundary")
         oracle_digest = fixture.get("oracleDigest")
         if not isinstance(oracle_digest, str) or not SHA256_RE.fullmatch(oracle_digest):
             raise QualificationError(f"fixture {fixture_id} lacks an authored oracle digest")
+        actual_source_digest = _actual_source_digest(source_path)
+        if _digest_mismatches(digest, actual_source_digest):
+            raise QualificationError(f"fixture {fixture_id} source digest does not match the checked-in artifact")
+        source_units = _source_units(source_path)
+        source_fact_failures = [
+            fact["factId"]
+            for fact in facts
+            if _source_fact_match(source_units, fact)["status"] != "passed"
+        ]
+        if source_fact_failures:
+            raise QualificationError(
+                f"fixture {fixture_id} has source facts not found in the artifact: {', '.join(source_fact_failures)}"
+            )
+        if _sha256_text(_canonical(facts)) != oracle_digest:
+            raise QualificationError(f"fixture {fixture_id} oracle digest does not match authored facts")
 
     matrix = corpus["producerMatrix"]
     if not isinstance(matrix, list) or not matrix:
@@ -393,6 +502,15 @@ def _load_corpus(path: Path = DEFAULT_CORPUS_PATH) -> dict[str, Any]:
                 raise QualificationError(f"available producer {producer_id} has no fixture")
             if producer_id not in producer_ids_from_fixtures:
                 raise QualificationError(f"producer {producer_id} does not bind a fixture owner")
+            fixture = next(item for item in fixtures if item["fixtureId"] == entry["fixtureId"])
+            if fixture.get("producerId") != producer_id:
+                raise QualificationError(f"producer {producer_id} does not own its declared fixture")
+            if entry.get("independenceGrade") not in QUALIFYING_GRADES:
+                raise QualificationError(f"available producer {producer_id} has no qualifying independence grade")
+            if entry.get("independenceGrade") != fixture.get("independenceGrade"):
+                raise QualificationError(f"available producer {producer_id} grade does not match its fixture")
+            if provenance.get("sourceReference") != fixture.get("provenance", {}).get("sourceReference"):
+                raise QualificationError(f"available producer {producer_id} provenance is not bound to its fixture")
         else:
             if entry.get("fixtureId") is not None:
                 raise QualificationError(f"missing producer {producer_id} cannot bind a local fixture")
@@ -408,13 +526,28 @@ def _load_corpus(path: Path = DEFAULT_CORPUS_PATH) -> dict[str, Any]:
     groups = corpus["adjudicationGroups"]
     if not isinstance(groups, list) or not groups:
         raise QualificationError("issue #104 has no differential adjudication groups")
+    group_ids: set[str] = set()
+    fixture_by_id = {item["fixtureId"]: item for item in fixtures}
+    matrix_by_id = {item["producerId"]: item for item in matrix}
     for group in groups:
         if not isinstance(group, dict) or not isinstance(group.get("groupId"), str) or not isinstance(group.get("producerIds"), list) or len(group["producerIds"]) < 2:
             raise QualificationError("issue #104 differential group is invalid")
+        if group["groupId"] in group_ids:
+            raise QualificationError(f"duplicate issue #104 differential group: {group['groupId']}")
+        group_ids.add(group["groupId"])
+        if group.get("required") is not True:
+            raise QualificationError(f"differential group {group.get('groupId')} is not required")
         if not set(group["producerIds"]).issubset(matrix_ids):
             raise QualificationError(f"differential group {group.get('groupId')} references an unknown producer")
         if not group.get("factIds"):
             raise QualificationError(f"differential group {group.get('groupId')} has no adjudicated facts")
+        group_facts = set(group["factIds"])
+        if not any(
+            matrix_by_id[producer_id].get("availability") == "available"
+            and group_facts.issubset({fact["factId"] for fact in fixture_by_id[matrix_by_id[producer_id]["fixtureId"]]["expectedFacts"]})
+            for producer_id in group["producerIds"]
+        ):
+            raise QualificationError(f"differential group {group.get('groupId')} is not bound to an authored fixture fact set")
 
     relations = corpus["metamorphicRelations"]
     if not isinstance(relations, list) or not relations:
@@ -424,8 +557,13 @@ def _load_corpus(path: Path = DEFAULT_CORPUS_PATH) -> dict[str, Any]:
         if not isinstance(relation, dict) or not isinstance(relation.get("relationId"), str) or relation["relationId"] in relation_ids:
             raise QualificationError("issue #104 metamorphic relation is invalid or duplicated")
         relation_ids.add(relation["relationId"])
+        if relation.get("required") is not True:
+            raise QualificationError(f"metamorphic relation {relation.get('relationId')} is not required")
         if relation.get("fixtureId") not in fixture_ids or not isinstance(relation.get("transform"), dict) or not relation.get("preservesFactIds"):
             raise QualificationError(f"metamorphic relation {relation.get('relationId')} is incomplete")
+        known_fact_ids = {fact["factId"] for fact in fixture_by_id[relation["fixtureId"]]["expectedFacts"]}
+        if not set(relation["preservesFactIds"]).issubset(known_fact_ids):
+            raise QualificationError(f"metamorphic relation {relation.get('relationId')} references an unknown authored fact")
 
     hostile = corpus["hostileCases"]
     if not isinstance(hostile, list) or not hostile:
@@ -435,8 +573,17 @@ def _load_corpus(path: Path = DEFAULT_CORPUS_PATH) -> dict[str, Any]:
         if not isinstance(case, dict) or not isinstance(case.get("caseId"), str) or case["caseId"] in hostile_ids:
             raise QualificationError("issue #104 hostile case is invalid or duplicated")
         hostile_ids.add(case["caseId"])
+        if case.get("required") is not True:
+            raise QualificationError(f"hostile case {case.get('caseId')} is not required")
         if case.get("fixtureId") not in fixture_ids or not isinstance(case.get("mutation"), dict) or not isinstance(case.get("limits"), dict) or not isinstance(case.get("expected"), dict):
             raise QualificationError(f"hostile case {case.get('caseId')} is incomplete")
+        expected = case["expected"]
+        if expected.get("conversionStatus") != REQUIRED_HOSTILE_STATUS:
+            raise QualificationError(f"hostile case {case.get('caseId')} is not fail-closed")
+        if case["limits"] and not isinstance(expected.get("limitRejectedBeforeParse"), bool):
+            raise QualificationError(f"hostile resource case {case.get('caseId')} lacks an explicit limit observation")
+        if case["mutation"].get("type") not in {"identity", "replace-bytes", "repeat"}:
+            raise QualificationError(f"hostile case {case.get('caseId')} has an unsupported mutation")
 
     requirements = corpus["requirements"]
     if not isinstance(requirements, list) or not requirements:
@@ -623,7 +770,26 @@ def _fixture_result(fixture: dict[str, Any], input_path: Path, run: dict[str, An
     source_mismatches = [item for item in source_facts if item["status"] != "passed"]
     output_mismatches = [item for item in output_facts if item.get("status") == "failed"]
     conversion_status = (document or {}).get("conversion", {}).get("status") if isinstance(document, dict) else None
-    converter_ok = not run["timedOut"] and isinstance(document, dict) and conversion_status != "failed"
+    input_artifact = _artifact_binding(input_path, "materialized-fixture")
+    output_artifact = _artifact_binding(run.get("outputPath", ""), "converter-output")
+    evidence_artifact = _artifact_binding(run.get("evidencePath", ""), "converter-evidence")
+    execution_binding = _execution_binding(input_path, run)
+    required_output_facts = [
+        item for item in output_facts
+        if next((fact for fact in fixture["expectedFacts"] if fact["factId"] == item.get("factId")), {}).get("outputContains") is True
+    ]
+    output_boundary_ok = bool(required_output_facts) and all(item.get("status") == "passed" for item in required_output_facts)
+    converter_ok = (
+        not run["timedOut"]
+        and run.get("returnCode") == 0
+        and isinstance(document, dict)
+        and conversion_status != "failed"
+        and input_artifact.get("status") == "bound"
+        and output_artifact.get("status") == "bound"
+        and evidence_artifact.get("status") == "bound"
+        and execution_binding.get("status") == "passed"
+        and output_boundary_ok
+    )
     return {
         "fixtureId": fixture["fixtureId"],
         "scenarioId": fixture["scenarioId"],
@@ -642,11 +808,126 @@ def _fixture_result(fixture: dict[str, Any], input_path: Path, run: dict[str, An
             "evidence": run.get("evidence"),
             "stderr": run.get("stderr"),
         },
+        "inputArtifact": input_artifact,
+        "outputArtifact": output_artifact,
+        "evidenceArtifact": evidence_artifact,
+        "executionBinding": execution_binding,
+        "actualFacts": output_facts,
         "sourceDigest": source_digest,
         "digestMismatches": digest_mismatches,
         "oracleDigest": {"declared": fixture["oracleDigest"], "actual": oracle_digest, "matches": oracle_digest_match},
         "status": "passed" if not source_mismatches and not output_mismatches and not digest_mismatches and oracle_digest_match and converter_ok else "failed",
     }
+
+
+def _declared_artifact_is_current(declaration: Any, role: str) -> bool:
+    """Check a report-declared artifact against its current bytes."""
+
+    if not isinstance(declaration, dict) or declaration.get("status") != "bound":
+        return False
+    path = declaration.get("path")
+    if not isinstance(path, str) or not path:
+        return False
+    observed = _artifact_binding(path, role)
+    return (
+        observed.get("status") == "bound"
+        and observed.get("sha256") == declaration.get("sha256")
+        and observed.get("bytes") == declaration.get("bytes")
+    )
+
+
+def _recompute_fixture_actual(fixture: dict[str, Any], result: dict[str, Any]) -> tuple[list[dict[str, Any]], bool]:
+    """Recompute output facts from the converter artifact, not report flags."""
+
+    output_declaration = result.get("outputArtifact")
+    if not _declared_artifact_is_current(output_declaration, "evaluator-converter-output"):
+        return [], False
+    output_path = Path(output_declaration["path"])
+    evidence_declaration = result.get("evidenceArtifact")
+    if not _declared_artifact_is_current(evidence_declaration, "evaluator-converter-evidence"):
+        return [], False
+    try:
+        document = _read_json(output_path)
+        evidence_value = _read_json(Path(evidence_declaration["path"]))
+    except (OSError, QualificationError):
+        return [], False
+    if not isinstance(document, dict) or not isinstance(evidence_value, dict):
+        return [], False
+    if evidence_value.get("outcome") != "success" or document.get("conversion", {}).get("status") == "failed":
+        return [], False
+    scalars = _output_scalars(document)
+    actual_facts = [_output_fact_match(scalars, fact) for fact in fixture["expectedFacts"]]
+    input_ok = _declared_artifact_is_current(result.get("inputArtifact"), "evaluator-materialized-input")
+    evidence_ok = _declared_artifact_is_current(result.get("evidenceArtifact"), "evaluator-converter-evidence")
+    input_path = Path(result.get("inputArtifact", {}).get("path", ""))
+    binding_ok = _execution_binding(input_path, {"evidence": evidence_value}).get("status") == "passed"
+    return actual_facts, bool(input_ok and evidence_ok and binding_ok and all(item.get("status") == "passed" for item in actual_facts))
+
+
+def _recompute_metamorphic_actual(relation: dict[str, Any], fixture: dict[str, Any], observed: dict[str, Any]) -> bool:
+    """Re-evaluate a metamorphic result from the transformed input/output bytes."""
+
+    transformed = observed.get("transformedArtifact")
+    output = observed.get("outputArtifact")
+    evidence = observed.get("evidenceArtifact")
+    if not (
+        _declared_artifact_is_current(transformed, "evaluator-metamorphic-input")
+        and _declared_artifact_is_current(output, "evaluator-metamorphic-output")
+        and _declared_artifact_is_current(evidence, "evaluator-metamorphic-evidence")
+    ):
+        return False
+    try:
+        units = _source_units(Path(transformed["path"]))
+        document = _read_json(Path(output["path"]))
+        evidence_value = _read_json(Path(evidence["path"]))
+    except (OSError, QualificationError):
+        return False
+    if not isinstance(document, dict) or not isinstance(evidence_value, dict) or evidence_value.get("outcome") != "success" or document.get("conversion", {}).get("status") == "failed":
+        return False
+    if _execution_binding(Path(transformed["path"]), {"evidence": evidence_value}).get("status") != "passed":
+        return False
+    scalars = _output_scalars(document)
+    facts = {fact["factId"]: fact for fact in fixture["expectedFacts"]}
+    for fact_id in relation.get("preservesFactIds", []):
+        fact = facts.get(fact_id)
+        if fact is None:
+            return False
+        source_check = _source_fact_match(units, fact)
+        output_check = _output_fact_match(scalars, fact)
+        if source_check["status"] != "passed" or output_check.get("status") != "passed":
+            return False
+    return bool(relation.get("preservesFactIds"))
+
+
+def _recompute_hostile_actual(case: dict[str, Any], observed: dict[str, Any]) -> bool:
+    """Re-evaluate a hostile case from its mutated input and output artifacts."""
+
+    mutated = observed.get("mutatedArtifact")
+    output = observed.get("outputArtifact")
+    evidence = observed.get("evidenceArtifact")
+    if not (
+        _declared_artifact_is_current(mutated, "evaluator-hostile-input")
+        and _declared_artifact_is_current(output, "evaluator-hostile-output")
+        and _declared_artifact_is_current(evidence, "evaluator-hostile-evidence")
+    ):
+        return False
+    try:
+        document = _read_json(Path(output["path"]))
+        evidence_value = _read_json(Path(evidence["path"]))
+    except (OSError, QualificationError):
+        return False
+    if not isinstance(document, dict) or not isinstance(evidence_value, dict) or evidence_value.get("outcome") != "failed":
+        return False
+    if _execution_binding(Path(mutated["path"]), {"evidence": evidence_value}).get("status") != "passed":
+        return False
+    expected = case.get("expected", {})
+    conversion_status = document.get("conversion", {}).get("status")
+    diagnostic = _diagnostic_text({"document": document, "stdout": "", "stderr": ""})
+    observed_limit = evidence_value.get("input", {}).get("limitRejectedBeforeParse")
+    status_ok = conversion_status == expected.get("conversionStatus") == REQUIRED_HOSTILE_STATUS
+    diagnostic_ok = not expected.get("diagnosticContains") or str(expected["diagnosticContains"]) in diagnostic
+    limit_ok = expected.get("limitRejectedBeforeParse") is None or observed_limit is expected.get("limitRejectedBeforeParse")
+    return bool(status_ok and diagnostic_ok and limit_ok)
 
 
 def _legacy_manifest_audit(corpus: dict[str, Any]) -> dict[str, Any]:
@@ -826,7 +1107,29 @@ def _producer_report(corpus: dict[str, Any], source_sha: str | None, corpus_sha:
                 required_unavailable.append(producer["producerId"])
         else:
             fixture_result = by_fixture[producer["fixtureId"]]
-            qualified = fixture_result["status"] == "passed" and producer["independenceGrade"] in QUALIFYING_GRADES
+            actual_facts = [
+                {
+                    "factId": item.get("factId"),
+                    "value": item.get("value"),
+                    "contains": item.get("contains") is True,
+                    "status": item.get("status"),
+                }
+                for item in fixture_result.get("actualFacts", [])
+                if isinstance(item, dict)
+            ]
+            artifact_bound = (
+                fixture_result.get("inputArtifact", {}).get("status") == "bound"
+                and fixture_result.get("outputArtifact", {}).get("status") == "bound"
+                and fixture_result.get("evidenceArtifact", {}).get("status") == "bound"
+                and fixture_result.get("executionBinding", {}).get("status") == "passed"
+            )
+            qualified = (
+                fixture_result["status"] == "passed"
+                and producer["independenceGrade"] in QUALIFYING_GRADES
+                and artifact_bound
+                and actual_facts
+                and all(item.get("status") == "passed" for item in actual_facts)
+            )
             entry = {
                 "producerId": producer["producerId"],
                 "format": producer["format"],
@@ -836,6 +1139,13 @@ def _producer_report(corpus: dict[str, Any], source_sha: str | None, corpus_sha:
                 "independenceGrade": producer["independenceGrade"],
                 "sourceReference": producer["provenance"]["sourceReference"],
                 "fixtureStatus": fixture_result["status"],
+                "sourceArtifact": fixture_result.get("inputArtifact"),
+                "actualArtifact": fixture_result.get("outputArtifact"),
+                "evidenceArtifact": fixture_result.get("evidenceArtifact"),
+                "executionBinding": fixture_result.get("executionBinding"),
+                "actualFacts": actual_facts,
+                "authoredSourceDigest": fixture_result.get("sourceDigest"),
+                "authoredOracleDigest": fixture_result.get("oracleDigest"),
                 "status": "qualified" if qualified else "failed",
             }
             if producer["required"] and not qualified:
@@ -965,6 +1275,11 @@ def _producer_envelope(
             for item in records(digests_name, "fixtures")
             if isinstance(item, dict) and isinstance(item.get("fixtureId"), str)
         }
+        recomputed_fixture_actuals: dict[str, tuple[list[dict[str, Any]], bool]] = {
+            fixture_id: _recompute_fixture_actual(fixture, result)
+            for fixture in corpus.get("fixtures", [])
+            for fixture_id, result in [(fixture["fixtureId"], fixture_results.get(fixture["fixtureId"], {}))]
+        }
         authority_facts = records(provenance_name, "producerAuthority")
         actual_facts = records(digests_name, "producerActual")
         authority_oracles = records(provenance_name, "producerOracleAuthority")
@@ -973,9 +1288,10 @@ def _producer_envelope(
         for fixture in corpus.get("fixtures", []):
             fixture_id = fixture["fixtureId"]
             result = fixture_results.get(fixture_id, {})
+            recomputed_facts, recomputed_ok = recomputed_fixture_actuals.get(fixture_id, ([], False))
             output_facts = {
                 item.get("factId"): item
-                for item in result.get("outputFacts", [])
+                for item in recomputed_facts
                 if isinstance(item, dict) and isinstance(item.get("factId"), str)
             }
             for fact in fixture.get("expectedFacts", []):
@@ -983,17 +1299,19 @@ def _producer_envelope(
                 expected = {
                     "value": fact.get("value"),
                     "contains": fact.get("outputContains") is True,
+                    "artifactBound": True,
                 }
                 observed = output_facts.get(fact_id, {})
                 actual = {
                     "value": observed.get("value"),
                     "contains": observed.get("contains") is True,
+                    "artifactBound": recomputed_ok,
                 }
                 target = {"fixtureId": fixture_id, "producerId": fixture["producerId"], "factId": fact_id}
                 authority_index = len(authority_facts)
                 authority_facts.append({"caseId": fact_id, "expected": expected, "target": target, "status": "passed"})
                 actual_index = len(actual_facts)
-                actual_facts.append({"caseId": fact_id, "actual": actual, "target": target, "status": "passed" if actual == expected else "failed"})
+                actual_facts.append({"caseId": fact_id, "actual": actual, "target": target, "status": "passed" if actual == expected and recomputed_ok else "failed"})
                 add_case(
                     case_id=f"fact-{fact_id}",
                     classification="positive",
@@ -1006,9 +1324,9 @@ def _producer_envelope(
                     diagnostic={"code": "ISSUE_104_AUTHORED_FACT", "message": "source-side authored fact is compared with converter output"},
                 )
 
-            oracle = result.get("oracleDigest", {})
+            declared_oracle = _sha256_text(_canonical(fixture.get("expectedFacts", [])))
             expected_oracle = {"matches": True}
-            actual_oracle = {"matches": oracle.get("matches") is True}
+            actual_oracle = {"matches": declared_oracle == fixture.get("oracleDigest")}
             oracle_target = {"fixtureId": fixture_id, "oracleDigest": fixture.get("oracleDigest")}
             authority_index = len(authority_oracles)
             authority_oracles.append({"caseId": f"oracle-{fixture_id}", "expected": expected_oracle, "target": oracle_target, "status": "passed"})
@@ -1038,6 +1356,11 @@ def _producer_envelope(
             for item in corpus.get("producerMatrix", [])
             if isinstance(item, dict) and isinstance(item.get("producerId"), str)
         }
+        recomputed_producer_actuals: dict[str, tuple[list[dict[str, Any]], bool]] = {
+            producer_id: recomputed_fixture_actuals.get(producer.get("fixtureId"), ([], False))
+            for producer_id, producer in matrix_by_id.items()
+            if producer.get("availability") == "available"
+        }
         for producer_id, producer in matrix_by_id.items():
             entry = producer_entries.get(producer_id, {})
             target = {"producerId": producer_id, "format": producer.get("format")}
@@ -1053,12 +1376,17 @@ def _producer_envelope(
                 classification = "negative"
                 assertion_type = "mutation-killed"
             else:
-                expected = {"required": producer.get("required") is True, "availability": "available", "independenceGrade": producer.get("independenceGrade")}
+                fixture_id = producer.get("fixtureId")
+                _, recomputed_ok = recomputed_producer_actuals.get(producer_id, ([], False))
+                expected = {"required": producer.get("required") is True, "availability": "available", "independenceGrade": producer.get("independenceGrade"), "qualified": True}
                 actual = {
                     "required": entry.get("required") is True,
                     "availability": entry.get("availability"),
                     "independenceGrade": entry.get("independenceGrade"),
+                    "qualified": recomputed_ok,
                 }
+                if producer.get("required") is True and not recomputed_ok:
+                    uncovered.append(f"{producer_id}: producer output artifact or execution binding is not independently verifiable")
                 classification = "positive"
                 assertion_type = "corpus-independence"
             authority_index = len(authority_producers)
@@ -1079,13 +1407,54 @@ def _producer_envelope(
 
         authority_groups = records(provenance_name, "producerDifferentialAuthority")
         actual_groups = records(differential_name, "producerDifferentialActual")
-        differential_groups = {item.get("groupId"): item for item in records(differential_name, "groups") if isinstance(item, dict)}
         for group in corpus.get("adjudicationGroups", []):
             group_id = group["groupId"]
-            observed = differential_groups.get(group_id, {})
             expected_adjudication = "unavailable" if any(matrix_by_id.get(pid, {}).get("availability") == "missing" for pid in group.get("producerIds", [])) else "agreement"
             expected = {"required": group.get("required") is True, "adjudication": expected_adjudication}
-            actual = {"required": observed.get("required") is True, "adjudication": observed.get("adjudication")}
+            runtime_members = []
+            for producer_id in group.get("producerIds", []):
+                producer = matrix_by_id.get(producer_id, {})
+                if producer.get("availability") != "available":
+                    runtime_members.append({"producerId": producer_id, "available": False, "facts": {}})
+                    continue
+                facts, artifact_ok = recomputed_producer_actuals.get(producer_id, ([], False))
+                runtime_members.append({
+                    "producerId": producer_id,
+                    "available": artifact_ok,
+                    "facts": {
+                        item.get("factId"): {
+                            "value": item.get("value"),
+                            "contains": item.get("contains") is True,
+                            "status": item.get("status"),
+                        }
+                        for item in facts
+                        if isinstance(item, dict) and isinstance(item.get("factId"), str)
+                    },
+                })
+            runtime_available = [item for item in runtime_members if item["available"]]
+            runtime_unavailable = [item for item in runtime_members if not item["available"]]
+            runtime_pairwise = []
+            for index, left in enumerate(runtime_available):
+                for right in runtime_available[index + 1:]:
+                    runtime_pairwise.append(
+                        all(
+                            left["facts"].get(fact_id, {}).get("status") == "passed"
+                            and right["facts"].get(fact_id, {}).get("status") == "passed"
+                            and left["facts"].get(fact_id) == right["facts"].get(fact_id)
+                            for fact_id in group.get("factIds", [])
+                        )
+                    )
+            runtime_agreement = (
+                len(runtime_available) >= 2
+                and not runtime_unavailable
+                and all(
+                    all(item["facts"].get(fact_id, {}).get("status") == "passed" for fact_id in group.get("factIds", []))
+                    for item in runtime_available
+                )
+                and all(runtime_pairwise)
+            )
+            actual_adjudication = "unavailable" if runtime_unavailable else "agreement" if runtime_agreement else "insufficient-members"
+            actual = {"required": group.get("required") is True, "adjudication": actual_adjudication}
             target = {"groupId": group_id, "format": group.get("format"), "factIds": group.get("factIds", [])}
             authority_index = len(authority_groups)
             authority_groups.append({"caseId": f"differential-{group_id}", "expected": expected, "target": target, "status": "passed"})
@@ -1106,11 +1475,12 @@ def _producer_envelope(
         authority_relations = records(provenance_name, "producerMetamorphicAuthority")
         actual_relations = records(metamorphic_name, "producerMetamorphicActual")
         metamorphic_results = {item.get("relationId"): item for item in records(metamorphic_name, "relations") if isinstance(item, dict)}
+        fixture_by_id = {fixture["fixtureId"]: fixture for fixture in corpus.get("fixtures", [])}
         for relation in corpus.get("metamorphicRelations", []):
             relation_id = relation["relationId"]
             observed = metamorphic_results.get(relation_id, {})
             expected = {"preserved": relation.get("required") is True and bool(relation.get("preservesFactIds"))}
-            actual = {"preserved": observed.get("status") == "passed"}
+            actual = {"preserved": _recompute_metamorphic_actual(relation, fixture_by_id.get(relation.get("fixtureId"), {}), observed)}
             target = {"relationId": relation_id, "fixtureId": relation.get("fixtureId"), "transform": relation.get("transform")}
             authority_index = len(authority_relations)
             authority_relations.append({"caseId": f"metamorphic-{relation_id}", "expected": expected, "target": target, "status": "passed"})
@@ -1135,7 +1505,7 @@ def _producer_envelope(
             case_id = hostile["caseId"]
             observed = hostile_results.get(case_id, {})
             expected = {"detected": hostile.get("required") is True}
-            actual = {"detected": observed.get("detected") is True}
+            actual = {"detected": _recompute_hostile_actual(hostile, observed)}
             target = {"caseId": case_id, "fixtureId": hostile.get("fixtureId"), "limits": hostile.get("limits", {})}
             authority_index = len(authority_hostile)
             authority_hostile.append({"caseId": f"hostile-{case_id}", "expected": expected, "target": target, "status": "passed"})
@@ -1279,28 +1649,62 @@ def _producer_envelope(
 
 
 def _fact_map(fixture: dict[str, Any]) -> dict[str, Any]:
+    """Return authored facts for diagnostics; never use this as differential actuals."""
+
     return {fact["factId"]: fact.get("value") for fact in fixture["expectedFacts"]}
 
 
 def _differential_report(corpus: dict[str, Any], source_sha: str | None, corpus_sha: str | None, producer_report: dict[str, Any]) -> dict[str, Any]:
     report = _base_report("differential-adjudication", source_sha, corpus_sha)
     producer_entries = {item["producerId"]: item for item in producer_report["producerMatrix"]}
-    fixture_by_producer = {fixture["producerId"]: fixture for fixture in corpus["fixtures"]}
     groups = []
     for group in corpus["adjudicationGroups"]:
         available = [producer_id for producer_id in group["producerIds"] if producer_entries[producer_id]["status"] == "qualified"]
         unavailable = [producer_id for producer_id in group["producerIds"] if producer_entries[producer_id]["status"] == "unavailable"]
         member_facts = []
         for producer_id in available:
-            fixture = fixture_by_producer[producer_id]
-            values = _fact_map(fixture)
-            member_facts.append({"producerId": producer_id, "fixtureId": fixture["fixtureId"], "facts": {key: values.get(key) for key in group["factIds"]}})
+            entry = producer_entries[producer_id]
+            actual_by_id = {
+                item.get("factId"): item
+                for item in entry.get("actualFacts", [])
+                if isinstance(item, dict) and isinstance(item.get("factId"), str)
+            }
+            facts = {
+                fact_id: {
+                    "value": actual_by_id.get(fact_id, {}).get("value"),
+                    "contains": actual_by_id.get(fact_id, {}).get("contains") is True,
+                    "status": actual_by_id.get(fact_id, {}).get("status"),
+                }
+                for fact_id in group["factIds"]
+            }
+            member_facts.append({
+                "producerId": producer_id,
+                "fixtureId": entry.get("fixtureId"),
+                "sourceArtifact": entry.get("sourceArtifact"),
+                "actualArtifact": entry.get("actualArtifact"),
+                "executionBinding": entry.get("executionBinding"),
+                "facts": facts,
+                "actualArtifactsBound": all(
+                    item.get("status") == "passed"
+                    and entry.get("sourceArtifact", {}).get("status") == "bound"
+                    and entry.get("actualArtifact", {}).get("status") == "bound"
+                    for item in facts.values()
+                ),
+            })
         pairwise = []
         for index, left in enumerate(member_facts):
             for right in member_facts[index + 1:]:
-                differences = [fact_id for fact_id in group["factIds"] if left["facts"].get(fact_id) != right["facts"].get(fact_id)]
+                differences = [
+                    fact_id
+                    for fact_id in group["factIds"]
+                    if left["facts"].get(fact_id) != right["facts"].get(fact_id)
+                ]
                 pairwise.append({"left": left["producerId"], "right": right["producerId"], "differences": differences, "status": "passed" if not differences else "failed"})
-        agreement = len(member_facts) >= 2 and all(item["status"] == "passed" for item in pairwise)
+        agreement = (
+            len(member_facts) >= 2
+            and all(item["actualArtifactsBound"] for item in member_facts)
+            and all(item["status"] == "passed" for item in pairwise)
+        )
         status = "passed" if agreement and not unavailable else "failed"
         groups.append({
             "groupId": group["groupId"],
@@ -1312,6 +1716,7 @@ def _differential_report(corpus: dict[str, Any], source_sha: str | None, corpus_
             "pairwiseComparisons": pairwise,
             "adjudication": "agreement" if agreement else ("unavailable" if unavailable else "insufficient-members"),
             "independentExpectedFacts": True,
+            "actualValuesDerivedFromProducerArtifacts": True,
             "status": status,
         })
     report["groups"] = groups
@@ -1320,6 +1725,7 @@ def _differential_report(corpus: dict[str, Any], source_sha: str | None, corpus_
     report["assertions"] = [
         {"id": "required-differential-groups-executed", "status": "passed" if groups else "failed"},
         {"id": "differential-adjudication-has-two-available-members", "status": "passed" if all(len(item["availableProducers"]) >= 2 for item in groups) else "failed"},
+        {"id": "differential-members-have-bound-artifacts", "status": "passed" if all(all(member["actualArtifactsBound"] for member in item["memberFacts"]) for item in groups) else "failed"},
         {"id": "no-differential-disagreement", "status": "passed" if all(not item["pairwiseComparisons"] or all(pair["status"] == "passed" for pair in item["pairwiseComparisons"]) for item in groups) else "failed"},
     ]
     return report
@@ -1356,6 +1762,7 @@ def _transform_input(base: Path, transform: dict[str, Any], destination: Path) -
 def _metamorphic_report(corpus: dict[str, Any], source_sha: str | None, corpus_sha: str | None, fixture_inputs: dict[str, Path], fixture_by_id: dict[str, dict[str, Any]], work_dir: Path) -> dict[str, Any]:
     report = _base_report("metamorphic-relations", source_sha, corpus_sha)
     relation_results = []
+    independent = _runner_import_audit()["independent"]
     for relation in corpus["metamorphicRelations"]:
         fixture = fixture_by_id[relation["fixtureId"]]
         base = fixture_inputs[fixture["fixtureId"]]
@@ -1368,6 +1775,11 @@ def _metamorphic_report(corpus: dict[str, Any], source_sha: str | None, corpus_s
             document = run.get("document")
             scalars = _output_scalars(document) if isinstance(document, dict) else []
             units = _source_units(mutated)
+            base_artifact = _artifact_binding(base, "metamorphic-base-input")
+            transformed_artifact = _artifact_binding(mutated, "metamorphic-transformed-input")
+            output_artifact = _artifact_binding(run.get("outputPath", ""), "metamorphic-converter-output")
+            evidence_artifact = _artifact_binding(run.get("evidencePath", ""), "metamorphic-converter-evidence")
+            execution_binding = _execution_binding(mutated, run)
             checks = []
             facts = {fact["factId"]: fact for fact in fixture["expectedFacts"]}
             for fact_id in relation["preservesFactIds"]:
@@ -1378,24 +1790,47 @@ def _metamorphic_report(corpus: dict[str, Any], source_sha: str | None, corpus_s
                 source_check = _source_fact_match(units, fact)
                 output_check = _output_fact_match(scalars, fact)
                 checks.append({"factId": fact_id, "sourceStatus": source_check["status"], "outputStatus": output_check.get("status"), "status": "passed" if source_check["status"] == "passed" and output_check.get("status") in {"passed", "not-required"} else "failed"})
-            status = "passed" if not run["timedOut"] and isinstance(document, dict) and document.get("conversion", {}).get("status") != "failed" and all(item["status"] == "passed" for item in checks) else "failed"
+            changed = base_artifact.get("sha256") != transformed_artifact.get("sha256")
+            artifact_ok = (
+                base_artifact.get("status") == "bound"
+                and transformed_artifact.get("status") == "bound"
+                and (changed or relation["transform"].get("type") == "identity")
+                and execution_binding.get("status") == "passed"
+            )
+            status = "passed" if (
+                independent
+                and not run["timedOut"]
+                and run.get("returnCode") == 0
+                and isinstance(document, dict)
+                and document.get("conversion", {}).get("status") != "failed"
+                and bool(checks)
+                and all(item["status"] == "passed" for item in checks)
+                and artifact_ok
+            ) else "failed"
             relation_results.append({
                 "relationId": relation["relationId"],
                 "fixtureId": fixture["fixtureId"],
                 "transform": relation["transform"],
-                "independentFromAdapter": True,
+                "independentFromAdapter": independent,
+                "baseArtifact": base_artifact,
+                "transformedArtifact": transformed_artifact,
+                "outputArtifact": output_artifact,
+                "evidenceArtifact": evidence_artifact,
+                "executionBinding": execution_binding,
+                "transformChangedBytes": changed,
                 "checks": checks,
                 "converter": {"returnCode": run["returnCode"], "conversionStatus": (document or {}).get("conversion", {}).get("status") if isinstance(document, dict) else None, "stderr": run.get("stderr")},
                 "status": status,
             })
         except (OSError, QualificationError, zipfile.BadZipFile) as exc:
-            relation_results.append({"relationId": relation["relationId"], "fixtureId": fixture["fixtureId"], "transform": relation["transform"], "independentFromAdapter": True, "status": "failed", "error": f"{type(exc).__name__}: {exc}"})
+            relation_results.append({"relationId": relation["relationId"], "fixtureId": fixture["fixtureId"], "transform": relation["transform"], "independentFromAdapter": independent, "status": "failed", "error": f"{type(exc).__name__}: {exc}"})
     report["relations"] = relation_results
     report["failedRelationCount"] = sum(item["status"] != "passed" for item in relation_results)
     report["sectionStatus"] = "passed" if report["failedRelationCount"] == 0 else "failed"
     report["assertions"] = [
         {"id": "all-required-relations-executed", "status": "passed" if len(relation_results) == len(corpus["metamorphicRelations"]) else "failed"},
         {"id": "all-required-relations-preserve-authored-facts", "status": "passed" if report["failedRelationCount"] == 0 else "failed"},
+        {"id": "relations-use-bound-transformed-artifacts", "status": "passed" if all(item.get("executionBinding", {}).get("status") == "passed" and item.get("transformedArtifact", {}).get("status") == "bound" for item in relation_results) else "failed"},
         {"id": "relations-do-not-source-expected-values-from-adapter", "status": "passed" if all(item.get("independentFromAdapter") is True for item in relation_results) else "failed"},
     ]
     return report
@@ -1443,17 +1878,41 @@ def _hostile_report(corpus: dict[str, Any], source_sha: str | None, corpus_sha: 
             observed_status = document.get("conversion", {}).get("status") if isinstance(document, dict) else None
             diagnostic = _diagnostic_text(run)
             expected = case["expected"]
+            base_artifact = _artifact_binding(fixture_inputs[fixture["fixtureId"]], "hostile-base-input")
+            mutated_artifact = _artifact_binding(mutated, "hostile-mutated-input")
+            output_artifact = _artifact_binding(run.get("outputPath", ""), "hostile-converter-output")
+            evidence_artifact = _artifact_binding(run.get("evidencePath", ""), "hostile-converter-evidence")
+            execution_binding = _execution_binding(mutated, run)
             status_ok = observed_status == expected.get("conversionStatus")
             diagnostic_ok = not expected.get("diagnosticContains") or str(expected["diagnosticContains"]) in diagnostic
             evidence_ok = expected.get("limitRejectedBeforeParse") is None or evidence.get("input", {}).get("limitRejectedBeforeParse") is expected.get("limitRejectedBeforeParse")
-            detected = status_ok and diagnostic_ok and evidence_ok and not run["timedOut"]
+            artifact_ok = (
+                base_artifact.get("status") == "bound"
+                and mutated_artifact.get("status") == "bound"
+                and execution_binding.get("status") == "passed"
+            )
+            detected = (
+                status_ok
+                and diagnostic_ok
+                and evidence_ok
+                and artifact_ok
+                and not run["timedOut"]
+                and isinstance(document, dict)
+                and run.get("returnCode") == 2
+            )
             cases.append({
                 "caseId": case["caseId"],
                 "fixtureId": fixture["fixtureId"],
                 "format": fixture["format"],
                 "limits": case["limits"],
                 "mutation": case["mutation"],
+                "baseArtifact": base_artifact,
+                "mutatedArtifact": mutated_artifact,
+                "outputArtifact": output_artifact,
+                "evidenceArtifact": evidence_artifact,
+                "executionBinding": execution_binding,
                 "observed": {"conversionStatus": observed_status, "diagnostic": diagnostic[-2000:], "limitRejectedBeforeParse": evidence.get("input", {}).get("limitRejectedBeforeParse")},
+                "returnCode": run.get("returnCode"),
                 "expected": expected,
                 "detected": detected,
                 "status": "passed" if detected else "failed",
@@ -1466,6 +1925,7 @@ def _hostile_report(corpus: dict[str, Any], source_sha: str | None, corpus_sha: 
     report["assertions"] = [
         {"id": "all-hostile-cases-executed", "status": "passed" if len(cases) == len(corpus["hostileCases"]) else "failed"},
         {"id": "all-hostile-cases-fail-closed", "status": "passed" if report["failedCaseCount"] == 0 else "failed"},
+        {"id": "hostile-cases-use-bound-mutated-artifacts", "status": "passed" if all(item.get("mutatedArtifact", {}).get("status") == "bound" and item.get("executionBinding", {}).get("status") == "passed" for item in cases) else "failed"},
         {"id": "resource-limits-are-observable", "status": "passed" if any(item.get("observed", {}).get("limitRejectedBeforeParse") is True for item in cases) else "failed"},
     ]
     return report

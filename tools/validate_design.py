@@ -304,7 +304,11 @@ def validate_schema(schema: dict) -> None:
     for name in ["node", "text", "style", "layout", "geometry", "relation", "order", "observation", "extension", "diagnostic", "conversionReport"]:
         require(name in definitions, f"IR schema is missing typed definition: {name}")
     for name, definition in definitions.items():
-        if isinstance(definition, dict) and definition.get("type") == "object" and name not in {"extension", "styleProperties"}:
+        # Opaque extension payloads are deliberately recursive key/value
+        # envelopes.  Their open keys are the preservation boundary for
+        # non-critical, unknown producer fields; all interpreted definitions
+        # remain closed typed objects.
+        if isinstance(definition, dict) and definition.get("type") == "object" and name not in {"extension", "styleProperties", "extensionPayload", "opaqueExtensionPayloadObject"}:
             require(definition.get("additionalProperties") is False, f"typed definition is an open property bag: {name}")
     raw = json.dumps(schema, ensure_ascii=False)
     forbidden = [

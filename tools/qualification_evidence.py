@@ -116,6 +116,12 @@ ARTIFACT_REFERENCE_ALLOWED_FIELDS = ARTIFACT_REFERENCE_REQUIRED_FIELDS
 SELECTOR_REQUIRED_FIELDS = frozenset({"kind"})
 SELECTOR_ALLOWED_FIELDS = frozenset({"kind", "pointer", "lineStart", "lineEnd"})
 CLASSIFICATIONS = frozenset({"positive", "negative", "mutation", "metamorphic", "differential", "hostile"})
+COMPARISON_OPERATORS = frozenset({"equal", "not-equal", "contains"})
+PRODUCER_RESULT_VALUES = frozenset({"passed", "failed", "skipped"})
+PRODUCER_ASSERTION_STATUS_VALUES = frozenset({"passed", "failed"})
+_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_SOURCE_SHA = re.compile(r"^[0-9a-f]{40}$")
 
 
 def is_producer_report_output(value: Any) -> bool:
@@ -133,6 +139,135 @@ def is_producer_report_output(value: Any) -> bool:
         isinstance(value.get("role"), str)
         and value["role"].casefold() == PRODUCER_REPORT_OUTPUT_ROLE
     )
+
+
+def evaluate_registered_assertion(assertion_type: Any, expected: Any, actual: Any, comparison: Any) -> bool | None:
+    """Evaluate a typed producer assertion without a generic equality fallback."""
+
+    if not isinstance(assertion_type, str) or assertion_type not in ASSERTION_EVALUATOR_REGISTRY:
+        return None
+    if not isinstance(comparison, dict) or set(comparison) != {"operator"}:
+        return None
+    try:
+        return bool(ASSERTION_EVALUATOR_REGISTRY[assertion_type](expected, actual, comparison))
+    except (TypeError, ValueError):
+        return None
+
+
+def _valid_identifier(value: Any) -> bool:
+    return isinstance(value, str) and _IDENTIFIER.fullmatch(value) is not None
+
+
+def _valid_sha256(value: Any) -> bool:
+    return isinstance(value, str) and _SHA256.fullmatch(value) is not None
+
+
+def _valid_source_sha(value: Any) -> bool:
+    return isinstance(value, str) and _SOURCE_SHA.fullmatch(value) is not None
+
+
+def _artifact_reference_shape_errors(reference: Any, label: str) -> list[str]:
+    errors: list[str] = []
+    if not isinstance(reference, dict):
+        return [f"{label} must be an artifact reference object"]
+    missing = sorted(ARTIFACT_REFERENCE_REQUIRED_FIELDS - set(reference))
+    extra = sorted(set(reference) - ARTIFACT_REFERENCE_ALLOWED_FIELDS)
+    if missing:
+        errors.append(f"{label} is missing: {', '.join(missing)}")
+    if extra:
+        errors.append(f"{label} has unknown fields: {', '.join(extra)}")
+    if not isinstance(reference.get("path"), str) or not reference.get("path"):
+        errors.append(f"{label}.path is required")
+    if not _valid_sha256(reference.get("sha256")):
+        errors.append(f"{label}.sha256 is not a lowercase SHA-256")
+    if not _valid_sha256(reference.get("selectedSha256")):
+        errors.append(f"{label}.selectedSha256 is not a lowercase SHA-256")
+    selector = reference.get("selector")
+    if not isinstance(selector, dict):
+        errors.append(f"{label}.selector must be an object")
+    else:
+        selector_extra = sorted(set(selector) - SELECTOR_ALLOWED_FIELDS)
+        if selector_extra:
+            errors.append(f"{label}.selector has unknown fields: {', '.join(selector_extra)}")
+        kind = selector.get("kind")
+        if kind not in {"json-pointer", "whole-file"}:
+            errors.append(f"{label}.selector.kind is invalid")
+        elif kind == "json-pointer" and (not isinstance(selector.get("pointer"), str) or not selector.get("pointer", "").startswith("/") and selector.get("pointer") != ""):
+            errors.append(f"{label}.selector.pointer is invalid")
+        elif kind == "whole-file" and any(key in selector for key in ("pointer", "lineStart", "lineEnd")):
+            errors.append(f"{label}.selector has fields incompatible with whole-file")
+    return errors
+
+
+def _typed_assertion_shape_errors(assertion: Any, index: int) -> list[str]:
+    label = f"producer assertion {index}"
+    if not isinstance(assertion, dict):
+        return [f"{label} must be an object"]
+    errors: list[str] = []
+    missing = sorted(PRODUCER_ASSERTION_REQUIRED_FIELDS - set(assertion))
+    extra = sorted(set(assertion) - PRODUCER_ASSERTION_ALLOWED_FIELDS)
+    if missing:
+        errors.append(f"{label} is missing: {', '.join(missing)}")
+    if extra:
+        errors.append(f"{label} has unknown fields: {', '.join(extra)}")
+    if not _valid_identifier(assertion.get("assertionId")):
+        errors.append(f"{label}.assertionId is invalid")
+    if not _valid_identifier(assertion.get("requirementId")):
+        errors.append(f"{label}.requirementId is invalid")
+    if not _valid_identifier(assertion.get("testCaseId")):
+        errors.append(f"{label}.testCaseId is invalid")
+    assertion_type = assertion.get("assertionType")
+    if assertion_type not in ASSERTION_EVALUATOR_REGISTRY:
+        errors.append(f"{label}.assertionType has no registered evaluator")
+    if assertion.get("classification") not in CLASSIFICATIONS:
+        errors.append(f"{label}.classification is invalid")
+    for field in ("authorityArtifact", "actualArtifact", "supportingArtifact"):
+        errors.extend(_artifact_reference_shape_errors(assertion.get(field), f"{label}.{field}"))
+    comparison = assertion.get("comparison")
+    if not isinstance(comparison, dict) or set(comparison) != {"operator"} or comparison.get("operator") not in COMPARISON_OPERATORS:
+        errors.append(f"{label}.comparison is invalid")
+    if assertion.get("status") not in PRODUCER_ASSERTION_STATUS_VALUES:
+        errors.append(f"{label}.status is invalid")
+    target = assertion.get("target")
+    if not isinstance(target, dict) or not target:
+        errors.append(f"{label}.target must be a non-empty object")
+    diagnostic = assertion.get("diagnostic")
+    if not isinstance(diagnostic, dict) or set(diagnostic) != {"code", "message"} or not all(isinstance(diagnostic.get(field), str) and diagnostic[field] for field in ("code", "message")):
+        errors.append(f"{label}.diagnostic is invalid")
+    return errors
+
+
+def _typed_case_shape_errors(case: Any, index: int) -> list[str]:
+    label = f"producer test case {index}"
+    if not isinstance(case, dict):
+        return [f"{label} must be an object"]
+    errors: list[str] = []
+    missing = sorted(PRODUCER_CASE_REQUIRED_FIELDS - set(case))
+    extra = sorted(set(case) - PRODUCER_CASE_ALLOWED_FIELDS)
+    if missing:
+        errors.append(f"{label} is missing: {', '.join(missing)}")
+    if extra:
+        errors.append(f"{label} has unknown fields: {', '.join(extra)}")
+    if not _valid_identifier(case.get("caseId")):
+        errors.append(f"{label}.caseId is invalid")
+    if not _valid_identifier(case.get("requirementId")):
+        errors.append(f"{label}.requirementId is invalid")
+    if case.get("classification") not in CLASSIFICATIONS:
+        errors.append(f"{label}.classification is invalid")
+    for field in ("inputArtifact", "authorityArtifact", "actualArtifact", "supportingArtifact"):
+        errors.extend(_artifact_reference_shape_errors(case.get(field), f"{label}.{field}"))
+    comparison = case.get("comparison")
+    if not isinstance(comparison, dict) or set(comparison) != {"operator"} or comparison.get("operator") not in COMPARISON_OPERATORS:
+        errors.append(f"{label}.comparison is invalid")
+    if case.get("result") not in PRODUCER_RESULT_VALUES:
+        errors.append(f"{label}.result is invalid")
+    target = case.get("target")
+    if not isinstance(target, dict) or not target:
+        errors.append(f"{label}.target must be a non-empty object")
+    diagnostic = case.get("diagnostic")
+    if not isinstance(diagnostic, dict) or set(diagnostic) != {"code", "message"} or not all(isinstance(diagnostic.get(field), str) and diagnostic[field] for field in ("code", "message")):
+        errors.append(f"{label}.diagnostic is invalid")
+    return errors
 
 
 def canonical_json_bytes(value: Any) -> bytes:
@@ -271,7 +406,12 @@ def allowed_producer_assertion_types(issue_numbers: list[int]) -> frozenset[str]
 
 
 def validate_producer_report_shape(report: Any) -> list[str]:
-    """Validate the closed, issue-specific producer report envelope."""
+    """Validate the closed, typed producer report envelope.
+
+    This is intentionally a shape/type check only.  Artifact selectors and
+    assertion results are checked against copied output content by the bundle
+    builder after this function succeeds.
+    """
 
     errors: list[str] = []
     if not isinstance(report, dict):
@@ -284,29 +424,53 @@ def validate_producer_report_shape(report: Any) -> list[str]:
         errors.append("producer report has unknown fields: " + ", ".join(extra))
     if report.get("schema") != PRODUCER_REPORT_SCHEMA or report.get("version") != PRODUCER_REPORT_VERSION:
         errors.append("producer report schema/version is invalid")
+    if not _valid_identifier(report.get("evidenceId")):
+        errors.append("producer report evidenceId is invalid")
     if not isinstance(report.get("producerId"), str) or not report["producerId"]:
         errors.append("producer report producerId is required")
     if not isinstance(report.get("authorityId"), str) or not report["authorityId"]:
         errors.append("producer report authorityId is required")
+    if report.get("producerId") == report.get("authorityId"):
+        errors.append("producer report producerId and authorityId must be distinct")
     independence = report.get("independence")
     if not isinstance(independence, dict):
         errors.append("producer report independence must be an object")
     else:
         required = {"producerComponentDigest", "authorityComponentDigest", "evaluatorComponentDigest", "expectedDerivedFromActual", "sharedComponentDigests"}
+        extra_independence = sorted(set(independence) - required)
         if required - set(independence):
             errors.append("producer report independence fields are incomplete")
+        if extra_independence:
+            errors.append("producer report independence has unknown fields: " + ", ".join(extra_independence))
         if independence.get("expectedDerivedFromActual") is not False:
             errors.append("producer report must prove expected output was not derived from actual output")
         if not isinstance(independence.get("sharedComponentDigests"), list):
             errors.append("producer report sharedComponentDigests must be an array")
+        else:
+            if any(not _valid_sha256(value) for value in independence["sharedComponentDigests"]):
+                errors.append("producer report sharedComponentDigests contains an invalid digest")
+        for field in ("producerComponentDigest", "authorityComponentDigest", "evaluatorComponentDigest"):
+            if not _valid_sha256(independence.get(field)):
+                errors.append(f"producer report independence {field} is invalid")
     for field in ("evidenceId", "sourceSha"):
         if not isinstance(report.get(field), str) or not report[field]:
             errors.append(f"producer report {field} is required")
-    if not isinstance(report.get("requirementIds"), list) or not report["requirementIds"]:
+    if not _valid_source_sha(report.get("sourceSha")):
+        errors.append("producer report sourceSha is invalid")
+    requirement_ids = report.get("requirementIds")
+    if not isinstance(requirement_ids, list) or not requirement_ids:
         errors.append("producer report requirementIds must be a non-empty array")
+    elif any(not _valid_identifier(value) for value in requirement_ids):
+        errors.append("producer report requirementIds contains an invalid identifier")
+    elif len(requirement_ids) != len(set(requirement_ids)):
+        errors.append("producer report requirementIds must be unique")
     input_digests = report.get("inputDigests")
     if not isinstance(input_digests, list) or not input_digests or any(not isinstance(item, str) for item in input_digests):
         errors.append("producer report inputDigests must be a non-empty array")
+    elif any(not _valid_sha256(item) for item in input_digests):
+        errors.append("producer report inputDigests contains an invalid digest")
+    elif len(input_digests) != len(set(input_digests)):
+        errors.append("producer report inputDigests must be unique")
     for field in ("assertions", "testCases"):
         if not isinstance(report.get(field), list) or not report[field]:
             errors.append(f"producer report {field} must be a non-empty array")
@@ -315,8 +479,16 @@ def validate_producer_report_shape(report: Any) -> list[str]:
             errors.append(f"producer report {field} must be an array")
     if report.get("status") not in {"passed", "failed", "blocked"}:
         errors.append("producer report status is invalid")
-    if not isinstance(report.get("failureCount"), int) or report.get("failureCount") < 0:
+    if not isinstance(report.get("failureCount"), int) or isinstance(report.get("failureCount"), bool) or report.get("failureCount") < 0:
         errors.append("producer report failureCount is invalid")
+    assertions = report.get("assertions")
+    if isinstance(assertions, list):
+        for index, assertion in enumerate(assertions):
+            errors.extend(_typed_assertion_shape_errors(assertion, index))
+    cases = report.get("testCases")
+    if isinstance(cases, list):
+        for index, case in enumerate(cases):
+            errors.extend(_typed_case_shape_errors(case, index))
     return errors
 
 try:

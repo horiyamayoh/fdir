@@ -1,10 +1,10 @@
 flowchart LR
-  source[Source-declared facts] --> ir[Document Form IR authority]
+  source[Source-declared facts] --> adapter[Parser / Adapter]
+  adapter --> ir[Document Form IR authority]
   ir --> canonical[Canonical IR bytes]
   canonical --> digest[IR content digest]
-  canonical --> index[Index projection]
-  index -. rebuildable .-> canonical
-  rendered[Rendered/OCR observation] --> ir
-  sourceBytes[Original file bytes] -. ingestion metadata only .-> source
-  semantic[Semantic IR] -->|reads facts| ir
-  ir -. does not infer meaning .-> semantic
+  canonical --> index[Rebuildable index projection]
+  rendered[Rendered/OCR observation] -. observation only .-> ir
+  ir -. facts only .-> semantic[Downstream Semantic IR]
+  sourceBytes[Original file bytes] -. outside IR .-> metadata[Ingestion metadata]
+  metadata -. execution context only .-> adapter

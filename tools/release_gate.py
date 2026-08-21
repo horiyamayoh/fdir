@@ -74,8 +74,12 @@ TRACEABILITY_PATH = ROOT / "machine" / "traceability.json"
 SCHEMA_PATH = ROOT / "schemas" / "document-form-ir.schema.json"
 EXAMPLES_PATH = ROOT / "examples"
 CLEAN_ROOM_REPLAY_PATH = ROOT / "e2e" / ".run" / "clean-room-replay.json"
-AUDIT_RECOVERY_ISSUES = tuple(range(87, 106))
+AUDIT_RECOVERY_ISSUES = tuple(range(87, 106)) + tuple(range(108, 114))
+LIVE_ISSUES = AUDIT_RECOVERY_ISSUES
 QUALIFICATION_ISSUES = tuple(range(88, 106))
+BARRIER_ISSUES = tuple(range(108, 114))
+UMBRELLA_ISSUE = 87
+FINAL_QUALIFICATION_ISSUE = 105
 SOURCE_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 DIRECT_QUERY_INDEX_SCHEMA = "fdir/document-form-index"
@@ -244,12 +248,18 @@ def check_clean_tree() -> dict[str, int | bool]:
     return {"dirty_tree": False, "status_entries": 0}
 
 
-def check_ci_binding() -> dict[str, str | bool]:
-    """Bind an Actions run to the exact checkout that the gate inspected."""
+def check_ci_binding(*, require_actions: bool = False) -> dict[str, str | bool]:
+    """Bind an Actions run to the exact checkout that the gate inspected.
+
+    Local metadata is useful for development diagnostics, but it is never a
+    release authority.  Final release callers must opt into the stricter
+    GitHub Actions-only branch.
+    """
 
     head = current_head()
     actions = os.environ.get("GITHUB_ACTIONS", "").casefold() == "true"
     if not actions:
+        require(not require_actions, "final release qualification requires GitHub Actions provenance", "CI_PROVIDER_REQUIRED")
         return {"provider": "local", "source_sha": head, "actions": False}
 
     declared_sha = os.environ.get("GITHUB_SHA", "")
@@ -665,6 +675,63 @@ def check_release_claims() -> dict[str, int]:
     return {"child_claims": len(claims), "capability_claims": len(capability_claims), "independent_positive_cases": len(corpus["cases"]), "independent_negative_cases": len(corpus.get("negativeCases", [])), "strict_issue_bindings": len(strict_issue_evidence)}
 
 
+def check_recovery_scope_contract(contract: Any) -> dict[str, Any]:
+    """Validate the split live/report scope and its non-duplicating barriers."""
+
+    require(isinstance(contract, dict), "qualification contract is not an object", "QUALIFICATION_SCOPE")
+    require(contract.get("targetIssueNumbers") == list(LIVE_ISSUES), "qualification target scope is not #87-#105 and #108-#113", "QUALIFICATION_SCOPE")
+    require(contract.get("recoveryChildIssueNumbers") == list(QUALIFICATION_ISSUES), "qualification child scope is not #88-#105", "QUALIFICATION_SCOPE")
+    require(contract.get("barrierIssueNumbers") == [UMBRELLA_ISSUE, *BARRIER_ISSUES], "qualification barrier issue scope is invalid", "QUALIFICATION_SCOPE")
+    ci_policy = contract.get("ciPolicy")
+    require(isinstance(ci_policy, dict) and ci_policy.get("allowedProviders") == ["github-actions"], "qualification contract permits a non-GitHub provider", "CI_PROVIDER_REQUIRED")
+    coverage = contract.get("barrierCoverage")
+    require(isinstance(coverage, dict), "qualification barrierCoverage is missing", "BARRIER_COVERAGE_SCOPE")
+    expected_coverage = {
+        "issue-88-qualification-contract": list(BARRIER_ISSUES),
+        "issue-105-release-quality": [UMBRELLA_ISSUE, *BARRIER_ISSUES],
+    }
+    require(set(coverage) == set(expected_coverage), "barrierCoverage must be owned only by #88 and #105", "BARRIER_COVERAGE_SCOPE")
+    for evidence_id, issue_numbers in expected_coverage.items():
+        record = coverage.get(evidence_id)
+        require(isinstance(record, dict), f"barrierCoverage record is missing: {evidence_id}", "BARRIER_COVERAGE_SCOPE")
+        require(record.get("issueNumbers") == issue_numbers, f"barrierCoverage is invalid for {evidence_id}", "BARRIER_COVERAGE_SCOPE")
+        require(isinstance(record.get("role"), str) and record.get("role"), f"barrierCoverage role is missing: {evidence_id}", "BARRIER_COVERAGE_SCOPE")
+    return {"liveIssues": len(LIVE_ISSUES), "qualificationIssues": len(QUALIFICATION_ISSUES), "barrierIssues": len(BARRIER_ISSUES)}
+
+
+def _validate_live_issue_scope(snapshot: Any) -> dict[int, dict[str, Any]]:
+    if not isinstance(snapshot, dict) or not isinstance(snapshot.get("issues"), list):
+        raise GateError("verified GitHub issue state has no issue list", "ISSUE_STATE_SCOPE")
+    target_issues = tuple(AUDIT_RECOVERY_ISSUES)
+    raw_numbers = [item.get("issueNumber") for item in snapshot["issues"] if isinstance(item, dict)]
+    require(raw_numbers == list(target_issues), "verified GitHub issue state must be ordered as #87-#105 and #108-#113", "ISSUE_STATE_SCOPE")
+    live_by_number = {
+        int(item["issueNumber"]): item
+        for item in snapshot["issues"]
+        if isinstance(item, dict) and isinstance(item.get("issueNumber"), int)
+    }
+    require(set(live_by_number) == set(target_issues), "verified GitHub audit state is incomplete", "ISSUE_STATE_SCOPE")
+    return live_by_number
+
+
+def _require_umbrella_closed_last(live_by_number: dict[int, dict[str, Any]]) -> None:
+    """Require #87 to be the final closure in the live issue snapshot."""
+
+    umbrella = live_by_number.get(UMBRELLA_ISSUE, {}).get("closedAt")
+    require(isinstance(umbrella, str), "umbrella issue #87 has no close timestamp", "UMBRELLA_NOT_LAST")
+    try:
+        from github_issue_state import parse_datetime
+    except ImportError:  # pragma: no cover
+        from tools.github_issue_state import parse_datetime
+    umbrella_time = parse_datetime(umbrella, field="issue #87.closedAt")
+    for issue_number, issue in live_by_number.items():
+        if issue_number == UMBRELLA_ISSUE:
+            continue
+        require(isinstance(issue.get("closedAt"), str), f"issue #{issue_number} has no close timestamp", "UMBRELLA_NOT_LAST")
+        child_time = parse_datetime(issue.get("closedAt"), field=f"issue #{issue_number}.closedAt")
+        require(umbrella_time > child_time, f"umbrella issue #87 was not closed after issue #{issue_number}", "UMBRELLA_NOT_LAST")
+
+
 def check_audit_recovery_release_boundary(
     *,
     issue_state: dict[str, Any] | None = None,
@@ -686,7 +753,7 @@ def check_audit_recovery_release_boundary(
     children = recovery.get("children")
     require(isinstance(children, list), "audit recovery children are missing", "RECOVERY_PLAN_INVALID")
     child_by_number = {child.get("issueNumber"): child for child in children if isinstance(child, dict)}
-    required_children = set(range(88, 106))
+    required_children = set(QUALIFICATION_ISSUES)
     require(set(child_by_number) == required_children, "audit recovery plan does not cover #88-#105 exactly", "RECOVERY_PLAN_SCOPE")
 
     source_sha = current_head()
@@ -703,8 +770,7 @@ def check_audit_recovery_release_boundary(
         raise GateError(exc.detail, exc.code) from exc
 
     boundary = derive_release_boundary(snapshot)
-    live_by_number = {int(item["issueNumber"]): item for item in snapshot.get("issues", [])}
-    require(set(live_by_number) == set(AUDIT_RECOVERY_ISSUES), "verified GitHub audit state is incomplete", "ISSUE_STATE_SCOPE")
+    live_by_number = _validate_live_issue_scope(snapshot)
 
     # A stale committed completion flag is itself a release failure.  It is
     # never used to make an open issue pass, but it must be visible as a
@@ -723,6 +789,7 @@ def check_audit_recovery_release_boundary(
     require(isinstance(qualification, dict), "audit recovery plan has no qualification evidence binding", "RECOVERY_QUALIFICATION_BINDING")
     require(qualification.get("manifestPath") == "qualification/<source-sha>/manifest.json", "audit recovery qualification manifest path is not source-SHA templated", "RECOVERY_QUALIFICATION_BINDING")
     contract = load_json(QUALIFICATION_CONTRACT_PATH)
+    check_recovery_scope_contract(contract)
     expected_evidence = set(contract.get("scope", {}).get("requiredEvidenceIds", []))
     require(set(qualification.get("requiredEvidenceIds", [])) == expected_evidence, "audit recovery qualification evidence IDs do not match the contract", "RECOVERY_QUALIFICATION_BINDING")
 
@@ -753,9 +820,14 @@ def check_audit_recovery_release_boundary(
     close_blockers = evidence_close_time_blockers(snapshot, evidence_times or {})
     if close_blockers:
         raise GateError(json.dumps(close_blockers, ensure_ascii=False, sort_keys=True), "GITHUB_ISSUE_CLOSED_BEFORE_EVIDENCE")
+    if not boundary.get("releaseBlocked"):
+        _require_umbrella_closed_last(live_by_number)
     return {
-        "recovery_children": len(children),
-        "umbrella_issue": 87,
+        "recovery_children": len(QUALIFICATION_ISSUES),
+        "umbrella_issue": UMBRELLA_ISSUE,
+        "live_issue_numbers": list(LIVE_ISSUES),
+        "qualification_issue_numbers": list(QUALIFICATION_ISSUES),
+        "barrier_issue_numbers": list(BARRIER_ISSUES),
         "live_open_issues": len(boundary.get("openIssues", [])),
         "releaseBlocked": boundary.get("releaseBlocked"),
         "status": boundary.get("status"),
@@ -1074,7 +1146,7 @@ def semantic_assertion_count(value: dict[str, Any]) -> int:
     return semantic
 
 
-def check_qualification_bundle(bundle_manifest: Path) -> dict[str, int]:
+def check_qualification_bundle(bundle_manifest: Path, *, require_actions: bool = False) -> dict[str, int]:
     """Check the semantic and identity properties beyond the generic bundle schema."""
 
     manifest_path = bundle_manifest.resolve()
@@ -1087,6 +1159,7 @@ def check_qualification_bundle(bundle_manifest: Path) -> dict[str, int]:
     require(manifest.get("dirtyTree") is False, "qualification bundle is not bound to a clean tree")
 
     contract = load_json(QUALIFICATION_CONTRACT_PATH)
+    check_recovery_scope_contract(contract)
     scope = contract.get("scope") if isinstance(contract, dict) else None
     required_ids = set(scope.get("requiredEvidenceIds", [])) if isinstance(scope, dict) else set()
     require(required_ids, "qualification contract has no required Evidence IDs")
@@ -1096,12 +1169,19 @@ def check_qualification_bundle(bundle_manifest: Path) -> dict[str, int]:
     report_paths = sorted(reports_dir.glob("*.json")) if reports_dir.is_dir() else []
     require(report_paths, "qualification bundle has no Evidence reports")
     reports: dict[str, dict[str, Any]] = {}
+    covered_issue_numbers: set[int] = set()
     for path in report_paths:
         value = load_json(path)
         require(isinstance(value, dict), f"qualification Evidence report is not an object: {path.name}")
         evidence_id = value.get("evidenceId")
         require(isinstance(evidence_id, str) and evidence_id not in reports, f"qualification Evidence ID is invalid or duplicated: {evidence_id!r}")
         require(evidence_id in required_ids, f"qualification bundle contains an unscoped Evidence ID: {evidence_id}")
+        issue_numbers = value.get("issueNumbers")
+        require(isinstance(issue_numbers, list) and issue_numbers and all(isinstance(item, int) and not isinstance(item, bool) for item in issue_numbers), f"qualification Evidence issue scope is invalid: {evidence_id}")
+        require(len(issue_numbers) == len(set(issue_numbers)), f"qualification Evidence repeats an issue number: {evidence_id}")
+        require(set(issue_numbers) <= set(QUALIFICATION_ISSUES), f"qualification Evidence binds a live-only issue: {evidence_id}")
+        require(not covered_issue_numbers.intersection(issue_numbers), f"qualification Evidence duplicates report coverage: {evidence_id}")
+        covered_issue_numbers.update(issue_numbers)
         require(value.get("sourceSha") == source_sha, f"qualification Evidence source SHA mismatch: {evidence_id}")
         require(value.get("dirtyTree") is False, f"qualification Evidence is dirty: {evidence_id}")
         require(value.get("status") == "passed" and value.get("failureCount") == 0, f"qualification Evidence is not passed: {evidence_id}")
@@ -1139,12 +1219,13 @@ def check_qualification_bundle(bundle_manifest: Path) -> dict[str, int]:
         ci_records.append(record)
         require(ci.get("sourceSha") == source_sha and ci.get("repository") == "horiyamayoh/fdir", f"qualification Evidence CI binding mismatch: {evidence_id}")
         require(ci.get("status") == "completed", f"qualification Evidence CI status is not completed: {evidence_id}")
-        if actions:
+        if actions or require_actions:
             require(ci.get("provider") == "github-actions", f"qualification Evidence is not bound to GitHub Actions: {evidence_id}")
             require(isinstance(ci.get("runId"), str) and re.fullmatch(r"[1-9][0-9]*", ci["runId"]), f"qualification Evidence run ID is invalid: {evidence_id}")
             require(isinstance(ci.get("runUrl"), str) and re.fullmatch(r"https://github\.com/horiyamayoh/fdir/actions/runs/[1-9][0-9]*", ci["runUrl"]), f"qualification Evidence run URL is invalid: {evidence_id}")
         else:
             require(ci.get("provider") == "local" and isinstance(ci.get("runUrl"), str) and ci["runUrl"].startswith("local://"), f"local qualification Evidence CI binding is invalid: {evidence_id}")
+    require(covered_issue_numbers == set(QUALIFICATION_ISSUES), "qualification Evidence reports must cover exactly #88-#105")
     require(len(set(ci_records)) == 1, "qualification bundle mixes CI runs or environments")
 
     recovery_contract = load_json(ROOT / "machine" / "recovery-report-contract.json")
@@ -1182,7 +1263,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--mode",
         choices=("smoke", "release"),
         default=None,
-        help="smoke is development-only; release requires a bundle or final attestation",
+        help="smoke is development-only; release requires both a bundle and final attestation",
     )
     parser.add_argument(
         "--summary",
@@ -1194,13 +1275,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--bundle",
         type=Path,
         metavar="MANIFEST",
-        help="commit-bound qualification bundle manifest; selecting this enables release mode",
+        help="commit-bound qualification bundle manifest; release also requires --attestation",
     )
     parser.add_argument(
         "--attestation",
         type=Path,
         metavar="JSON",
-        help="final external release attestation; selecting this enables release mode",
+        help="final external release attestation bound to the selected --bundle",
     )
     parser.add_argument(
         "--issue-snapshot",
@@ -1213,22 +1294,33 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    has_release_authority = args.bundle is not None or args.attestation is not None
-    release_mode = args.mode == "release" or has_release_authority
-    if not release_mode or (args.mode == "release" and not has_release_authority):
+    has_bundle = args.bundle is not None
+    has_attestation = args.attestation is not None
+    has_release_authority = has_bundle and has_attestation
+    release_mode = args.mode == "release" or has_bundle or has_attestation
+    if not has_release_authority:
         # This is the only intentionally cheap path.  The bundle builder uses
         # it for the #105 Phase-A receipt; it must be a successful command with
         # a blocked result, never a release-ready result.
+        if has_bundle and not has_attestation:
+            diagnostic_code = "FINAL_ATTESTATION_REQUIRED"
+            diagnostic_detail = "release qualification requires --bundle and --attestation; a candidate bundle alone is not release authority"
+        elif has_attestation and not has_bundle:
+            diagnostic_code = "BUNDLE_REQUIRED"
+            diagnostic_detail = "release qualification requires --bundle and --attestation; an attestation without its candidate bundle is diagnostic-only"
+        else:
+            diagnostic_code = "RELEASE_AUTHORITY_REQUIRED"
+            diagnostic_detail = "release qualification requires --bundle and --attestation; this invocation is development smoke only"
         summary = {
             "schema": "fdir/release-gate-summary",
             "version": "1.1.0",
             "status": "blocked",
             "releaseReady": False,
-            "mode": "smoke" if not (args.mode == "release" and not has_release_authority) else "release",
+            "mode": "release" if release_mode else "smoke",
             "exit_code": 1,
             "diagnostics": [{
-                "code": "RELEASE_AUTHORITY_REQUIRED",
-                "detail": "release qualification requires --bundle or --attestation; this invocation is development smoke only",
+                "code": diagnostic_code,
+                "detail": diagnostic_detail,
             }],
             "checks": [],
             "commands": [],
@@ -1247,8 +1339,9 @@ def main(argv: list[str] | None = None) -> int:
         else:  # pragma: no cover
             sys.stdout.write(rendered)
         # Smoke is not a release result and is allowed to be consumed as the
-        # explicit blocked #105 receipt.  Explicit release mode still fails.
-        return 1 if args.mode == "release" else 0
+        # explicit blocked #105 receipt.  Any partial authority invocation,
+        # and explicit release mode, fail closed.
+        return 1 if release_mode else 0
     checks: list[dict[str, Any]] = []
     commands: list[dict[str, Any]] = []
 
@@ -1323,7 +1416,7 @@ def main(argv: list[str] | None = None) -> int:
 
     check_functions: tuple[tuple[str, Callable[[], dict[str, Any]]], ...] = (
         ("clean_worktree", check_clean_tree),
-        ("ci_binding", check_ci_binding),
+        ("ci_binding", lambda: check_ci_binding(require_actions=True)),
         ("design_catalog", check_design_catalog),
         ("issue_plan_and_github_map", check_issue_plan),
         ("phase2_contracts", check_phase2_contracts),
@@ -1355,7 +1448,7 @@ def main(argv: list[str] | None = None) -> int:
             bundle_result = validate_bundle(args.bundle, repo_root=ROOT)
             if bundle_result.get("status") != "passed":
                 raise GateError(json.dumps(bundle_result.get("diagnostics", []), ensure_ascii=False), "QUALIFICATION_BUNDLE_INVALID")
-            bundle_details = check_qualification_bundle(args.bundle)
+            bundle_details = check_qualification_bundle(args.bundle, require_actions=True)
         except Exception as exc:
             checks.append({"name": "qualification_bundle", "status": "failed", "error": str(exc), "code": getattr(exc, "code", "QUALIFICATION_BUNDLE_INVALID")})
         else:

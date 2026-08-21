@@ -842,6 +842,14 @@ def run_all() -> dict[str, Any]:
             "requiredEvidenceIds": [first_spec["evidenceId"]],
             "requiredRequirementIds": list(first_spec["requirementIds"]),
         }
+        # This fixture deliberately exercises the local diagnostic lane.  The
+        # production qualification contract remains GitHub-Actions-only; a
+        # local positive here must opt into that lane explicitly rather than
+        # weakening the release contract.
+        integrity_contract["ciPolicy"] = {
+            **dict(integrity_contract.get("ciPolicy", {})),
+            "allowedProviders": ["local"],
+        }
         integrity_contract["defaultEvidence"] = [first_spec]
         integrity_contract_path = root / "qualification-contract.json"
         _write_json(integrity_contract_path, integrity_contract)

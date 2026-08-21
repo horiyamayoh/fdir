@@ -441,12 +441,22 @@ def _schema_fragment(entry: dict[str, Any], schema_root: dict[str, Any]) -> dict
     return _resolve_fragment(schema_root, schema_path)
 
 
-def _jsonschema_errors(payload: dict[str, Any], schema: dict[str, Any]) -> list[str]:
+def _jsonschema_errors(
+    payload: dict[str, Any],
+    schema: dict[str, Any],
+    root_schema: dict[str, Any] | None = None,
+) -> list[str]:
     try:
-        from jsonschema import Draft202012Validator
+        from jsonschema import Draft202012Validator, RefResolver
     except ImportError as exc:  # pragma: no cover - locked qualification dependency
         raise QualificationError("jsonschema is required for independent payload validation") from exc
-    validator = Draft202012Validator(schema)
+    # Registry entries point at fragments in the shared extension schema.  A
+    # fragment containing ``#/$defs/...`` references cannot be validated as a
+    # detached object: its local root has no $defs table.  Keep the fragment
+    # as the validation target while resolving references against the
+    # independently loaded document root.
+    resolver = RefResolver.from_schema(root_schema or schema)
+    validator = Draft202012Validator(schema, resolver=resolver)
     return [error.message for error in sorted(validator.iter_errors(payload), key=lambda item: list(item.path))]
 
 
@@ -860,7 +870,7 @@ def _schema_evidence(corpus: dict[str, Any], registry: dict[str, Any], schema_ro
             continue
         try:
             fragment = _schema_fragment(actual_entry, schema_root)
-            errors = _jsonschema_errors(case["payload"], fragment)
+            errors = _jsonschema_errors(case["payload"], fragment, schema_root)
             row["positiveErrors"] = errors
             row["positiveStatus"] = "passed" if not errors else "failed"
             if errors:

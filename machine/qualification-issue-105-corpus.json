@@ -21,6 +21,12 @@
     "release-claim-conformance.json"
   ],
   "releaseScopeIssues": [88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104],
+  "targetIssueNumbers": [87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 108, 109, 110, 111, 112, 113],
+  "barrierIssueNumbers": [87, 108, 109, 110, 111, 112, 113],
+  "barrierCoverage": {
+    "issue-88-qualification-contract": [108, 109, 110, 111, 112, 113],
+    "issue-105-release-quality": [87, 108, 109, 110, 111, 112, 113]
+  },
   "releaseEvidence": [
     {"issueNumber": 88, "evidenceId": "issue-88-qualification-contract", "requiredReports": ["evidence-integrity-report.json"]},
     {"issueNumber": 89, "evidenceId": "issue-89-defect-injection", "requiredReports": ["defect-injection-campaign.json"]},

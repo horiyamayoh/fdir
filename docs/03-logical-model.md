@@ -6,9 +6,9 @@ DocumentForm は共通 core の配列と、必須性が異なる optional entity
 
 ~~~json
 {
-  "schema": {"name": "fdir/document-form", "version": "1.0"},
+  "schema": {"name": "fdir/document-form", "version": "1.0.0"},
   "documentId": "doc_01J...",
-  "sourceFormat": {"kind": "docx", "version": "ECMA-376-Strict"},
+  "sourceFormat": {"namespace": "format", "name": "docx", "version": "ECMA-376"},
   "rootNodeId": "node_document",
   "nodes": [],
   "texts": [],
@@ -94,13 +94,14 @@ Style の properties は自由 map ではありません。schema で列挙し�
 {
   "styleId": "style_para_body",
   "role": "paragraph",
-  "authored": {"alignment": "left", "spacing": {"before": {"value":"0","unit":"pt"}}},
+  "origin": "authored",
   "basedOn": "style_normal",
   "theme": {"themeId": "theme_default", "slot": "bodyText"},
-  "direct": {"foreground": {"kind":"rgb","r":196,"g":0,"b":0,"a":1}},
-  "conditional": [],
-  "resolved": {"foreground": {"kind":"rgb","r":196,"g":0,"b":0,"a":1}},
-  "resolution": {"order":["authored","basedOn","theme","direct","conditional"],"status":"preserved"}
+  "authored": {"paragraphAlignment": "left"},
+  "declaration": {"paragraphAlignment": "left"},
+  "resolvedFrom": ["style_normal"],
+  "resolved": {"paragraphAlignment": "left"},
+  "status": "normalized"
 }
 ~~~
 
@@ -108,9 +109,10 @@ Style の properties は自由 map ではありません。schema で列挙し�
 
 ## 3.6 Status と diagnostic の粒度
 
-許可する status は preserved、normalized、approximated、ambiguous、unsupported、omitted、unavailable、failed です。omitted は policy により意図的に除外した場合、unavailable は入力または観測の条件で取得できなかった場合に限ります。
+entity/feature に許可する status は preserved、normalized、approximated、ambiguous、unsupported、omitted-by-policy、unavailable、failed です。omitted-by-policy は policy により意図的に除外した場合、unavailable は入力または観測の条件で取得できなかった場合に限ります。
 
 - ConversionReport.status: 文書全体の最悪状態を要約する。子状態を隠さない。
+- ConversionReport.status の値は complete、complete-with-warnings、partial、failed です。entity/feature status と混同しません。
 - FeatureStatus: styles、geometry、formulas 等の feature 単位。
 - Node.status: 個々の構造要素の表現状態。
 - field status: formula/displayed/OCR 等、値の出所が異なる field に必要な場合だけ付ける。
