@@ -1,0 +1,1357 @@
+{
+  "$schema": "fdir/qualification-issue-corpus",
+  "version": "1.0.0",
+  "issueNumber": 94,
+  "evidenceId": "issue-94-geometry-order",
+  "requirementIds": [
+    "QUAL-94-GEOMETRY-ORDER"
+  ],
+  "authoring": {
+    "kind": "independent-authored-exact-vectors",
+    "usesAdapters": false,
+    "usesRenderer": false,
+    "numericDomain": "rational-affine-and-integer-geometry",
+    "oraclePolicy": "expected-facts-are-authored-data-and-are-never-derived-from-the-runner"
+  },
+  "coordinateTransforms": {
+    "requiredLanes": [
+      "affine-composition",
+      "inverse-roundtrip",
+      "rational-unit-scale",
+      "noncommutative-operation-order",
+      "projective-composition"
+    ],
+    "coveredLanes": [
+      "affine-composition",
+      "inverse-roundtrip",
+      "rational-unit-scale",
+      "noncommutative-operation-order",
+      "projective-composition"
+    ],
+    "vectors": [
+      {
+        "id": "translate-then-scale",
+        "operations": [
+          {
+            "kind": "translate",
+            "x": 10,
+            "y": -2
+          },
+          {
+            "kind": "scale",
+            "sx": 2,
+            "sy": 3
+          }
+        ],
+        "point": [
+          4,
+          5
+        ],
+        "expected": {
+          "matrix": [
+            2,
+            0,
+            0,
+            3,
+            20,
+            -6
+          ],
+          "point": [
+            28,
+            9
+          ],
+          "inversePoint": [
+            4,
+            5
+          ],
+          "exact": true
+        },
+        "reported": {
+          "status": "preserved",
+          "exact": true,
+          "approximation": false
+        }
+      },
+      {
+        "id": "rotate-then-translate",
+        "operations": [
+          {
+            "kind": "rotate90",
+            "quarterTurns": 1
+          },
+          {
+            "kind": "translate",
+            "x": 5,
+            "y": 1
+          }
+        ],
+        "point": [
+          2,
+          1
+        ],
+        "expected": {
+          "matrix": [
+            0,
+            -1,
+            1,
+            0,
+            5,
+            1
+          ],
+          "point": [
+            6,
+            -1
+          ],
+          "inversePoint": [
+            2,
+            1
+          ],
+          "exact": true
+        },
+        "reported": {
+          "status": "preserved",
+          "exact": true,
+          "approximation": false
+        }
+      },
+      {
+        "id": "rational-unit-scale",
+        "operations": [
+          {
+            "kind": "scale",
+            "sx": "3/2",
+            "sy": "5/2"
+          }
+        ],
+        "point": [
+          1,
+          1
+        ],
+        "expected": {
+          "matrix": [
+            "3/2",
+            0,
+            0,
+            "5/2",
+            0,
+            0
+          ],
+          "point": [
+            "3/2",
+            "5/2"
+          ],
+          "inversePoint": [
+            1,
+            1
+          ],
+          "exact": true
+        },
+        "reported": {
+          "status": "preserved",
+          "exact": true,
+          "approximation": false
+        }
+      },
+      {
+        "id": "scale-then-translate-order",
+        "operations": [
+          {
+            "kind": "scale",
+            "sx": 2,
+            "sy": 2
+          },
+          {
+            "kind": "translate",
+            "x": 5,
+            "y": 0
+          }
+        ],
+        "point": [
+          1,
+          2
+        ],
+        "expected": {
+          "matrix": [
+            2,
+            0,
+            0,
+            2,
+            5,
+            0
+          ],
+          "point": [
+            7,
+            4
+          ],
+          "inversePoint": [
+            1,
+            2
+          ],
+          "exact": true
+        },
+        "reported": {
+          "status": "preserved",
+          "exact": true,
+          "approximation": false
+        }
+      },
+      {
+        "id": "projective-perspective-exact",
+        "transformModel": "projective",
+        "operations": [
+          {
+            "kind": "projective",
+            "values": [
+              2,
+              0,
+              1,
+              0,
+              3,
+              2,
+              "1/4",
+              "1/5",
+              1
+            ]
+          }
+        ],
+        "point": [
+          2,
+          1
+        ],
+        "expected": {
+          "matrix": [
+            2,
+            0,
+            1,
+            0,
+            3,
+            2,
+            "1/4",
+            "1/5",
+            1
+          ],
+          "point": [
+            "50/17",
+            "50/17"
+          ],
+          "inversePoint": [
+            2,
+            1
+          ],
+          "exact": true,
+          "matrixModel": "projective"
+        },
+        "reported": {
+          "status": "preserved",
+          "exact": true,
+          "approximation": false
+        }
+      }
+    ],
+    "mutations": [
+      {
+        "id": "coordinate-swap-operation-order",
+        "vectorId": "translate-then-scale",
+        "kind": "swap-operations"
+      },
+      {
+        "id": "coordinate-round-rational-result",
+        "vectorId": "rational-unit-scale",
+        "kind": "round-results"
+      },
+      {
+        "id": "coordinate-replace-rotation",
+        "vectorId": "rotate-then-translate",
+        "kind": "replace-rotation-with-identity"
+      },
+      {
+        "id": "coordinate-drop-perspective",
+        "vectorId": "projective-perspective-exact",
+        "kind": "drop-perspective"
+      }
+    ],
+    "unmetCoverage": [
+      "adapter-backed DOCX/XLSX/PDF round-trip transform vectors",
+      "source-format unit metadata and page-origin reconciliation",
+      "independent renderer or raster cross-check"
+    ]
+  },
+  "geometryLanes": {
+    "requiredLanes": [
+      "rectangle-exact-bounds",
+      "polyline-exact-points",
+      "bezier-control-hull",
+      "clipping-path-closure",
+      "cubic-extrema-exact"
+    ],
+    "coveredLanes": [
+      "rectangle-exact-bounds",
+      "polyline-exact-points",
+      "bezier-control-hull",
+      "clipping-path-closure",
+      "cubic-extrema-exact"
+    ],
+    "vectors": [
+      {
+        "id": "rectangle-exact-bounds",
+        "primitive": {
+          "kind": "rectangle",
+          "x": -2,
+          "y": 3,
+          "width": 10,
+          "height": 4,
+          "status": "preserved",
+          "exact": true,
+          "approximation": false
+        },
+        "expected": {
+          "bounds": [
+            -2,
+            3,
+            8,
+            7
+          ],
+          "area": 40,
+          "exactFor": "primitive"
+        }
+      },
+      {
+        "id": "polyline-exact-points",
+        "primitive": {
+          "kind": "polyline",
+          "points": [
+            [
+              0,
+              0
+            ],
+            [
+              3,
+              4
+            ],
+            [
+              -1,
+              2
+            ]
+          ],
+          "status": "preserved",
+          "exact": true,
+          "approximation": false
+        },
+        "expected": {
+          "bounds": [
+            -1,
+            0,
+            3,
+            4
+          ],
+          "pointCount": 3,
+          "segmentLengthSquared": [
+            25,
+            20
+          ],
+          "exactFor": "points-and-segments"
+        }
+      },
+      {
+        "id": "bezier-control-hull",
+        "primitive": {
+          "kind": "bezier",
+          "p0": [
+            0,
+            0
+          ],
+          "p1": [
+            2,
+            5
+          ],
+          "p2": [
+            6,
+            -1
+          ],
+          "p3": [
+            8,
+            4
+          ],
+          "status": "preserved",
+          "exact": true,
+          "approximation": false
+        },
+        "expected": {
+          "endpoints": [
+            [
+              0,
+              0
+            ],
+            [
+              8,
+              4
+            ]
+          ],
+          "controlHull": [
+            0,
+            -1,
+            8,
+            5
+          ],
+          "controlPoints": [
+            [
+              0,
+              0
+            ],
+            [
+              2,
+              5
+            ],
+            [
+              6,
+              -1
+            ],
+            [
+              8,
+              4
+            ]
+          ],
+          "exactFor": "control-points-and-control-hull"
+        }
+      },
+      {
+        "id": "bezier-rational-extrema",
+        "primitive": {
+          "kind": "bezier",
+          "p0": [
+            0,
+            0
+          ],
+          "p1": [
+            3,
+            0
+          ],
+          "p2": [
+            3,
+            3
+          ],
+          "p3": [
+            0,
+            3
+          ],
+          "measureExtrema": true,
+          "status": "preserved",
+          "exact": true,
+          "approximation": false
+        },
+        "expected": {
+          "endpoints": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              3
+            ]
+          ],
+          "controlHull": [
+            0,
+            0,
+            3,
+            3
+          ],
+          "controlPoints": [
+            [
+              0,
+              0
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              3,
+              3
+            ],
+            [
+              0,
+              3
+            ]
+          ],
+          "extrema": {
+            "x": [
+              {
+                "t": "1/2",
+                "value": "9/4"
+              }
+            ],
+            "y": []
+          },
+          "bounds": [
+            0,
+            0,
+            "9/4",
+            3
+          ],
+          "exactFor": "control-points-and-cubic-extrema"
+        }
+      },
+      {
+        "id": "clipping-path-closure",
+        "primitive": {
+          "kind": "clippingPath",
+          "points": [
+            [
+              0,
+              0
+            ],
+            [
+              10,
+              0
+            ],
+            [
+              10,
+              10
+            ],
+            [
+              0,
+              10
+            ]
+          ],
+          "closed": true,
+          "status": "preserved",
+          "exact": true,
+          "approximation": false
+        },
+        "expected": {
+          "bounds": [
+            0,
+            0,
+            10,
+            10
+          ],
+          "signedArea": 100,
+          "closed": true,
+          "exactFor": "polygon-closure-and-area"
+        }
+      }
+    ],
+    "mutations": [
+      {
+        "id": "geometry-change-rectangle-width",
+        "vectorId": "rectangle-exact-bounds",
+        "kind": "change-width"
+      },
+      {
+        "id": "geometry-preserve-approximate-bezier",
+        "vectorId": "bezier-control-hull",
+        "kind": "mark-approximate"
+      },
+      {
+        "id": "geometry-swap-polyline-points",
+        "vectorId": "polyline-exact-points",
+        "kind": "swap-points"
+      },
+      {
+        "id": "geometry-open-clipping-path",
+        "vectorId": "clipping-path-closure",
+        "kind": "open-clip"
+      },
+      {
+        "id": "geometry-change-cubic-extremum",
+        "vectorId": "bezier-rational-extrema",
+        "kind": "change-control-point"
+      }
+    ],
+    "unmetCoverage": [
+      "format-specific primitive extraction from DOCX/XLSX/PDF",
+      "connector arrowhead and marker geometry",
+      "capability-profile binding for every geometry construct"
+    ]
+  },
+  "anchorResolution": {
+    "requiredLanes": [
+      "absolute-anchor",
+      "inline-offset-anchor",
+      "grid-cell-anchor",
+      "nested-coordinate-space-anchor",
+      "endpoint-pair-anchor"
+    ],
+    "coveredLanes": [
+      "absolute-anchor",
+      "inline-offset-anchor",
+      "grid-cell-anchor",
+      "nested-coordinate-space-anchor",
+      "endpoint-pair-anchor"
+    ],
+    "vectors": [
+      {
+        "id": "absolute-anchor",
+        "coordinateSpaces": [
+          {
+            "id": "page",
+            "parent": null,
+            "matrix": [
+              1,
+              0,
+              0,
+              1,
+              100,
+              50
+            ]
+          }
+        ],
+        "anchor": {
+          "kind": "absolute",
+          "spaceId": "page",
+          "point": [
+            4,
+            6
+          ],
+          "status": "preserved",
+          "exact": true,
+          "approximation": false
+        },
+        "expected": {
+          "globalPoint": [
+            104,
+            56
+          ],
+          "kind": "absolute"
+        }
+      },
+      {
+        "id": "inline-offset-anchor",
+        "coordinateSpaces": [
+          {
+            "id": "body",
+            "parent": null,
+            "matrix": [
+              1,
+              0,
+              0,
+              1,
+              0,
+              0
+            ]
+          }
+        ],
+        "anchor": {
+          "kind": "inline",
+          "spaceId": "body",
+          "basePoint": [
+            20,
+            30
+          ],
+          "offset": [
+            5,
+            -2
+          ],
+          "status": "preserved",
+          "exact": true,
+          "approximation": false
+        },
+        "expected": {
+          "globalPoint": [
+            25,
+            28
+          ],
+          "kind": "inline"
+        }
+      },
+      {
+        "id": "grid-cell-anchor",
+        "coordinateSpaces": [
+          {
+            "id": "sheet",
+            "parent": null,
+            "matrix": [
+              1,
+              0,
+              0,
+              1,
+              10,
+              20
+            ]
+          }
+        ],
+        "anchor": {
+          "kind": "grid",
+          "spaceId": "sheet",
+          "gridOrigin": [
+            2,
+            3
+          ],
+          "cellSize": [
+            8,
+            12
+          ],
+          "row": 2,
+          "column": 3,
+          "offset": [
+            1,
+            -1
+          ],
+          "status": "preserved",
+          "exact": true,
+          "approximation": false
+        },
+        "expected": {
+          "globalPoint": [
+            37,
+            46
+          ],
+          "kind": "grid"
+        }
+      },
+      {
+        "id": "nested-coordinate-space-anchor",
+        "coordinateSpaces": [
+          {
+            "id": "root",
+            "parent": null,
+            "matrix": [
+              1,
+              0,
+              0,
+              1,
+              100,
+              0
+            ]
+          },
+          {
+            "id": "child",
+            "parent": "root",
+            "matrix": [
+              2,
+              0,
+              0,
+              2,
+              0,
+              0
+            ]
+          }
+        ],
+        "anchor": {
+          "kind": "relative",
+          "spaceId": "child",
+          "basePoint": [
+            3,
+            4
+          ],
+          "offset": [
+            -1,
+            2
+          ],
+          "status": "preserved",
+          "exact": true,
+          "approximation": false
+        },
+        "expected": {
+          "globalPoint": [
+            104,
+            12
+          ],
+          "kind": "relative"
+        }
+      },
+      {
+        "id": "endpoint-pair-anchor",
+        "coordinateSpaces": [
+          {
+            "id": "page",
+            "parent": null,
+            "matrix": [
+              1,
+              0,
+              0,
+              1,
+              10,
+              20
+            ]
+          }
+        ],
+        "anchor": {
+          "kind": "endpoint",
+          "spaceId": "page",
+          "start": [
+            1,
+            2
+          ],
+          "end": [
+            4,
+            6
+          ],
+          "offset": [
+            2,
+            -1
+          ],
+          "status": "preserved",
+          "exact": true,
+          "approximation": false
+        },
+        "expected": {
+          "globalStart": [
+            13,
+            21
+          ],
+          "globalEnd": [
+            16,
+            25
+          ],
+          "kind": "endpoint"
+        }
+      }
+    ],
+    "mutations": [
+      {
+        "id": "anchor-unknown-space",
+        "vectorId": "absolute-anchor",
+        "kind": "unknown-space"
+      },
+      {
+        "id": "anchor-swap-offset-axes",
+        "vectorId": "inline-offset-anchor",
+        "kind": "swap-offset-axes"
+      },
+      {
+        "id": "anchor-wrong-grid-row",
+        "vectorId": "grid-cell-anchor",
+        "kind": "wrong-grid-row"
+      },
+      {
+        "id": "anchor-preserve-approximate",
+        "vectorId": "nested-coordinate-space-anchor",
+        "kind": "mark-approximate"
+      },
+      {
+        "id": "anchor-swap-endpoints",
+        "vectorId": "endpoint-pair-anchor",
+        "kind": "swap-endpoints"
+      }
+    ],
+    "unmetCoverage": [
+      "DOCX/XLSX/PDF adapter anchor round-trips",
+      "merged-cell and table-grid anchor semantics",
+      "floating-layout renderer cross-check",
+      "capability-profile binding for anchor constructs"
+    ]
+  },
+  "clipAndPaintOrder": {
+    "requiredLanes": [
+      "clip-reference-closure",
+      "clip-before-paint",
+      "restore-after-paint",
+      "exact-paint-event-order",
+      "interleaved-paint-lane"
+    ],
+    "coveredLanes": [
+      "clip-reference-closure",
+      "clip-before-paint",
+      "restore-after-paint",
+      "exact-paint-event-order",
+      "interleaved-paint-lane"
+    ],
+    "scenes": [
+      {
+        "id": "nested-clip-paint-scene",
+        "geometries": [
+          {
+            "id": "clip-main",
+            "kind": "clippingPath",
+            "status": "preserved",
+            "exact": true,
+            "approximation": false
+          },
+          {
+            "id": "background-geometry",
+            "kind": "rectangle",
+            "status": "preserved",
+            "exact": true,
+            "approximation": false
+          },
+          {
+            "id": "shape-geometry",
+            "kind": "bezier",
+            "status": "preserved",
+            "exact": true,
+            "approximation": false
+          }
+        ],
+        "nodes": [
+          {
+            "id": "background",
+            "geometryId": "background-geometry"
+          },
+          {
+            "id": "shape",
+            "geometryId": "shape-geometry"
+          },
+          {
+            "id": "label"
+          }
+        ],
+        "events": [
+          {
+            "id": "paint-background",
+            "kind": "paint",
+            "targetId": "background"
+          },
+          {
+            "id": "push-clip-main",
+            "kind": "clip",
+            "geometryId": "clip-main"
+          },
+          {
+            "id": "paint-shape",
+            "kind": "paint",
+            "targetId": "shape",
+            "clipGeometryIds": [
+              "clip-main"
+            ]
+          },
+          {
+            "id": "restore-clip-main",
+            "kind": "restore",
+            "geometryId": "clip-main"
+          },
+          {
+            "id": "paint-label",
+            "kind": "paint",
+            "targetId": "label"
+          }
+        ],
+        "expected": {
+        "eventOrder": [
+          "paint-background",
+          "push-clip-main",
+          "paint-shape",
+          "restore-clip-main",
+          "paint-label"
+        ],
+        "paintEventOrder": [
+          "paint-background",
+          "paint-shape",
+          "paint-label"
+        ],
+          "clipBindings": [
+            {
+              "targetId": "shape",
+              "geometryIds": [
+                "clip-main"
+              ]
+            }
+          ],
+          "exact": true
+        },
+        "reported": {
+          "status": "preserved",
+          "exact": true,
+          "approximation": false
+        }
+      },
+      {
+        "id": "unclipped-paint-scene",
+        "geometries": [
+          {
+            "id": "text-geometry",
+            "kind": "rectangle",
+            "status": "preserved",
+            "exact": true,
+            "approximation": false
+          }
+        ],
+        "nodes": [
+          {
+            "id": "text",
+            "geometryId": "text-geometry"
+          }
+        ],
+        "events": [
+          {
+            "id": "paint-text",
+            "kind": "paint",
+            "targetId": "text"
+          }
+        ],
+        "expected": {
+        "eventOrder": [
+          "paint-text"
+        ],
+        "paintEventOrder": [
+          "paint-text"
+        ],
+          "clipBindings": [],
+          "exact": true
+        },
+        "reported": {
+          "status": "preserved",
+          "exact": true,
+          "approximation": false
+        }
+      }
+    ],
+    "mutations": [
+      {
+        "id": "clip-swap-push-and-paint",
+        "sceneId": "nested-clip-paint-scene",
+        "kind": "swap-clip-and-target"
+      },
+      {
+        "id": "clip-drop-target-reference",
+        "sceneId": "nested-clip-paint-scene",
+        "kind": "drop-clip-reference"
+      },
+      {
+        "id": "clip-preserve-approximate-path",
+        "sceneId": "nested-clip-paint-scene",
+        "kind": "mark-clip-approximate"
+      },
+      {
+        "id": "clip-duplicate-paint-event",
+        "sceneId": "unclipped-paint-scene",
+        "kind": "duplicate-event"
+      },
+      {
+        "id": "clip-swap-interleaved-paint-events",
+        "sceneId": "nested-clip-paint-scene",
+        "kind": "swap-paint-events"
+      }
+    ],
+    "unmetCoverage": [
+      "PDF graphics-state replay against content operators",
+      "DOCX drawing z-order extraction",
+      "nested clip-stack behavior from real adapters",
+      "independent renderer or pixel-order oracle"
+    ]
+  },
+  "readingOrderAmbiguity": {
+    "requiredLanes": [
+      "resolved-single-column-order",
+      "explicit-column-ambiguity",
+      "no-arbitrary-order-for-ambiguous-items"
+    ],
+    "coveredLanes": [
+      "resolved-single-column-order",
+      "explicit-column-ambiguity",
+      "no-arbitrary-order-for-ambiguous-items"
+    ],
+    "scenes": [
+      {
+        "id": "two-column-ambiguous-scene",
+        "items": [
+          {
+            "id": "heading",
+            "box": [
+              0,
+              0,
+              200,
+              20
+            ],
+            "orderKey": 0
+          },
+          {
+            "id": "left-column",
+            "box": [
+              0,
+              40,
+              80,
+              20
+            ],
+            "orderKey": null
+          },
+          {
+            "id": "right-column",
+            "box": [
+              120,
+              40,
+              80,
+              20
+            ],
+            "orderKey": null
+          }
+        ],
+        "explicitEdges": [
+          [
+            "heading",
+            "left-column"
+          ],
+          [
+            "heading",
+            "right-column"
+          ]
+        ],
+        "expected": {
+          "ambiguousPairs": [
+            [
+              "left-column",
+              "right-column"
+            ]
+          ],
+          "resolvedOrder": [
+            "heading"
+          ],
+          "exact": true
+        },
+        "reported": {
+          "status": "ambiguous",
+          "order": [
+            "heading"
+          ],
+          "ambiguities": [
+            {
+              "pair": [
+                "left-column",
+                "right-column"
+              ],
+              "reason": "same-band-columns",
+              "status": "ambiguous"
+            }
+          ],
+          "exact": true,
+          "approximation": false
+        }
+      },
+      {
+        "id": "single-column-resolved-scene",
+        "items": [
+          {
+            "id": "paragraph-one",
+            "box": [
+              0,
+              0,
+              100,
+              10
+            ],
+            "orderKey": 1
+          },
+          {
+            "id": "paragraph-two",
+            "box": [
+              0,
+              20,
+              100,
+              10
+            ],
+            "orderKey": 2
+          },
+          {
+            "id": "paragraph-three",
+            "box": [
+              0,
+              40,
+              100,
+              10
+            ],
+            "orderKey": 3
+          }
+        ],
+        "explicitEdges": [],
+        "expected": {
+          "ambiguousPairs": [],
+          "resolvedOrder": [
+            "paragraph-one",
+            "paragraph-two",
+            "paragraph-three"
+          ],
+          "exact": true
+        },
+        "reported": {
+          "status": "preserved",
+          "order": [
+            "paragraph-one",
+            "paragraph-two",
+            "paragraph-three"
+          ],
+          "ambiguities": [],
+          "exact": true,
+          "approximation": false
+        }
+      }
+    ],
+    "mutations": [
+      {
+        "id": "reading-hide-column-ambiguity",
+        "sceneId": "two-column-ambiguous-scene",
+        "kind": "hide-ambiguity"
+      },
+      {
+        "id": "reading-arbitrary-order-for-columns",
+        "sceneId": "two-column-ambiguous-scene",
+        "kind": "add-arbitrary-order"
+      },
+      {
+        "id": "reading-swap-resolved-order",
+        "sceneId": "single-column-resolved-scene",
+        "kind": "swap-resolved-order"
+      },
+      {
+        "id": "reading-preserve-approximate-order",
+        "sceneId": "single-column-resolved-scene",
+        "kind": "mark-approximate"
+      }
+    ],
+    "unmetCoverage": [
+      "multi-column locale and script-specific reading corpus",
+      "table, list, caption, and semantic heading reading rules",
+      "PDF marked-content and source-order cross-check",
+      "adapter output binding and visual reading-order oracle"
+    ]
+  },
+  "adapterIntegration": {
+    "qualificationScope": "bounded-public-converter-geometry-order-integration",
+    "requiredLanes": [
+      "docx-geometry-round-trip",
+      "docx-inline-anchor-linkage",
+      "xlsx-grid-source-order",
+      "pdf-paint-order",
+      "markdown-source-order"
+    ],
+    "coveredLanes": [
+      "docx-geometry-round-trip",
+      "docx-inline-anchor-linkage",
+      "xlsx-grid-source-order",
+      "pdf-paint-order",
+      "markdown-source-order"
+    ],
+    "oracle": {
+      "expectedValuesAreRuntimeIndependent": true,
+      "adapterHelpersUsedForExpected": false,
+      "sourceFactsParsedBy": "qualification-runner-independent-source-parser",
+      "publicBoundary": "tools/convert_document.py convert",
+      "forbiddenDerivations": [
+        "adapter-private geometry or order helpers",
+        "generated IR copied into the corpus",
+        "current adapter output used to author expected values",
+        "renderer output treated as source authority"
+      ]
+    },
+    "fixtures": [
+      {
+        "fixtureId": "docx-inline-geometry-authored",
+        "format": "docx",
+        "reports": ["geometry", "anchor"],
+        "source": {
+          "type": "zip-parts",
+          "parts": {
+            "[Content_Types].xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/></Types>",
+            "_rels/.rels": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"word/document.xml\"/></Relationships>",
+            "word/_rels/document.xml.rels": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"></Relationships>",
+            "word/document.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\" xmlns:wp=\"http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing\" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:wps=\"http://schemas.microsoft.com/office/word/2010/wordprocessingShape\"><w:body><w:p><w:r><w:t>Geometry host</w:t></w:r><w:drawing><wp:inline><wp:extent cx=\"1524000\" cy=\"762000\"/><wp:docPr id=\"7\" name=\"AuthoredShape\"/><a:graphic><a:graphicData uri=\"http://schemas.microsoft.com/office/word/2010/wordprocessingShape\"><wps:wsp><wps:cNvSpPr/><wps:spPr><a:prstGeom prst=\"roundRect\"/></wps:spPr><wps:txbxContent><w:p><w:r><w:t>Nested shape</w:t></w:r></w:p></wps:txbxContent></wps:wsp></a:graphicData></a:graphic></wp:inline></w:drawing></w:p><w:sectPr><w:pgSz w:w=\"11906\" w:h=\"16838\"/></w:sectPr></w:body></w:document>"
+          }
+        },
+        "sourceFacts": {
+          "inlineExtents": [{"cx": 1524000, "cy": 762000, "shape": "roundRect"}],
+          "drawingParentKinds": ["paragraph"],
+          "drawingContexts": ["paragraph"],
+          "topLevelKinds": ["paragraph", "sectPr"],
+          "textValues": ["Geometry host", "Nested shape"]
+        },
+        "expected": {
+          "geometry": {
+            "kind": "rectangle",
+            "spaceId": "space-docx-page",
+            "status": "preserved",
+            "primitive": {
+              "kind": "rectangle",
+              "x": "0",
+              "y": "0",
+              "width": {"value": "1524000", "unit": "emu"},
+              "height": {"value": "762000", "unit": "emu"}
+            }
+          },
+          "layout": {
+            "placement": "inline",
+            "anchorKind": "inline",
+            "status": "preserved",
+            "geometryLinked": true,
+            "surfaceKind": "page"
+          },
+          "topLevelOrder": ["paragraph", "section"],
+          "drawingParentKinds": ["paragraph"]
+        }
+      },
+      {
+        "fixtureId": "xlsx-grid-order-authored",
+        "format": "xlsx",
+        "reports": ["reading"],
+        "source": {
+          "type": "zip-parts",
+          "parts": {
+            "[Content_Types].xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/><Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/></Types>",
+            "_rels/.rels": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>",
+            "xl/_rels/workbook.xml.rels": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rIdSheet\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/></Relationships>",
+            "xl/workbook.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><sheets><sheet name=\"GeometryGrid\" sheetId=\"1\" r:id=\"rIdSheet\"/></sheets></workbook>",
+            "xl/worksheets/sheet1.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><dimension ref=\"A1:C3\"/><sheetData><row r=\"1\"><c r=\"A1\" t=\"inlineStr\"><is><t>North</t></is></c><c r=\"B1\" t=\"inlineStr\"><is><t>East</t></is></c></row><row r=\"2\"><c r=\"A2\" t=\"n\"><v>1</v></c><c r=\"B2\" t=\"n\"><v>2</v></c><c r=\"C2\" t=\"n\"><v>3</v></c></row><row r=\"3\"><c r=\"A3\" t=\"inlineStr\"><is><t>South</t></is></c></row></sheetData><mergeCells count=\"1\"><mergeCell ref=\"A1:A2\"/></mergeCells></worksheet>"
+          }
+        },
+        "sourceFacts": {
+          "cellOrder": ["A1", "B1", "A2", "B2", "C2", "A3"],
+          "mergeRanges": ["A1:A2"]
+        },
+        "expected": {
+          "gridCellOrder": ["A1", "B1", "A2", "B2", "C2", "A3"],
+          "gridOrderStatus": "preserved",
+          "mergeRanges": ["A1:A2"]
+        }
+      },
+      {
+        "fixtureId": "pdf-paint-order-authored",
+        "format": "pdf",
+        "reports": ["clip", "reading"],
+        "source": {
+          "type": "repo-file",
+          "path": "e2e/corpus/pdf-independent.pdf"
+        },
+        "sourceFacts": {
+          "mediaBox": [0, 0, 612, 792],
+          "graphicsStateOperators": ["q", "cm", "rg", "w", "Q"],
+          "paintEvents": [
+            {"kind": "path", "rect": [72, 700, 100, 20], "paint": "fill"},
+            {"kind": "text", "value": "Independent PDF"}
+          ]
+        },
+        "expected": {
+          "paintOrder": ["path", "glyph"],
+          "paintOrderStatus": "preserved",
+          "readingOrderStatus": "ambiguous",
+          "graphicsStateOperators": ["q", "cm", "rg", "w", "Q"],
+          "pathPoints": [
+            {"x": "72", "y": "700"},
+            {"x": "172", "y": "700"},
+            {"x": "172", "y": "720"},
+            {"x": "72", "y": "720"}
+          ]
+        }
+      },
+      {
+        "fixtureId": "markdown-source-order-authored",
+        "format": "markdown",
+        "reports": ["reading"],
+        "source": {
+          "type": "repo-file",
+          "path": "e2e/corpus/markdown-independent.md"
+        },
+        "sourceFacts": {
+          "blockOrder": ["heading", "paragraph", "blockquote", "table", "paragraph"]
+        },
+        "expected": {
+          "blockOrder": ["heading", "paragraph", "blockquote", "table", "paragraph"],
+          "sourceOrderStatus": "preserved"
+        }
+      }
+    ],
+    "mutations": [
+      {"id": "integration-docx-width", "fixtureId": "docx-inline-geometry-authored", "kind": "change-geometry-width"},
+      {"id": "integration-docx-layout-link", "fixtureId": "docx-inline-geometry-authored", "kind": "remove-layout-link"},
+      {"id": "integration-xlsx-grid-order", "fixtureId": "xlsx-grid-order-authored", "kind": "swap-grid-order"},
+      {"id": "integration-pdf-paint-order", "fixtureId": "pdf-paint-order-authored", "kind": "swap-paint-order"},
+      {"id": "integration-pdf-reading-status", "fixtureId": "pdf-paint-order-authored", "kind": "mark-reading-preserved"},
+      {"id": "integration-markdown-block-order", "fixtureId": "markdown-source-order-authored", "kind": "swap-block-order"}
+    ],
+    "unmetCoverage": [
+      "adapter-backed rational and nested coordinate transform round-trips",
+      "DOCX floating and relative anchor resolution across multiple pages",
+      "XLSX chart, drawing, merged-cell, and renderer geometry round-trips",
+      "PDF graphics-state clip-stack replay from real content operators",
+      "independent renderer, raster, and multi-producer differential oracle",
+      "script- and locale-specific reading-order corpus"
+    ]
+  }
+}
