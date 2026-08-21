@@ -1368,6 +1368,18 @@ def main(argv: list[str] | None = None) -> int:
         if isinstance(audit_details, dict) and audit_details.get("live_open_issues") == 0:
             checks.append({"name": "qualification_bundle", "status": "failed", "error": "release-ready gate requires --bundle for exact-SHA Evidence validation"})
 
+    # A candidate bundle is a Phase-A input to the external attestation step;
+    # it is not itself final release authority.  Requiring the attestation here
+    # prevents a bundle-only invocation from turning a passed candidate into a
+    # release-ready summary.
+    if args.bundle is not None and args.attestation is None:
+        checks.append({
+            "name": "final_attestation",
+            "status": "failed",
+            "code": "FINAL_ATTESTATION_REQUIRED",
+            "error": "a candidate bundle requires an external final attestation before release-ready can be emitted",
+        })
+
     passed = all(check["status"] == "passed" for check in checks)
     summary: dict[str, Any] = {
         "schema": "fdir/release-gate-summary",

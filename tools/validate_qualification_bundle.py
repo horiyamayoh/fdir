@@ -1216,6 +1216,164 @@ def _validate_recovery_report_catalog(
                 _add(diagnostics, "RECOVERY_REPORT_ASSERTIONS", f"issue #{issue_text} report {path} has no assertions", path)
 
 
+def _validate_behavioral_report_declarations(
+    bundle_root: Path,
+    report_by_id: dict[str, tuple[str, dict[str, Any]]],
+    manifest: dict[str, Any],
+    diagnostics: list[dict[str, str]],
+    contract: dict[str, Any],
+) -> None:
+    """Resolve declared report metadata against the files in the bundle.
+
+    The generic Evidence envelope proves that a command and its outputs were
+    packaged.  It does not prove that each issue-specific report is the report
+    declared by the behavioral contract.  In particular, a bounded runner can
+    emit a generic ``fdir/qualification-evidence`` object while the contract
+    declares an issue-specific schema; accepting that mismatch would turn a
+    producer-envelope PASS into a false completion claim.  Validate the
+    declaration and the materialized JSON independently here.
+    """
+
+    scope = contract.get("scope", {}) if isinstance(contract, dict) else {}
+    if set(scope.get("issueNumbers", [])) != set(range(88, 106)):
+        # The evidence-integrity tests intentionally use a one-lane disposable
+        # contract.  Their positive fixture must remain focused on packaging
+        # integrity rather than the production recovery catalog.
+        return
+    behavioral = contract.get("behavioralReportContract")
+    if not isinstance(behavioral, dict):
+        _add(diagnostics, "BEHAVIORAL_CONTRACT_MISSING", "behavioralReportContract is missing")
+        return
+    requirements = behavioral.get("requirements")
+    policies = behavioral.get("policies")
+    if not isinstance(requirements, list) or not isinstance(policies, dict):
+        _add(diagnostics, "BEHAVIORAL_CONTRACT_INVALID", "behavioralReportContract requirements or policies are invalid")
+        return
+
+    required_fields = policies.get("requiredReportFields")
+    if not isinstance(required_fields, list) or not all(isinstance(field, str) and field for field in required_fields):
+        _add(diagnostics, "BEHAVIORAL_REPORT_POLICY", "requiredReportFields must be a non-empty string array")
+        return
+    required_fields_set = set(required_fields)
+    required_assertion_fields = policies.get("requiredAssertionFields")
+    required_case_fields = policies.get("requiredCaseFields")
+    required_independence_fields = policies.get("requiredIndependenceFields")
+    if not all(
+        isinstance(fields, list) and fields and all(isinstance(field, str) and field for field in fields)
+        for fields in (required_assertion_fields, required_case_fields, required_independence_fields)
+    ):
+        _add(diagnostics, "BEHAVIORAL_REPORT_POLICY", "required assertion, case, and independence fields must be non-empty string arrays")
+        return
+
+    for requirement in requirements:
+        if not isinstance(requirement, dict):
+            _add(diagnostics, "BEHAVIORAL_REQUIREMENT_ENTRY", "behavioral requirement is not an object")
+            continue
+        issue = requirement.get("ownerIssue")
+        evidence_id = requirement.get("evidenceId")
+        requirement_id = requirement.get("requirementId")
+        if not isinstance(issue, int) or not isinstance(evidence_id, str) or not isinstance(requirement_id, str):
+            _add(diagnostics, "BEHAVIORAL_REQUIREMENT_BINDING", "behavioral requirement has invalid owner/evidence/requirement binding")
+            continue
+        evidence_entry = report_by_id.get(evidence_id)
+        if evidence_entry is None:
+            _add(diagnostics, "BEHAVIORAL_EVIDENCE_MISSING", f"behavioral evidence report is unresolved: {evidence_id}")
+            continue
+        _, evidence_report = evidence_entry
+        outputs = [item for item in evidence_report.get("outputs", []) if isinstance(item, dict)]
+        declarations = requirement.get("reports")
+        if not isinstance(declarations, list) or not declarations:
+            _add(diagnostics, "BEHAVIORAL_REPORT_DECLARATIONS", f"issue #{issue} has no report declarations")
+            continue
+        for declaration in declarations:
+            if not isinstance(declaration, dict):
+                _add(diagnostics, "BEHAVIORAL_REPORT_DECLARATION", f"issue #{issue} contains a non-object report declaration")
+                continue
+            bundle_path = declaration.get("bundlePath")
+            output_role = declaration.get("outputRole")
+            report_id = declaration.get("reportId")
+            if not all(isinstance(value, str) and value for value in (bundle_path, output_role, report_id)):
+                _add(diagnostics, "BEHAVIORAL_REPORT_DECLARATION", f"issue #{issue} has an incomplete report declaration")
+                continue
+            matches = [
+                item for item in outputs
+                if item.get("path") == bundle_path and item.get("role") == output_role
+            ]
+            if len(matches) != 1:
+                code = "BEHAVIORAL_OUTPUT_MISSING" if not matches else "BEHAVIORAL_OUTPUT_DUPLICATE"
+                _add(diagnostics, code, f"{report_id} resolves to {len(matches)} declared outputs", bundle_path)
+                continue
+            target = bundle_root / Path(*PurePosixPath(bundle_path).parts)
+            if not target.is_file():
+                _add(diagnostics, "BEHAVIORAL_REPORT_MISSING", f"{report_id} file is missing: {bundle_path}", bundle_path)
+                continue
+            try:
+                value = load_json(target)
+            except (OSError, json.JSONDecodeError) as exc:
+                _add(diagnostics, "BEHAVIORAL_REPORT_JSON", f"{report_id} is not valid JSON: {exc}", bundle_path)
+                continue
+            if not isinstance(value, dict):
+                _add(diagnostics, "BEHAVIORAL_REPORT_OBJECT", f"{report_id} is not a JSON object", bundle_path)
+                continue
+
+            expected_schema = declaration.get("schema")
+            expected_version = declaration.get("schemaVersion")
+            producer_report = declaration.get("producerReport") is True
+            if value.get("schema") != expected_schema:
+                _add(diagnostics, "BEHAVIORAL_REPORT_SCHEMA", f"{report_id} schema is {value.get('schema')!r}; expected {expected_schema!r}", bundle_path)
+            if value.get("version") != expected_version:
+                _add(diagnostics, "BEHAVIORAL_REPORT_VERSION", f"{report_id} version is {value.get('version')!r}; expected {expected_version!r}", bundle_path)
+            if not producer_report and value.get("reportKind") != declaration.get("reportKind"):
+                _add(diagnostics, "BEHAVIORAL_REPORT_KIND", f"{report_id} reportKind is {value.get('reportKind')!r}; expected {declaration.get('reportKind')!r}", bundle_path)
+            if value.get("evidenceId") != evidence_id:
+                _add(diagnostics, "BEHAVIORAL_REPORT_EVIDENCE_ID", f"{report_id} evidenceId is not bound to {evidence_id}", bundle_path)
+            issue_numbers = value.get("issueNumbers")
+            issue_number = value.get("issueNumber")
+            if not producer_report and issue_number != issue and not (isinstance(issue_numbers, list) and issue in issue_numbers):
+                _add(diagnostics, "BEHAVIORAL_REPORT_ISSUE", f"{report_id} is not bound to issue #{issue}", bundle_path)
+            declared_requirements = value.get("requirementIds")
+            if not isinstance(declared_requirements, list) or requirement_id not in declared_requirements:
+                _add(diagnostics, "BEHAVIORAL_REPORT_REQUIREMENT", f"{report_id} is not bound to {requirement_id}", bundle_path)
+            if value.get("sourceSha") != manifest.get("sourceSha"):
+                _add(diagnostics, "BEHAVIORAL_REPORT_SOURCE_SHA", f"{report_id} sourceSha does not match the bundle", bundle_path)
+            if producer_report:
+                continue
+            missing_fields = sorted(required_fields_set - set(value))
+            if missing_fields:
+                _add(diagnostics, "BEHAVIORAL_REPORT_FIELDS", f"{report_id} is missing required fields: {', '.join(missing_fields)}", bundle_path)
+            if not isinstance(value.get("assertions"), list) or not value.get("assertions"):
+                _add(diagnostics, "BEHAVIORAL_REPORT_ASSERTIONS", f"{report_id} has no assertions", bundle_path)
+            else:
+                for index, assertion in enumerate(value["assertions"]):
+                    if not isinstance(assertion, dict):
+                        _add(diagnostics, "BEHAVIORAL_ASSERTION_ENTRY", f"{report_id} assertion {index} is not an object", bundle_path)
+                        continue
+                    missing_assertion_fields = sorted(set(required_assertion_fields) - set(assertion))
+                    if missing_assertion_fields:
+                        _add(diagnostics, "BEHAVIORAL_ASSERTION_FIELDS", f"{report_id} assertion {index} is missing: {', '.join(missing_assertion_fields)}", bundle_path)
+            if not isinstance(value.get("cases"), list) or not value.get("cases"):
+                _add(diagnostics, "BEHAVIORAL_REPORT_CASES", f"{report_id} has no cases", bundle_path)
+            else:
+                for index, case in enumerate(value["cases"]):
+                    if not isinstance(case, dict):
+                        _add(diagnostics, "BEHAVIORAL_CASE_ENTRY", f"{report_id} case {index} is not an object", bundle_path)
+                        continue
+                    missing_case_fields = sorted(set(required_case_fields) - set(case))
+                    if missing_case_fields:
+                        _add(diagnostics, "BEHAVIORAL_CASE_FIELDS", f"{report_id} case {index} is missing: {', '.join(missing_case_fields)}", bundle_path)
+            independence = value.get("independence")
+            if not isinstance(independence, dict):
+                _add(diagnostics, "BEHAVIORAL_INDEPENDENCE", f"{report_id} independence is not an object", bundle_path)
+            else:
+                missing_independence_fields = sorted(set(required_independence_fields) - set(independence))
+                if missing_independence_fields:
+                    _add(diagnostics, "BEHAVIORAL_INDEPENDENCE_FIELDS", f"{report_id} independence is missing: {', '.join(missing_independence_fields)}", bundle_path)
+                if independence.get("expectedDerivedFromActual") is not False:
+                    _add(diagnostics, "BEHAVIORAL_INDEPENDENCE_DERIVATION", f"{report_id} expected values are not independently bound from actual values", bundle_path)
+            if value.get("waivers") != []:
+                _add(diagnostics, "BEHAVIORAL_WAIVER", f"{report_id} contains a waiver; release waivers are forbidden", bundle_path)
+
+
 def validate_bundle(
     manifest_path: Path,
     *,
@@ -1305,6 +1463,7 @@ def validate_bundle(
         _add(diagnostics, "MANIFEST_ISSUE_SCOPE", f"manifest issueNumbers {sorted(declared_issue_numbers)} do not match contract {sorted(expected_issue_numbers)}")
     _validate_issue_indexes(bundle_root, manifest, contract, report_by_id, diagnostics)
     _validate_recovery_report_catalog(bundle_root, report_by_id, diagnostics, contract)
+    _validate_behavioral_report_declarations(bundle_root, report_by_id, manifest, diagnostics, contract)
     return _result(manifest_path, manifest, diagnostics, report_by_id)
 
 

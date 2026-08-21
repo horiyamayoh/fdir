@@ -161,6 +161,17 @@ class GithubIssueStateTests(unittest.TestCase):
         self.assertFalse(report["releaseReady"])
         self.assertEqual(report["diagnostics"][0]["code"], "RELEASE_AUTHORITY_REQUIRED")
 
+    def test_explicit_release_mode_without_authority_fails_closed(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = release_gate.main(["--mode", "release"])
+        self.assertEqual(exit_code, 1)
+        report = json.loads(output.getvalue())
+        self.assertEqual(report["mode"], "release")
+        self.assertEqual(report["status"], "blocked")
+        self.assertFalse(report["releaseReady"])
+        self.assertEqual(report["diagnostics"][0]["code"], "RELEASE_AUTHORITY_REQUIRED")
+
 
 if __name__ == "__main__":
     unittest.main()

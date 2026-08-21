@@ -197,8 +197,8 @@ jobs:
             --timeout 1800
       - name: Validate commit-bound qualification bundle
         run: python tools/validate_qualification_bundle.py "${{ steps.bundle-path.outputs.bundle-root }}/manifest.json"
-      - name: Run final release gate
-        run: python tools/release_gate.py --bundle "${{ steps.bundle-path.outputs.bundle-root }}/manifest.json"
+      - name: Run candidate qualification gate
+        run: python tools/strict_completion_gate.py --bundle "${{ steps.bundle-path.outputs.bundle-root }}/manifest.json"
       - name: Publish qualification digest
         shell: bash
         run: |
@@ -345,7 +345,7 @@ jobs:
                   "Prepare commit-bound bundle path",
                   "Build commit-bound qualification bundle",
                   "Validate commit-bound qualification bundle",
-                  "Run final release gate",
+                  "Run candidate qualification gate",
                   "Publish qualification digest",
                   "Run real-input adapter E2E",
                   "Upload qualification bundle",
@@ -659,6 +659,15 @@ jobs:
               artifact_url=os.environ["BUNDLE_ARTIFACT_URL"],
               environment=external_environment,
           )
+      - name: Run final release gate
+        if: ${{ success() && env.EVIDENCE_MANUAL == 'true' && steps.inspect.outputs.release-ready == 'true' }}
+        shell: bash
+        env:
+          BUNDLE_MANIFEST: ${{ steps.candidate.outputs.manifest }}
+          ATTESTATION: ${{ runner.temp }}/fdir-release-evidence/release-attestation.json
+        run: |
+          set -euo pipefail
+          python tools/release_gate.py --bundle "$BUNDLE_MANIFEST" --attestation "$ATTESTATION"
       - name: Upload release attestation
         if: ${{ success() && env.EVIDENCE_MANUAL == 'true' && steps.inspect.outputs.release-ready == 'true' }}
         id: upload-attestation

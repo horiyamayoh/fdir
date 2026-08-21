@@ -37,7 +37,10 @@ class DesignWorkflowEvidenceTests(unittest.TestCase):
     def test_final_attestation_requires_a_completed_target_run(self) -> None:
         self.assertIn("workflow_dispatch:", self.text)
         self.assertIn("Require completed successful target run for final attestation", self.text)
+        self.assertIn("Run candidate qualification gate", self.text)
+        self.assertIn("python tools/strict_completion_gate.py --bundle", self.text)
         self.assertIn("Build final release attestation", self.text)
+        self.assertIn("python tools/release_gate.py --bundle \"$BUNDLE_MANIFEST\" --attestation \"$ATTESTATION\"", self.text)
         self.assertIn("from tools import release_attestation", self.text)
         self.assertIn("Upload release attestation publication receipt", self.text)
 

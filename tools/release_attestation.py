@@ -254,6 +254,22 @@ def validate_candidate_bundle(bundle_manifest: Path, *, repo_root: Path = ROOT, 
     without changing the release policy.
     """
 
+    try:
+        try:
+            from validate_qualification_bundle import validate_bundle
+        except ImportError:  # pragma: no cover
+            from tools.validate_qualification_bundle import validate_bundle
+        validation = validate_bundle(bundle_manifest, repo_root=repo_root, allow_dirty=allow_dirty)
+    except Exception as exc:
+        if isinstance(exc, AttestationError):
+            raise
+        raise AttestationError("BUNDLE_VALIDATION_ERROR", str(exc)) from exc
+    if validation.get("status") != "passed":
+        diagnostics = validation.get("diagnostics", [])
+        raise AttestationError(
+            "BUNDLE_VALIDATION_FAILED",
+            json.dumps(diagnostics, ensure_ascii=False, sort_keys=True),
+        )
     manifest = _load_json(bundle_manifest.resolve())
     if not isinstance(manifest, dict):
         raise AttestationError("BUNDLE_MANIFEST_SCHEMA", "bundle manifest is not an object")
@@ -343,6 +359,7 @@ def build_attestation(
     """Create a final attestation from a passed candidate bundle."""
 
     source_sha = _source_sha(source_sha)
+    validate_candidate_bundle(bundle_manifest, repo_root=repo_root)
     bundle, reports = _bundle_metadata(bundle_manifest, repo_root=repo_root, expected_source_sha=source_sha)
     env = environment or os.environ
     actions = env.get("GITHUB_ACTIONS", "").casefold() == "true"
