@@ -61,6 +61,7 @@ def _orchestration_probe(failing_command: str) -> int:
     original_runtime = release_gate.check_runtime_evidence
     original_audit = getattr(release_gate, "check_audit_recovery_release_boundary", None)
     original_clean_room = getattr(release_gate, "check_clean_room_replay", None)
+    directory = _probe_directory("release-orchestration-")
 
     def fake_run_command(name: str, display_command: str, argv: list[str]) -> dict[str, Any]:
         return {
@@ -86,7 +87,7 @@ def _orchestration_probe(failing_command: str) -> int:
     release_gate.run_command = fake_run_command  # type: ignore[assignment]
     release_gate.check_runtime_evidence = fake_runtime  # type: ignore[assignment]
     if original_audit is not None:
-        release_gate.check_audit_recovery_release_boundary = lambda: {"recovery_children": 18, "umbrella_issue": 87}  # type: ignore[assignment]
+        release_gate.check_audit_recovery_release_boundary = lambda **_: {"recovery_children": 18, "umbrella_issue": 87}  # type: ignore[assignment]
     if original_clean_room is not None:
         # The release defect probe exercises orchestration in a disposable
         # worktree, where the real two-run clean-room report is intentionally
@@ -94,7 +95,11 @@ def _orchestration_probe(failing_command: str) -> int:
         # command while preserving the normal gate's strict clean-room check.
         release_gate.check_clean_room_replay = lambda: {"runs": 2, "difference_count": 0, "diff_digest": "0" * 64}  # type: ignore[assignment]
     try:
-        result = int(release_gate.main([]))
+        # The normal smoke entrypoint intentionally exits before orchestration
+        # when no release authority is supplied.  A disposable bundle path
+        # selects the real orchestration path without making this probe a
+        # release claim; bundle validation fails closed at the end.
+        result = int(release_gate.main(["--bundle", str(directory / "synthetic-bundle.json")]))
         return 0 if result != 0 else 1
     finally:
         release_gate.run_command = original_run_command  # type: ignore[assignment]
@@ -103,6 +108,7 @@ def _orchestration_probe(failing_command: str) -> int:
             release_gate.check_audit_recovery_release_boundary = original_audit  # type: ignore[assignment]
         if original_clean_room is not None:
             release_gate.check_clean_room_replay = original_clean_room  # type: ignore[assignment]
+        shutil.rmtree(directory, ignore_errors=True)
 
 
 def main(argv: list[str] | None = None) -> int:

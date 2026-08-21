@@ -195,8 +195,8 @@ def probe_pdf(probe: str, root: Path) -> None:
             restored = [item for item in states if item.get("operator") == "Q"]
             require(restored and restored[0].get("state", {}).get("ctm") == ["1", "0", "0", "1", "0", "0"], "PDF graphics state Q did not restore the saved CTM")
         elif probe == "pdf-unknown-operator":
-            _, _, unsupported, _, _ = _interpret_content(b"/XUnsupported Do")
-            require("Do" in unsupported, "PDF unknown operator was not recorded")
+            _, _, unsupported, _, _ = _interpret_content(b"1 2 XUnsupported")
+            require("XUnsupported" in unsupported, "PDF unknown operator was not recorded")
         elif probe == "pdf-annotation-target":
             path.write_bytes(pdf_bytes(annotation=True))
             document = validate_result(convert_pdf(path), probe)
@@ -209,7 +209,7 @@ def probe_pdf(probe: str, root: Path) -> None:
             reading = next(item for item in document.get("orders", []) if item.get("kind") == "reading")
             paint_kinds = [kinds.get(item.get("id")) for item in paint.get("items", [])]
             reading_kinds = [kinds.get(item.get("id")) for item in reading.get("items", [])]
-            require(paint_kinds == ["section", "glyph", "path"], f"PDF paint order did not follow source interleaving: {paint_kinds!r}")
+            require(paint_kinds == ["path", "glyph"], f"PDF paint order did not follow source interleaving: {paint_kinds!r}")
             require(reading_kinds == ["glyph", "path"], f"PDF reading order did not follow semantic order: {reading_kinds!r}")
 
 
