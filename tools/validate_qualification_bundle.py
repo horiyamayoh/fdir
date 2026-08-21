@@ -38,6 +38,7 @@ try:
         PRODUCER_REPORT_VERSION,
         allowed_producer_assertion_types,
         canonical_json_bytes as evidence_canonical_json_bytes,
+        is_forbidden_artifact_role,
         selected_artifact_digest,
         selected_artifact_value,
         validate_producer_report_shape,
@@ -59,6 +60,7 @@ except ImportError:  # pragma: no cover - package-style imports
         PRODUCER_REPORT_VERSION,
         allowed_producer_assertion_types,
         canonical_json_bytes as evidence_canonical_json_bytes,
+        is_forbidden_artifact_role,
         selected_artifact_digest,
         selected_artifact_value,
         validate_producer_report_shape,
@@ -494,7 +496,7 @@ def _artifact_ref_value(
         _add(diagnostics, "ARTIFACT_REFERENCE_PATH", f"{label} is not a declared bundle output: {path!r}", report_path)
         return None, path if isinstance(path, str) else None
     role = output_roles.get(path, "")
-    if forbid_source_roles and (role.casefold() == "producer-report" or any(token in role.casefold() for token in ("snapshot", "source", "manifest", "schema", "contract", "workflow", "stdout", "stderr", "static", "code"))):
+    if forbid_source_roles and is_forbidden_artifact_role(role):
         _add(diagnostics, "PRODUCER_SOURCE_SNAPSHOT", f"{label} uses a source/static snapshot role: {role!r}", report_path)
     target = _resolve_relative(bundle_root, path)
     if not target.is_file():

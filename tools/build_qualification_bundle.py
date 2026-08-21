@@ -27,7 +27,9 @@ try:
         PRODUCER_REPORT_SCHEMA,
         PRODUCER_REPORT_OUTPUT_ROLE,
         PRODUCER_REPORT_VERSION,
+        SOURCE_SNAPSHOT_OUTPUT_ROLES,
         allowed_producer_assertion_types,
+        is_forbidden_artifact_role,
         is_producer_report_output,
         selected_artifact_digest,
         selected_artifact_value,
@@ -40,7 +42,9 @@ except ImportError:  # pragma: no cover - package-style imports
         PRODUCER_REPORT_SCHEMA,
         PRODUCER_REPORT_OUTPUT_ROLE,
         PRODUCER_REPORT_VERSION,
+        SOURCE_SNAPSHOT_OUTPUT_ROLES,
         allowed_producer_assertion_types,
+        is_forbidden_artifact_role,
         is_producer_report_output,
         selected_artifact_digest,
         selected_artifact_value,
@@ -233,11 +237,6 @@ def _artifact_reference(
     }
 
 
-def _forbidden_artifact_role(role: str) -> bool:
-    lowered = role.casefold()
-    return any(token in lowered for token in ("snapshot", "source", "manifest", "schema", "contract", "workflow", "stdout", "stderr", "static", "code"))
-
-
 def _validate_producer_report(
     report: Any,
     *,
@@ -302,7 +301,7 @@ def _validate_producer_report(
             raise BundleBuildError(f"PRODUCER_CASE_SUPPORT_SAME_ARTIFACT: support is not a separate artifact in case {case_id!r}")
         for field in ("authorityArtifact", "actualArtifact", "inputArtifact"):
             role = output_roles.get(case[field]["path"], "")
-            if _forbidden_artifact_role(role):
+            if is_forbidden_artifact_role(role):
                 raise BundleBuildError(f"PRODUCER_CASE_SOURCE_SNAPSHOT: {field} uses forbidden role {role!r} in case {case_id!r}")
     if "positive" not in classifications or not ({"negative", "mutation"} & classifications):
         raise BundleBuildError("PRODUCER_CASE_COVERAGE: producer report must contain positive and negative/mutation cases")
@@ -335,7 +334,7 @@ def _validate_producer_report(
             raise BundleBuildError(f"PRODUCER_ASSERTION_SUPPORT_SAME_ARTIFACT: support is not a separate artifact in {assertion_id!r}")
         for field in ("authorityArtifact", "actualArtifact"):
             role = output_roles.get(assertion[field]["path"], "")
-            if _forbidden_artifact_role(role):
+            if is_forbidden_artifact_role(role):
                 raise BundleBuildError(f"PRODUCER_ASSERTION_SOURCE_SNAPSHOT: {field} uses forbidden role {role!r} in {assertion_id!r}")
         if not isinstance(assertion.get("target"), dict) or not assertion["target"]:
             raise BundleBuildError(f"PRODUCER_ASSERTION_TARGET: target is required in {assertion_id!r}")
@@ -394,6 +393,10 @@ def _load_contract(contract_path: Path) -> tuple[dict[str, Any], list[dict[str, 
         raise BundleBuildError("qualification contract must contain default evidence definitions")
     if not isinstance(scope, dict):
         raise BundleBuildError("qualification contract scope is missing")
+    policies = contract.get("behavioralReportContract", {}).get("policies") if isinstance(contract.get("behavioralReportContract"), dict) else None
+    declared_snapshot_roles = policies.get("sourceSnapshotOutputRoles") if isinstance(policies, dict) else None
+    if not isinstance(declared_snapshot_roles, list) or set(declared_snapshot_roles) != set(SOURCE_SNAPSHOT_OUTPUT_ROLES):
+        raise BundleBuildError("qualification contract source snapshot roles are not the closed builder policy")
     expected_ids = set(scope.get("requiredEvidenceIds", []))
     actual_ids = [item.get("evidenceId") for item in defaults]
     if len(actual_ids) != len(set(actual_ids)) or set(actual_ids) != expected_ids:

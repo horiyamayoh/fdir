@@ -28,6 +28,37 @@ PRODUCER_REPORT_SCHEMA = "fdir/qualification-producer-report"
 PRODUCER_REPORT_VERSION = "1.0.0"
 PRODUCER_REPORT_OUTPUT_ROLE = "producer-report"
 
+# These are the exact output roles that may not serve as an authority,
+# actual, or input artifact in a producer claim.  Keep this closed set in
+# code so a semantic report such as ``source-occurrence-report`` is not
+# mistaken for a source snapshot merely because a token appears in its name.
+SOURCE_SNAPSHOT_OUTPUT_ROLES = frozenset({
+    "source",
+    "source-snapshot",
+    "contract-snapshot",
+    "schema-snapshot",
+    "manifest",
+    "workflow",
+    "runner",
+    "adapter",
+    "policy",
+    "campaign-contract",
+    "strict-policy-snapshot",
+    "model-contract",
+    "reference-registry",
+    "generated-schema",
+})
+NON_BEHAVIORAL_OUTPUT_ROLES = frozenset({"stdout", "stderr", "static", "code"})
+
+
+def is_forbidden_artifact_role(role: Any) -> bool:
+    """Reject exact non-behavioral roles used as producer claim artifacts."""
+
+    if not isinstance(role, str):
+        return True
+    normalized = role.casefold().strip()
+    return normalized in SOURCE_SNAPSHOT_OUTPUT_ROLES | NON_BEHAVIORAL_OUTPUT_ROLES | {PRODUCER_REPORT_OUTPUT_ROLE}
+
 PRODUCER_REPORT_REQUIRED_FIELDS = frozenset({
     "schema",
     "version",
