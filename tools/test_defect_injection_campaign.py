@@ -5,9 +5,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import shutil
+import sys
 import unittest
 
 from jsonschema import Draft202012Validator, RefResolver
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tools import run_defect_injection_campaign as campaign
 from tools.build_qualification_bundle import build_bundle

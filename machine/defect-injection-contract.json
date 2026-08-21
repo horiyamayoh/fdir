@@ -710,7 +710,7 @@
           {
             "count": 1,
             "new": "            elif False and item_local == \"hyperlink\":",
-            "old": "            elif item_local == \"hyperlink\":",
+            "old": "        elif item_local == \"hyperlink\":",
             "path": "tools/adapter_docx.py"
           }
         ],
@@ -748,7 +748,7 @@
           {
             "count": 1,
             "new": "            elif item_local == \"hyperlink\" and False:",
-            "old": "            elif item_local == \"hyperlink\":",
+            "old": "        elif item_local == \"hyperlink\":",
             "path": "tools/adapter_docx.py"
           }
         ],
@@ -787,7 +787,7 @@
           {
             "count": 1,
             "new": "            elif item_local == \"hyperlink\" and 0:",
-            "old": "            elif item_local == \"hyperlink\":",
+            "old": "        elif item_local == \"hyperlink\":",
             "path": "tools/adapter_docx.py"
           }
         ],
@@ -826,7 +826,7 @@
           {
             "count": 1,
             "new": "            elif item_local == \"hyperlink\" and item_local != \"hyperlink\":",
-            "old": "            elif item_local == \"hyperlink\":",
+            "old": "        elif item_local == \"hyperlink\":",
             "path": "tools/adapter_docx.py"
           }
         ],
@@ -1025,7 +1025,7 @@
           {
             "count": 1,
             "new": "                    pass  # defect injection skips header/footer stories",
-            "old": "                    _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles, limits)",
+            "old": "                _parse_story_part(\n                    builder,\n                    archive,\n                    str(package_part[\"name\"]),\n                    str(package_part[\"partId\"]),\n                    story_node_id,\n                    story_type,\n                    story_id,\n                    styles,\n                    limits,\n                    owner_surface_id=story_surface_id,\n                    relationships=story_relationships,\n                )",
             "path": "tools/adapter_docx.py"
           }
         ],
@@ -1064,8 +1064,8 @@
         "changes": [
           {
             "count": 1,
-            "new": "                    if False:\n                        _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles, limits)",
-            "old": "                    _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles, limits)",
+            "new": "                if False:\n                    _parse_story_part(\n                        builder,\n                        archive,\n                        str(package_part[\"name\"]),\n                        str(package_part[\"partId\"]),\n                        story_node_id,\n                        story_type,\n                        story_id,\n                        styles,\n                        limits,\n                        owner_surface_id=story_surface_id,\n                        relationships=story_relationships,\n                    )",
+            "old": "                _parse_story_part(\n                    builder,\n                    archive,\n                    str(package_part[\"name\"]),\n                    str(package_part[\"partId\"]),\n                    story_node_id,\n                    story_type,\n                    story_id,\n                    styles,\n                    limits,\n                    owner_surface_id=story_surface_id,\n                    relationships=story_relationships,\n                )",
             "path": "tools/adapter_docx.py"
           }
         ],
@@ -1105,8 +1105,8 @@
         "changes": [
           {
             "count": 1,
-            "new": "                    if 0:\n                        _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles, limits)",
-            "old": "                    _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles, limits)",
+            "new": "                if 0:\n                    _parse_story_part(\n                        builder,\n                        archive,\n                        str(package_part[\"name\"]),\n                        str(package_part[\"partId\"]),\n                        story_node_id,\n                        story_type,\n                        story_id,\n                        styles,\n                        limits,\n                        owner_surface_id=story_surface_id,\n                        relationships=story_relationships,\n                    )",
+            "old": "                _parse_story_part(\n                    builder,\n                    archive,\n                    str(package_part[\"name\"]),\n                    str(package_part[\"partId\"]),\n                    story_node_id,\n                    story_type,\n                    story_id,\n                    styles,\n                    limits,\n                    owner_surface_id=story_surface_id,\n                    relationships=story_relationships,\n                )",
             "path": "tools/adapter_docx.py"
           }
         ],
@@ -1146,8 +1146,8 @@
         "changes": [
           {
             "count": 1,
-            "new": "                    if part_name == \"__never__\":\n                        _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles, limits)",
-            "old": "                    _parse_story_part(builder, archive, part_name, str(package_part[\"partId\"]), styles, limits)",
+            "new": "                if str(package_part[\"name\"]) == \"__never__\":\n                    _parse_story_part(\n                        builder,\n                        archive,\n                        str(package_part[\"name\"]),\n                        str(package_part[\"partId\"]),\n                        story_node_id,\n                        story_type,\n                        story_id,\n                        styles,\n                        limits,\n                        owner_surface_id=story_surface_id,\n                        relationships=story_relationships,\n                    )",
+            "old": "                _parse_story_part(\n                    builder,\n                    archive,\n                    str(package_part[\"name\"]),\n                    str(package_part[\"partId\"]),\n                    story_node_id,\n                    story_type,\n                    story_id,\n                    styles,\n                    limits,\n                    owner_surface_id=story_surface_id,\n                    relationships=story_relationships,\n                )",
             "path": "tools/adapter_docx.py"
           }
         ],
@@ -1187,7 +1187,7 @@
           {
             "count": 1,
             "new": "                    pass  # defect injection skips style inheritance",
-            "old": "                    _resolve_styles(builder, style_graph, style_declarations, styles)",
+            "old": "                    _resolve_styles(\n                        builder,\n                        style_graph,\n                        style_declarations,\n                        styles,\n                        resolved_declarations=style_resolved_declarations,\n                        property_sources=style_property_sources,\n                        default_source=default_source,\n                        default_values=default_values,\n                        missing_parents=missing_parents,\n                    )",
             "path": "tools/adapter_docx.py"
           }
         ],
@@ -1225,8 +1225,8 @@
         "changes": [
           {
             "count": 1,
-            "new": "                    if False:\n                        _resolve_styles(builder, style_graph, style_declarations, styles)",
-            "old": "                    _resolve_styles(builder, style_graph, style_declarations, styles)",
+            "new": "                    if False:\n                        _resolve_styles(\n                            builder,\n                            style_graph,\n                            style_declarations,\n                            styles,\n                            resolved_declarations=style_resolved_declarations,\n                            property_sources=style_property_sources,\n                            default_source=default_source,\n                            default_values=default_values,\n                            missing_parents=missing_parents,\n                        )",
+            "old": "                    _resolve_styles(\n                        builder,\n                        style_graph,\n                        style_declarations,\n                        styles,\n                        resolved_declarations=style_resolved_declarations,\n                        property_sources=style_property_sources,\n                        default_source=default_source,\n                        default_values=default_values,\n                        missing_parents=missing_parents,\n                    )",
             "path": "tools/adapter_docx.py"
           }
         ],
@@ -1265,8 +1265,8 @@
         "changes": [
           {
             "count": 1,
-            "new": "                    if 0:\n                        _resolve_styles(builder, style_graph, style_declarations, styles)",
-            "old": "                    _resolve_styles(builder, style_graph, style_declarations, styles)",
+            "new": "                    if 0:\n                        _resolve_styles(\n                            builder,\n                            style_graph,\n                            style_declarations,\n                            styles,\n                            resolved_declarations=style_resolved_declarations,\n                            property_sources=style_property_sources,\n                            default_source=default_source,\n                            default_values=default_values,\n                            missing_parents=missing_parents,\n                        )",
+            "old": "                    _resolve_styles(\n                        builder,\n                        style_graph,\n                        style_declarations,\n                        styles,\n                        resolved_declarations=style_resolved_declarations,\n                        property_sources=style_property_sources,\n                        default_source=default_source,\n                        default_values=default_values,\n                        missing_parents=missing_parents,\n                    )",
             "path": "tools/adapter_docx.py"
           }
         ],
@@ -1305,8 +1305,8 @@
         "changes": [
           {
             "count": 1,
-            "new": "                    if styles is None:\n                        _resolve_styles(builder, style_graph, style_declarations, styles)",
-            "old": "                    _resolve_styles(builder, style_graph, style_declarations, styles)",
+            "new": "                    if styles is None:\n                        _resolve_styles(\n                            builder,\n                            style_graph,\n                            style_declarations,\n                            styles,\n                            resolved_declarations=style_resolved_declarations,\n                            property_sources=style_property_sources,\n                            default_source=default_source,\n                            default_values=default_values,\n                            missing_parents=missing_parents,\n                        )",
+            "old": "                    _resolve_styles(\n                        builder,\n                        style_graph,\n                        style_declarations,\n                        styles,\n                        resolved_declarations=style_resolved_declarations,\n                        property_sources=style_property_sources,\n                        default_source=default_source,\n                        default_values=default_values,\n                        missing_parents=missing_parents,\n                    )",
             "path": "tools/adapter_docx.py"
           }
         ],
@@ -1345,7 +1345,7 @@
           {
             "count": 1,
             "new": "    tokens = _inline_tokens(raw, {}) or [{\"kind\": \"text\", \"raw\": raw, \"start\": 0, \"end\": len(raw)}]",
-            "old": "    tokens = _inline_tokens(raw, references) or [{\"kind\": \"text\", \"raw\": raw, \"start\": 0, \"end\": len(raw)}]",
+            "old": "    tokens = _inline_tokens(raw, references, allow_strikethrough=allow_strikethrough) or [{\"kind\": \"text\", \"raw\": raw, \"start\": 0, \"end\": len(raw)}]",
             "path": "tools/adapter_markdown.py"
           }
         ],
@@ -1383,7 +1383,7 @@
           {
             "count": 1,
             "new": "    tokens = []",
-            "old": "    tokens = _inline_tokens(raw, references) or [{\"kind\": \"text\", \"raw\": raw, \"start\": 0, \"end\": len(raw)}]",
+            "old": "    tokens = _inline_tokens(raw, references, allow_strikethrough=allow_strikethrough) or [{\"kind\": \"text\", \"raw\": raw, \"start\": 0, \"end\": len(raw)}]",
             "path": "tools/adapter_markdown.py"
           }
         ],
@@ -1422,7 +1422,7 @@
           {
             "count": 1,
             "new": "    tokens = [{\"kind\": \"text\", \"raw\": raw, \"start\": 0, \"end\": len(raw)}]",
-            "old": "    tokens = _inline_tokens(raw, references) or [{\"kind\": \"text\", \"raw\": raw, \"start\": 0, \"end\": len(raw)}]",
+            "old": "    tokens = _inline_tokens(raw, references, allow_strikethrough=allow_strikethrough) or [{\"kind\": \"text\", \"raw\": raw, \"start\": 0, \"end\": len(raw)}]",
             "path": "tools/adapter_markdown.py"
           }
         ],
@@ -1460,8 +1460,8 @@
         "changes": [
           {
             "count": 1,
-            "new": "    tokens = _inline_tokens(\"\", references) or [{\"kind\": \"text\", \"raw\": raw, \"start\": 0, \"end\": len(raw)}]",
-            "old": "    tokens = _inline_tokens(raw, references) or [{\"kind\": \"text\", \"raw\": raw, \"start\": 0, \"end\": len(raw)}]",
+            "new": "    tokens = _inline_tokens(\"\", references, allow_strikethrough=allow_strikethrough) or [{\"kind\": \"text\", \"raw\": raw, \"start\": 0, \"end\": len(raw)}]",
+            "old": "    tokens = _inline_tokens(raw, references, allow_strikethrough=allow_strikethrough) or [{\"kind\": \"text\", \"raw\": raw, \"start\": 0, \"end\": len(raw)}]",
             "path": "tools/adapter_markdown.py"
           }
         ],
@@ -1656,7 +1656,7 @@
           {
             "count": 1,
             "new": "            \"tokenEnd\": max(0, token_end if token_end is not None else end_column - column + 1),",
-            "old": "            \"tokenEnd\": max(0, token_end if token_end is not None else end_column - column),",
+            "old": "        \"tokenEnd\": max(0, token_end if token_end is not None else end_column - column),",
             "path": "tools/adapter_markdown.py"
           }
         ],
@@ -1694,7 +1694,7 @@
           {
             "count": 1,
             "new": "            \"tokenEnd\": max(0, token_end if token_end is not None else end_column - column + 2),",
-            "old": "            \"tokenEnd\": max(0, token_end if token_end is not None else end_column - column),",
+            "old": "        \"tokenEnd\": max(0, token_end if token_end is not None else end_column - column),",
             "path": "tools/adapter_markdown.py"
           }
         ],
@@ -1733,7 +1733,7 @@
           {
             "count": 1,
             "new": "            \"tokenEnd\": max(0, token_end if token_end is not None else end_column - column + 3),",
-            "old": "            \"tokenEnd\": max(0, token_end if token_end is not None else end_column - column),",
+            "old": "        \"tokenEnd\": max(0, token_end if token_end is not None else end_column - column),",
             "path": "tools/adapter_markdown.py"
           }
         ],
@@ -1772,7 +1772,7 @@
           {
             "count": 1,
             "new": "            \"tokenEnd\": max(0, 0),",
-            "old": "            \"tokenEnd\": max(0, token_end if token_end is not None else end_column - column),",
+            "old": "        \"tokenEnd\": max(0, token_end if token_end is not None else end_column - column),",
             "path": "tools/adapter_markdown.py"
           }
         ],
@@ -1965,8 +1965,8 @@
         "changes": [
           {
             "count": 1,
-            "new": "                node = _paragraph(builder, parent_id, \"\\n\".join(item[0] for item in node_records), node_records[0][1], column=node_records[0][2], references=references, footnotes=footnotes, state=state, status=\"preserved\")",
-            "old": "                node = _paragraph(builder, parent_id, \"\\n\".join(item[0] for item in node_records), node_records[0][1], column=node_records[0][2], references=references, footnotes=footnotes, state=state, status=\"unsupported\")",
+            "new": "                    status=\"preserved\",",
+            "old": "                    status=\"unsupported\",",
             "path": "tools/adapter_markdown.py"
           }
         ],
@@ -2004,8 +2004,8 @@
         "changes": [
           {
             "count": 1,
-            "new": "                node = _paragraph(builder, parent_id, \"\\n\".join(item[0] for item in node_records), node_records[0][1], column=node_records[0][2], references=references, footnotes=footnotes, state=state, status=\"normalized\")",
-            "old": "                node = _paragraph(builder, parent_id, \"\\n\".join(item[0] for item in node_records), node_records[0][1], column=node_records[0][2], references=references, footnotes=footnotes, state=state, status=\"unsupported\")",
+            "new": "                    status=\"normalized\",",
+            "old": "                    status=\"unsupported\",",
             "path": "tools/adapter_markdown.py"
           }
         ],
@@ -2044,8 +2044,8 @@
         "changes": [
           {
             "count": 1,
-            "new": "                node = _paragraph(builder, parent_id, \"\\n\".join(item[0] for item in node_records), node_records[0][1], column=node_records[0][2], references=references, footnotes=footnotes, state=state, status=\"ambiguous\")",
-            "old": "                node = _paragraph(builder, parent_id, \"\\n\".join(item[0] for item in node_records), node_records[0][1], column=node_records[0][2], references=references, footnotes=footnotes, state=state, status=\"unsupported\")",
+            "new": "                    status=\"ambiguous\",",
+            "old": "                    status=\"unsupported\",",
             "path": "tools/adapter_markdown.py"
           }
         ],
@@ -2084,8 +2084,8 @@
         "changes": [
           {
             "count": 1,
-            "new": "                node = _paragraph(builder, parent_id, \"\\n\".join(item[0] for item in node_records), node_records[0][1], column=node_records[0][2], references=references, footnotes=footnotes, state=state, status=\"unavailable\")",
-            "old": "                node = _paragraph(builder, parent_id, \"\\n\".join(item[0] for item in node_records), node_records[0][1], column=node_records[0][2], references=references, footnotes=footnotes, state=state, status=\"unsupported\")",
+            "new": "                    status=\"unavailable\",",
+            "old": "                    status=\"unsupported\",",
             "path": "tools/adapter_markdown.py"
           }
         ],
@@ -2420,9 +2420,9 @@
       "patch": {
         "changes": [
           {
-            "count": 2,
-            "new": "enumerate(sorted(builder.document[\"nodes\"][1:], key=lambda item: item[\"kind\"]))",
-            "old": "enumerate(builder.document[\"nodes\"][1:])",
+            "count": 1,
+            "new": "            for ordinal, event in enumerate(sorted(content_paint_events, key=lambda item: item.get(\"kind\", \"\"))):",
+            "old": "            for ordinal, event in enumerate(content_paint_events):",
             "path": "tools/adapter_pdf.py"
           }
         ],
@@ -2458,9 +2458,9 @@
       "patch": {
         "changes": [
           {
-            "count": 2,
-            "new": "enumerate(list(reversed(builder.document[\"nodes\"][1:])))",
-            "old": "enumerate(builder.document[\"nodes\"][1:])",
+            "count": 1,
+            "new": "            for ordinal, event in enumerate(list(reversed(content_paint_events))):",
+            "old": "            for ordinal, event in enumerate(content_paint_events):",
             "path": "tools/adapter_pdf.py"
           }
         ],
@@ -2497,9 +2497,9 @@
       "patch": {
         "changes": [
           {
-            "count": 2,
-            "new": "enumerate(sorted(builder.document[\"nodes\"][1:], key=lambda item: item[\"nodeId\"]))",
-            "old": "enumerate(builder.document[\"nodes\"][1:])",
+            "count": 1,
+            "new": "            for ordinal, event in enumerate(sorted(content_paint_events, key=lambda item: item.get(\"operatorIndex\", 0))):",
+            "old": "            for ordinal, event in enumerate(content_paint_events):",
             "path": "tools/adapter_pdf.py"
           }
         ],
@@ -2536,9 +2536,9 @@
       "patch": {
         "changes": [
           {
-            "count": 2,
-            "new": "enumerate(sorted(builder.document[\"nodes\"][1:], key=lambda item: item.get(\"status\", \"\")))",
-            "old": "enumerate(builder.document[\"nodes\"][1:])",
+            "count": 1,
+            "new": "            for ordinal, event in enumerate(sorted(content_paint_events, key=lambda item: item.get(\"page\", 0))):",
+            "old": "            for ordinal, event in enumerate(content_paint_events):",
             "path": "tools/adapter_pdf.py"
           }
         ],
@@ -2576,8 +2576,8 @@
         "changes": [
           {
             "count": 1,
-            "new": "    pages = [(key, value) for key, value in reversed(list(objects.items())) if re.search(rb\"/Type\\s*/Page\\b\", value)]",
-            "old": "    pages = [(key, value) for key, value in sorted(objects.items()) if re.search(rb\"/Type\\s*/Page\\b\", value)]",
+            "new": "            for child in reversed(kids):",
+            "old": "            for child in kids:",
             "path": "tools/adapter_pdf.py"
           }
         ],
@@ -2615,8 +2615,8 @@
         "changes": [
           {
             "count": 1,
-            "new": "    pages = [(key, value) for key, value in list(objects.items()) if re.search(rb\"/Type\\s*/Page\\b\", value)]",
-            "old": "    pages = [(key, value) for key, value in sorted(objects.items()) if re.search(rb\"/Type\\s*/Page\\b\", value)]",
+            "new": "            for child in kids[::-1]:",
+            "old": "            for child in kids:",
             "path": "tools/adapter_pdf.py"
           }
         ],
@@ -2655,8 +2655,8 @@
         "changes": [
           {
             "count": 1,
-            "new": "    pages = [(key, value) for key, value in sorted(objects.items(), reverse=True) if re.search(rb\"/Type\\s*/Page\\b\", value)]",
-            "old": "    pages = [(key, value) for key, value in sorted(objects.items()) if re.search(rb\"/Type\\s*/Page\\b\", value)]",
+            "new": "            for child in sorted(kids, reverse=True):",
+            "old": "            for child in kids:",
             "path": "tools/adapter_pdf.py"
           }
         ],
@@ -2696,7 +2696,7 @@
           {
             "count": 1,
             "new": "                mapping = []  # defect injection drops ToUnicode mappings",
-            "old": "                mapping = _parse_cmap(_decode_stream(cmap_data, limits=limits, events=events), limits=limits, events=events)",
+            "old": "                mapping = _parse_cmap(_decode_stream(cmap_data, objects=objects, limits=limits, events=events), limits=limits, events=events)",
             "path": "tools/adapter_pdf.py"
           }
         ],
@@ -2734,7 +2734,7 @@
           {
             "count": 1,
             "new": "                mapping = _parse_cmap(b\"\")",
-            "old": "                mapping = _parse_cmap(_decode_stream(cmap_data, limits=limits, events=events), limits=limits, events=events)",
+            "old": "                mapping = _parse_cmap(_decode_stream(cmap_data, objects=objects, limits=limits, events=events), limits=limits, events=events)",
             "path": "tools/adapter_pdf.py"
           }
         ],
@@ -2773,7 +2773,7 @@
           {
             "count": 1,
             "new": "                mapping = _parse_cmap(_decode_stream(cmap_data, limits=limits, events=events), limits=limits, events=events) if False else []",
-            "old": "                mapping = _parse_cmap(_decode_stream(cmap_data, limits=limits, events=events), limits=limits, events=events)",
+            "old": "                mapping = _parse_cmap(_decode_stream(cmap_data, objects=objects, limits=limits, events=events), limits=limits, events=events)",
             "path": "tools/adapter_pdf.py"
           }
         ],
@@ -3237,7 +3237,7 @@
           {
             "count": 1,
             "new": "    require(True, \"independent corpus runner is not claimed\")  # defect injection bypasses claim binding",
-            "old": "    require(manifest.get(\"independentEvidence\", {}).get(\"runner\") == \"tools/independent_corpus.py\", \"independent corpus runner is not claimed\")",
+            "old": "    require(isinstance(independent_evidence, dict) and independent_evidence.get(\"runner\") == \"tools/independent_corpus.py\", \"independent corpus runner is not claimed\")",
             "path": "tools/release_gate.py"
           }
         ],
@@ -3274,7 +3274,7 @@
           {
             "count": 1,
             "new": "    require(1 == 1, \"independent corpus runner is not claimed\")",
-            "old": "    require(manifest.get(\"independentEvidence\", {}).get(\"runner\") == \"tools/independent_corpus.py\", \"independent corpus runner is not claimed\")",
+            "old": "    require(isinstance(independent_evidence, dict) and independent_evidence.get(\"runner\") == \"tools/independent_corpus.py\", \"independent corpus runner is not claimed\")",
             "path": "tools/release_gate.py"
           }
         ],
@@ -3312,7 +3312,7 @@
           {
             "count": 1,
             "new": "    require(\"independent\" not in \"\", \"independent corpus runner is not claimed\")",
-            "old": "    require(manifest.get(\"independentEvidence\", {}).get(\"runner\") == \"tools/independent_corpus.py\", \"independent corpus runner is not claimed\")",
+            "old": "    require(isinstance(independent_evidence, dict) and independent_evidence.get(\"runner\") == \"tools/independent_corpus.py\", \"independent corpus runner is not claimed\")",
             "path": "tools/release_gate.py"
           }
         ],
@@ -3839,7 +3839,7 @@
           {
             "count": 1,
             "new": "    pass  # defect injection bypasses extension payload validation",
-            "old": "    _validate_schema(extension[\"payload\"], payload_schema, schema, f\"$.extensions[{extension['extensionId']}].payload\")",
+            "old": "    _validate_schema(payload, payload_schema, schema, path)",
             "path": "tools/extension_registry.py"
           }
         ],
@@ -4343,7 +4343,7 @@
           {
             "count": 1,
             "new": "                            cached_value = None",
-            "old": "                            cached_value = _typed(raw_value, cell_type, number_format=cell_format, date_system=context[\"dateSystem\"])",
+            "old": "                            cached_value = _typed(\n                                raw_value,\n                                cell_type,\n                                status=value_status if raw_value is not None else \"unavailable\",\n                                number_format=cell_format,\n                                date_system=context[\"dateSystem\"],\n                                source_representation=_source_representation(cell_type),\n                            )",
             "path": "tools/adapter_xlsx.py"
           }
         ],
@@ -4382,7 +4382,7 @@
           {
             "count": 1,
             "new": "                            cached_value = None",
-            "old": "                            cached_value = _typed(raw_value, cell_type, number_format=cell_format, date_system=context[\"dateSystem\"])",
+            "old": "                            cached_value = _typed(\n                                raw_value,\n                                cell_type,\n                                status=value_status if raw_value is not None else \"unavailable\",\n                                number_format=cell_format,\n                                date_system=context[\"dateSystem\"],\n                                source_representation=_source_representation(cell_type),\n                            )",
             "path": "tools/adapter_xlsx.py"
           }
         ],
@@ -4422,7 +4422,7 @@
           {
             "count": 1,
             "new": "                            cached_value = {\"type\": \"blank\", \"value\": None, \"status\": \"unavailable\"}",
-            "old": "                            cached_value = _typed(raw_value, cell_type, number_format=cell_format, date_system=context[\"dateSystem\"])",
+            "old": "                            cached_value = _typed(\n                                raw_value,\n                                cell_type,\n                                status=value_status if raw_value is not None else \"unavailable\",\n                                number_format=cell_format,\n                                date_system=context[\"dateSystem\"],\n                                source_representation=_source_representation(cell_type),\n                            )",
             "path": "tools/adapter_xlsx.py"
           }
         ],
@@ -4462,7 +4462,7 @@
           {
             "count": 1,
             "new": "                                raw_value = raw_value  # defect injection skips shared-string lookup",
-            "old": "                                raw_value = shared[int(raw_value)]",
+            "old": "                                raw_value = shared[shared_number]",
             "path": "tools/adapter_xlsx.py"
           }
         ],
@@ -4500,7 +4500,7 @@
           {
             "count": 1,
             "new": "                                raw_value = \"\"",
-            "old": "                                raw_value = shared[int(raw_value)]",
+            "old": "                                raw_value = shared[shared_number]",
             "path": "tools/adapter_xlsx.py"
           }
         ],
@@ -4539,7 +4539,7 @@
           {
             "count": 1,
             "new": "                                raw_value = shared[0] if False else raw_value",
-            "old": "                                raw_value = shared[int(raw_value)]",
+            "old": "                                raw_value = shared[shared_number]",
             "path": "tools/adapter_xlsx.py"
           }
         ],
