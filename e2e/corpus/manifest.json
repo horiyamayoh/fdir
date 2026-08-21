@@ -20,6 +20,7 @@
       "path": "docx-story-independent",
       "expected": ["Story Header"],
       "caseClass": "positive",
+      "adapterExpectedStatus": "complete",
       "expectedStatus": "partial"
     },
     {
@@ -29,6 +30,7 @@
       "path": "xlsx-independent",
       "expected": ["Independent XLSX", "SUM(A1:A2)"],
       "caseClass": "positive",
+      "adapterExpectedStatus": "complete-with-warnings",
       "expectedStatus": "partial"
     },
     {

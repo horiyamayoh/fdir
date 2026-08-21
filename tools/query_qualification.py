@@ -356,7 +356,10 @@ def _negative_index_cases(document: dict[str, Any], label: str) -> list[dict[str
 def _convert_corpus_case(case: dict[str, Any], workspace: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     input_path = _package_case(case, workspace)
     document, evidence = convert_path(input_path, str(case["format"]))
-    expected_status = str(case.get("expectedStatus", "complete"))
+    # The independent occurrence lane may deliberately downgrade a public
+    # adapter self-report.  Query qualification exercises the raw adapter
+    # contract, so keep that expectation explicit in the corpus manifest.
+    expected_status = str(case.get("adapterExpectedStatus", case.get("expectedStatus", "complete")))
     actual_status = str(document.get("conversion", {}).get("status"))
     if actual_status != expected_status:
         raise AssertionError(f"{case['id']} status mismatch: expected {expected_status}, got {actual_status}")
