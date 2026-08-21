@@ -53,6 +53,8 @@ DECLARED_INPUTS = (
     "machine/audit-recovery-plan.json",
     "machine/qualification-contract.json",
     "tools/qualification_issue105.py",
+    "tools/validate_qualification_bundle.py",
+    "tools/validate_qualification_contract.py",
     "machine/qualification-issue-105-corpus.json",
 )
 EVALUATOR_PATH = ROOT / "tools" / "validate_qualification_bundle.py"

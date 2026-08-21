@@ -1052,6 +1052,7 @@ def _producer_input_paths(corpus_path: Path) -> list[Path]:
         ROOT / "tools" / "adapter_xlsx.py",
         ROOT / "tools" / "adapter_pdf.py",
         ROOT / "tools" / "adapter_markdown.py",
+        ROOT / "tools" / "validate_qualification_contract.py",
     ]
 
 

@@ -1549,6 +1549,7 @@ def _producer_input_paths(corpus_path: Path) -> list[Path]:
         RUNTIME_PATH,
         ROOT / "tools" / "qualification_issue97.py",
         ROOT / "tools" / "test_qualification_issue97.py",
+        ROOT / "tools" / "validate_qualification_contract.py",
     ]
 
 

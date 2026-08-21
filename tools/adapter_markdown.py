@@ -484,20 +484,36 @@ def _inline_tokens(
     return tokens
 
 
-def inspect(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any]:
+def inspect(
+    path: Path,
+    *,
+    limits: AdapterLimits | None = None,
+    profile: str | None = None,
+) -> dict[str, Any]:
     limits = input_limit_check(Path(path), limits)
     data = Path(path).read_bytes()
     source_index = _MarkdownSourceIndex.from_bytes(data)
+    dialect = _dialect_for_profile(profile)
+    capabilities = ["blocks", "inline", "links", "images", "lists", "authoring", "references", "raw-html", "source-maps"]
+    if dialect.tables:
+        capabilities.append("tables")
+    if dialect.task_lists:
+        capabilities.append("task-lists")
+    if dialect.strikethrough:
+        capabilities.append("strikethrough")
+    if dialect.footnotes:
+        capabilities.append("footnotes")
+    if dialect.front_matter:
+        capabilities.append("front-matter")
     return {
         "format": "markdown",
         "version": "commonmark",
         "bytes": len(data),
         "lines": len(source_index.lines) or 1,
-        "profile": "fdir-commonmark-0.31.2-bounded",
-        "capabilities": [
-            "blocks", "inline", "links", "images", "tables", "lists", "footnotes",
-            "front-matter", "authoring", "references", "raw-html", "source-maps",
-        ],
+        "profile": dialect.profile_id,
+        "profileName": dialect.name,
+        "profileKnown": dialect.known,
+        "capabilities": capabilities,
         "limits": {"maxInputBytes": limits.max_input_bytes, "maxTextChars": limits.max_text_chars},
     }
 

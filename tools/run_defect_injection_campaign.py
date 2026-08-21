@@ -44,6 +44,7 @@ ISSUE_89_INPUT_PATHS = (
     "machine/defect-injection-contract.json",
     "tools/run_defect_injection_campaign.py",
     "tools/defect_profile_formats.py",
+    "tools/validate_qualification_contract.py",
 )
 CLASSIFICATIONS = (
     "generated",

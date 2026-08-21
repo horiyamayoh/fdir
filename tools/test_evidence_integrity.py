@@ -60,6 +60,8 @@ ISSUE_88_INPUT_PATHS = (
     "schemas/qualification-evidence.schema.json",
     "machine/strict-completion-contract.json",
     "tools/test_evidence_integrity.py",
+    "tools/validate_qualification_bundle.py",
+    "tools/validate_qualification_contract.py",
 )
 
 

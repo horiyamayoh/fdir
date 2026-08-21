@@ -56,6 +56,8 @@ DECLARED_INPUTS = (
     "tools/qualification_issue103.py",
     "tools/test_query_surface.py",
     "tools/test_independent_index.py",
+    "tools/validate_qualification_bundle.py",
+    "tools/validate_qualification_contract.py",
 )
 EVALUATOR_PATH = ROOT / "tools" / "validate_qualification_bundle.py"
 SHARED_EVIDENCE_PATH = ROOT / "tools" / "qualification_evidence.py"

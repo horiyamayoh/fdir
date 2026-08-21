@@ -157,6 +157,8 @@ def _input_digests(manifest_path: Path) -> list[str]:
         ROOT / "tools" / "test_qualification_issue91.py",
         REPORT_SCHEMA_PATH,
         Path(manifest_path),
+        ROOT / "tools" / "qualification_evidence.py",
+        ROOT / "tools" / "validate_qualification_contract.py",
     ]
     digests: list[str] = []
     for path in paths:

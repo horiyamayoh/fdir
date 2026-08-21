@@ -180,6 +180,43 @@ def _bundle_issue_reports(manifest: Path) -> list[dict[str, Any]]:
     return entries
 
 
+def _attested_issue_reports(bundle: Path | None, snapshot: Any) -> list[dict[str, Any]]:
+    """Bind candidate issue evidence to the externally verified live state."""
+
+    entries = _bundle_issue_reports(bundle) if bundle is not None else []
+    if not isinstance(snapshot, dict) or not isinstance(snapshot.get("issues"), list):
+        return entries
+    snapshot_digest = snapshot.get("snapshotDigest")
+    live_by_issue = {
+        item.get("issueNumber"): item
+        for item in snapshot["issues"]
+        if isinstance(item, dict) and isinstance(item.get("issueNumber"), int)
+    }
+    for entry in entries:
+        issue = entry.get("issueNumber")
+        live = live_by_issue.get(issue)
+        if not isinstance(live, dict):
+            entry["status"] = "blocked"
+            entry["liveState"] = "blocked"
+            entry.setdefault("blockers", []).append({"code": "ISSUE_STATE_MISSING", "detail": f"final snapshot has no issue #{issue}"})
+            continue
+        entry.update({
+            "state": live.get("state"),
+            "stateReason": live.get("stateReason"),
+            "closedAt": live.get("closedAt"),
+            "updatedAt": live.get("updatedAt"),
+            "snapshotDigest": snapshot_digest,
+        })
+        completed = live.get("state") == "closed" and live.get("stateReason") == "completed" and live.get("closedAt") is not None
+        if completed and entry.get("status") == "passed":
+            entry["liveState"] = "verified"
+        else:
+            entry["status"] = "blocked"
+            entry["liveState"] = "blocked"
+            entry.setdefault("blockers", []).append({"code": "ISSUE_NOT_COMPLETED", "detail": f"issue #{issue} is not completed in the final live snapshot"})
+    return entries
+
+
 def _check_source_closure(report: dict[str, Any], label: str, blockers: list[dict[str, str]]) -> None:
     cases = list(report.get("cases", []))
     cases.extend(item for item in report.get("negativeChecks", []) if isinstance(item, dict))
@@ -375,7 +412,7 @@ def run_attestation(attestation: Path, *, bundle: Path | None = None) -> dict[st
         "issues": list(range(88, 106)),
         "blockers": [],
         "reportsChecked": ["qualification-bundle", "final-attestation", *[f"issue-{issue}" for issue in range(88, 106)]],
-        "issueReports": _bundle_issue_reports(bundle) if bundle is not None else [],
+        "issueReports": _attested_issue_reports(bundle, result.get("snapshot")),
         "attestation": result,
     }
 

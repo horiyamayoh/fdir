@@ -122,6 +122,8 @@ def _input_digests(corpus_path: Path) -> list[str]:
         CONVERTER_PATH,
         ROOT / "tools" / "adapter_docx.py",
         ROOT / "tools" / "adapter_xlsx.py",
+        ROOT / "tools" / "qualification_evidence.py",
+        ROOT / "tools" / "validate_qualification_contract.py",
     ]
     digests: list[str] = []
     for path in paths:

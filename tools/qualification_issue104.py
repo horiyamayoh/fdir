@@ -74,6 +74,8 @@ DECLARED_INPUTS = (
     "schemas/qualification-issue-104-report.schema.json",
     "schemas/qualification-issue-104-summary.schema.json",
     "tools/qualification_issue104.py",
+    "tools/validate_qualification_bundle.py",
+    "tools/validate_qualification_contract.py",
 )
 EVALUATOR_PATH = ROOT / "tools" / "validate_qualification_bundle.py"
 SHARED_EVIDENCE_PATH = ROOT / "tools" / "qualification_evidence.py"

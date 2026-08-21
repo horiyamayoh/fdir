@@ -14,6 +14,7 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tools import run_defect_injection_campaign as campaign
+from tools.qualification_evidence import SOURCE_SNAPSHOT_OUTPUT_ROLES
 from tools.build_qualification_bundle import build_bundle
 from tools.validate_qualification_bundle import validate_bundle
 
@@ -127,6 +128,11 @@ class DefectInjectionProducerTests(unittest.TestCase):
             },
             "sourcePolicy": {"shaFormat": "git-40-lowercase-hex", "releaseEvidenceMustBeClean": False},
             "bundlePolicy": {"manifestName": "manifest.json"},
+            "behavioralReportContract": {
+                "policies": {
+                    "sourceSnapshotOutputRoles": sorted(SOURCE_SNAPSHOT_OUTPUT_ROLES),
+                },
+            },
             "negativeFixtures": [{"id": "producer-envelope", "expectedDiagnostic": "PRODUCER_REPORT_MISSING"}],
             "defaultEvidence": [
                 {

@@ -54,6 +54,27 @@ class QualificationIssue102Tests(unittest.TestCase):
                     if key in assertion:
                         self.assertEqual(calculated[key], assertion[key], fixture["fixtureId"])
 
+    def test_public_inspect_reports_the_selected_profile(self) -> None:
+        try:
+            from tools import adapter_markdown
+            from tools import convert_document
+        except ImportError:  # pragma: no cover
+            import adapter_markdown
+            import convert_document
+
+        source = qualification.ROOT / "e2e" / ".run" / f"issue-102-inspect-{uuid.uuid4().hex}.md"
+        source.write_text("# profile\n", encoding="utf-8")
+        report = adapter_markdown.inspect(source, profile="gfm-0.29")
+        self.assertEqual(report["profile"], "gfm-0.29")
+        self.assertTrue(report["profileKnown"])
+        self.assertIn("task-lists", report["capabilities"])
+        self.assertNotIn("footnotes", report["capabilities"])
+
+        exit_code = convert_document.main(
+            ["inspect", str(source), "--format", "markdown", "--profile", "gfm-0.29"]
+        )
+        self.assertEqual(exit_code, 0)
+
     def test_negative_mutations_are_all_detected_by_the_independent_oracle(self) -> None:
         results = qualification._run_negative_mutations(self.corpus)
         self.assertEqual(len(results), len(self.corpus["negativeMutations"]))

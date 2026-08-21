@@ -1216,6 +1216,146 @@ def _validate_recovery_report_catalog(
                 _add(diagnostics, "RECOVERY_REPORT_ASSERTIONS", f"issue #{issue_text} report {path} has no assertions", path)
 
 
+_CONTRACT_CLASS_TO_PRODUCER_CLASS = {
+    "positive-oracle": "positive",
+    "oracle": "positive",
+}
+
+
+def _producer_class_for_contract(value: Any) -> Any:
+    """Normalize contract aliases to the closed producer classification set."""
+
+    return _CONTRACT_CLASS_TO_PRODUCER_CLASS.get(value, value)
+
+
+def _validate_producer_contract_inventory(
+    producer: dict[str, Any],
+    *,
+    requirement: dict[str, Any],
+    required_evaluator: dict[str, Any] | None,
+    evidence_report: dict[str, Any],
+    diagnostics: list[dict[str, str]],
+    report_path: str,
+) -> None:
+    """Bind a producer envelope to the requirement's closed inventory.
+
+    Producer-side recomputation proves that a declared record is internally
+    honest.  This check proves that the record is also the record the
+    requirement asked for; a complete-looking but unrelated producer report
+    must not satisfy a release requirement.
+    """
+
+    required_assertion_ids = requirement.get("requiredAssertionIds")
+    required_cases = requirement.get("requiredCases")
+    required_case_classes = requirement.get("requiredCaseClasses")
+    if not isinstance(required_assertion_ids, list) or not isinstance(required_cases, list) or not isinstance(required_case_classes, list):
+        _add(diagnostics, "BEHAVIORAL_INVENTORY_CONTRACT", "producer inventory contract is incomplete", report_path)
+        return
+
+    assertions = producer.get("assertions")
+    cases = producer.get("testCases")
+    assertion_ids = [item.get("assertionId") for item in assertions if isinstance(item, dict) and isinstance(item.get("assertionId"), str)] if isinstance(assertions, list) else []
+    case_ids = [item.get("caseId") for item in cases if isinstance(item, dict) and isinstance(item.get("caseId"), str)] if isinstance(cases, list) else []
+    required_assertion_set = {item for item in required_assertion_ids if isinstance(item, str)}
+    actual_assertion_set = set(assertion_ids)
+    required_case_ids = {
+        item.get("caseId")
+        for item in required_cases
+        if isinstance(item, dict) and isinstance(item.get("caseId"), str)
+    }
+    actual_case_set = set(case_ids)
+
+    missing_assertions = sorted(required_assertion_set - actual_assertion_set)
+    extra_assertions = sorted(actual_assertion_set - required_assertion_set)
+    if missing_assertions:
+        _add(diagnostics, "BEHAVIORAL_REQUIRED_ASSERTIONS_MISSING", "producer report is missing required assertions: " + ", ".join(missing_assertions), report_path)
+    if extra_assertions:
+        _add(diagnostics, "BEHAVIORAL_ORPHAN_ASSERTIONS", "producer report contains assertions outside the requirement inventory: " + ", ".join(extra_assertions), report_path)
+
+    missing_cases = sorted(required_case_ids - actual_case_set)
+    extra_cases = sorted(actual_case_set - required_case_ids)
+    if missing_cases:
+        _add(diagnostics, "BEHAVIORAL_REQUIRED_CASES_MISSING", "producer report is missing required cases: " + ", ".join(missing_cases), report_path)
+    if extra_cases:
+        _add(diagnostics, "BEHAVIORAL_ORPHAN_CASES", "producer report contains cases outside the requirement inventory: " + ", ".join(extra_cases), report_path)
+
+    expected_class_by_case = {
+        item["caseId"]: _producer_class_for_contract(item.get("classification"))
+        for item in required_cases
+        if isinstance(item, dict) and isinstance(item.get("caseId"), str)
+    }
+    actual_case_by_id = {
+        item.get("caseId"): item
+        for item in cases
+        if isinstance(item, dict) and isinstance(item.get("caseId"), str)
+    } if isinstance(cases, list) else {}
+    for case_id, expected_class in sorted(expected_class_by_case.items()):
+        actual_case = actual_case_by_id.get(case_id)
+        if actual_case is None:
+            continue
+        if actual_case.get("classification") != expected_class:
+            _add(
+                diagnostics,
+                "BEHAVIORAL_CASE_CLASSIFICATION",
+                f"case {case_id} classification is {actual_case.get('classification')!r}; expected {expected_class!r}",
+                report_path,
+            )
+    expected_classes = {
+        _producer_class_for_contract(item)
+        for item in required_case_classes
+        if isinstance(item, str)
+    }
+    actual_classes = {
+        item.get("classification")
+        for item in actual_case_by_id.values()
+        if isinstance(item.get("classification"), str)
+    }
+    if actual_classes != expected_classes:
+        missing_classes = sorted(expected_classes - actual_classes)
+        extra_classes = sorted(actual_classes - expected_classes)
+        _add(
+            diagnostics,
+            "BEHAVIORAL_CASE_CLASSES",
+            f"producer case classes do not match inventory; missing={missing_classes}, extra={extra_classes}",
+            report_path,
+        )
+
+    case_by_id = actual_case_by_id
+    for assertion in assertions if isinstance(assertions, list) else []:
+        if not isinstance(assertion, dict):
+            continue
+        assertion_id = assertion.get("assertionId")
+        case_id = assertion.get("testCaseId")
+        if assertion_id in required_assertion_set and case_id not in case_by_id:
+            _add(diagnostics, "BEHAVIORAL_ASSERTION_CASE_MAPPING", f"required assertion {assertion_id} does not map to a required case", report_path)
+        if case_id in case_by_id and assertion.get("classification") != case_by_id[case_id].get("classification"):
+            _add(diagnostics, "BEHAVIORAL_ASSERTION_CLASSIFICATION", f"assertion {assertion_id} classification does not match case {case_id}", report_path)
+
+    if not isinstance(required_evaluator, dict):
+        _add(diagnostics, "BEHAVIORAL_EVALUATOR_CONTRACT", "required evaluator declaration is missing", report_path)
+        return
+    evaluator_path = required_evaluator.get("path")
+    if not isinstance(evaluator_path, str):
+        _add(diagnostics, "BEHAVIORAL_EVALUATOR_CONTRACT", "required evaluator path is invalid", report_path)
+        return
+    input_entries = evidence_report.get("inputs")
+    input_by_path = {
+        item.get("path"): item
+        for item in input_entries
+        if isinstance(item, dict) and isinstance(item.get("path"), str)
+    } if isinstance(input_entries, list) else {}
+    evaluator_input = input_by_path.get(evaluator_path)
+    if evaluator_input is None:
+        _add(diagnostics, "BEHAVIORAL_EVALUATOR_BINDING", f"required evaluator is not bound as an Evidence input: {evaluator_path!r}", report_path)
+        return
+    independence = producer.get("independence")
+    evaluator_digest = independence.get("evaluatorComponentDigest") if isinstance(independence, dict) else None
+    shared_digests = independence.get("sharedComponentDigests", []) if isinstance(independence, dict) else []
+    declared_digest = evaluator_input.get("sha256")
+    if evaluator_digest != declared_digest and declared_digest not in shared_digests:
+        _add(diagnostics, "BEHAVIORAL_EVALUATOR_BINDING", "producer evaluator digest is not bound to the required evaluator input", report_path)
+
+
 def _validate_behavioral_report_declarations(
     bundle_root: Path,
     report_by_id: dict[str, tuple[str, dict[str, Any]]],
@@ -1337,6 +1477,14 @@ def _validate_behavioral_report_declarations(
             if value.get("sourceSha") != manifest.get("sourceSha"):
                 _add(diagnostics, "BEHAVIORAL_REPORT_SOURCE_SHA", f"{report_id} sourceSha does not match the bundle", bundle_path)
             if producer_report:
+                _validate_producer_contract_inventory(
+                    value,
+                    requirement=requirement,
+                    required_evaluator=behavioral.get("requiredEvaluator"),
+                    evidence_report=evidence_report,
+                    diagnostics=diagnostics,
+                    report_path=bundle_path,
+                )
                 continue
             missing_fields = sorted(required_fields_set - set(value))
             if missing_fields:

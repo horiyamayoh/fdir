@@ -716,6 +716,7 @@ def _producer_input_paths(corpus_path: Path) -> list[Path]:
         NODE_ORACLE_PATH,
         ROOT / "tools" / "qualification_issue98.py",
         ROOT / "tools" / "test_qualification_issue98.py",
+        ROOT / "tools" / "validate_qualification_contract.py",
     ]
 
 

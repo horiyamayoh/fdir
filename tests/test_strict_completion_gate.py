@@ -44,6 +44,31 @@ class StrictCompletionGateTests(unittest.TestCase):
             self.assertEqual(issue_reports[0]["liveState"], "pending-final-attestation")
             self.assertEqual(issue_reports[1]["status"], "blocked")
             self.assertEqual(issue_reports[1]["blockers"][0]["code"], "ISSUE_EVIDENCE_MISSING")
+
+            snapshot = {
+                "snapshotDigest": "c" * 64,
+                "issues": [
+                    {
+                        "issueNumber": 88,
+                        "state": "closed",
+                        "stateReason": "completed",
+                        "closedAt": "2026-08-21T00:00:00Z",
+                        "updatedAt": "2026-08-21T00:00:00Z",
+                    },
+                    {
+                        "issueNumber": 89,
+                        "state": "open",
+                        "stateReason": None,
+                        "closedAt": None,
+                        "updatedAt": "2026-08-21T00:00:00Z",
+                    },
+                ],
+            }
+            attested = strict_completion_gate._attested_issue_reports(manifest, snapshot)
+            self.assertEqual(attested[0]["liveState"], "verified")
+            self.assertEqual(attested[0]["snapshotDigest"], "c" * 64)
+            self.assertEqual(attested[1]["liveState"], "blocked")
+            self.assertIn("ISSUE_NOT_COMPLETED", {item["code"] for item in attested[1]["blockers"]})
         finally:
             if root.exists():
                 shutil.rmtree(root)

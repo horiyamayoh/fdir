@@ -137,6 +137,7 @@ def _write_producer_envelope(out_dir: Path, reports: dict[str, dict[str, Any]], 
         ROOT / "e2e" / "corpus" / "xlsx-independent" / "xl" / "_rels" / "workbook.xml.rels",
         ROOT / "e2e" / "corpus" / "xlsx-independent" / "xl" / "workbook.xml",
         ROOT / "e2e" / "corpus" / "xlsx-independent" / "xl" / "worksheets" / "sheet1.xml",
+        ROOT / "tools" / "validate_qualification_contract.py",
     ]
     write_producer_report(
         out_dir=out_dir,

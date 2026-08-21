@@ -170,6 +170,7 @@ def _write_producer_envelope(out_dir: Path, reports: dict[str, dict[str, Any]], 
         ROOT / "tools" / "adapter_markdown.py",
         ROOT / "machine" / "defect-injection-contract.json",
         ROOT / ".github" / "workflows" / "design.yml",
+        ROOT / "tools" / "validate_qualification_contract.py",
     ]
     write_producer_report(
         out_dir=out_dir,

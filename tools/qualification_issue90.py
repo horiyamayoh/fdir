@@ -752,6 +752,7 @@ def _producer_input_paths(corpus_path: Path, schema_path: Path) -> list[Path]:
         ROOT / "tools" / "test_qualification_issue90.py",
         Path(corpus_path),
         ROOT / "requirements-qualification.txt",
+        ROOT / "tools" / "validate_qualification_contract.py",
     ]
 
 

@@ -159,6 +159,7 @@ def build_parser() -> argparse.ArgumentParser:
     inspect = sub.add_parser("inspect")
     inspect.add_argument("input", type=Path)
     inspect.add_argument("--format", choices=sorted(ADAPTERS))
+    inspect.add_argument("--profile")
     convert = sub.add_parser("convert")
     convert.add_argument("input", type=Path)
     convert.add_argument("--format", choices=sorted(ADAPTERS))
@@ -190,7 +191,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.operation == "inspect":
         detected = detect_format(args.input, args.format)
         module = adapter_module(detected)
-        report = _call(module, "inspect", args.input, AdapterLimits())
+        report = _call(module, "inspect", args.input, AdapterLimits(), args.profile)
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0
     limits = AdapterLimits(
