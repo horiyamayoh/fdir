@@ -103,7 +103,7 @@ def _build_and_check(workspace: Path) -> tuple[Path, Path]:
     manifest = build_index(source, index_path)
     if manifest["schema"] != "fdir/independent-sqlite-index":
         raise AssertionError("unexpected independent index schema")
-    if manifest["indexVersion"] != "1.0.0":
+    if manifest["indexVersion"] != "1.1.0":
         raise AssertionError("unexpected independent index version")
     if manifest["canonicalization"] != "FDIR-IIDX-C14N-1":
         raise AssertionError("canonicalization binding is missing")
@@ -112,8 +112,14 @@ def _build_and_check(workspace: Path) -> tuple[Path, Path]:
         "extensionRegistrySha256", "queryContractSha256", "capabilityProfileSha256",
     }:
         raise AssertionError("contract bindings are incomplete")
-    if manifest["counts"]["entities"] != 17 or manifest["counts"]["fields"] != 173:
+    if manifest["counts"]["entities"] != 17 or manifest["counts"]["entityFields"] != 173:
         raise AssertionError(f"unexpected persisted row counts: {manifest['counts']}")
+    if manifest["counts"]["documentFields"] < 30 or manifest["counts"]["fields"] != manifest["counts"]["entityFields"] + manifest["counts"]["documentFields"]:
+        raise AssertionError("document-level facts were not persisted")
+    if manifest["contractVersions"]["queryContract"] != "1.3.0":
+        raise AssertionError("query contract version binding is missing")
+    if manifest["querySurface"]["registeredFieldPathCount"] < 1000:
+        raise AssertionError("generated field registry binding is unexpectedly small")
     if manifest["counts"]["references"] < 30:
         raise AssertionError("nested reference coverage is unexpectedly small")
 
@@ -124,10 +130,33 @@ def _build_and_check(workspace: Path) -> tuple[Path, Path]:
             raise AssertionError(f"unexpected preserved node count: {len(entities)}")
         try:
             index.get_field("nodes", "node-callout", "/doesNotExist")
-        except IndexFieldNotFound:
+        except (IndexFieldNotFound, IndependentIndexError):
             pass
         else:
             raise AssertionError("missing field was not distinguished from a stored value")
+        if index.get_field("__document__", "doc-callout", "/conversion/status") != "complete":
+            raise AssertionError("document conversion status was not indexed")
+        if index.query_fields("/zIndex", 20, collection="layouts") != [
+            {"queryContractVersion": "1.3.0", "profileId": "format:docx:ECMA-376:1", "collection": "layouts", "id": "layout-callout", "pointer": "/zIndex", "presence": "value", "value": 20, "status": "preserved"}
+        ]:
+            raise AssertionError("persistent typed field query did not preserve integer semantics")
+        if not any(
+            row["sourceId"] == "layout-callout"
+            and row["sourcePointer"] == "/anchor/surfaceId"
+            and row["targetId"] == "surface-page-1"
+            for row in index.find_references("surface-page-1", source_collection="layouts")
+        ):
+            raise AssertionError("persistent nested reference query mismatch")
+        first_page = index.list_entities_page("nodes", limit=2)
+        if len(first_page["items"]) != 2 or not first_page["nextCursor"]:
+            raise AssertionError("persistent deterministic pagination did not produce a cursor")
+        second_page = index.list_entities_page("nodes", limit=2, cursor=first_page["nextCursor"])
+        if {item["nodeId"] for item in first_page["items"]}.intersection(item["nodeId"] for item in second_page["items"]):
+            raise AssertionError("persistent pagination cursor repeated an entity")
+        _expect_rejection(
+            "cursor reused with a different query",
+            lambda: index.list_entities_page("nodes", status="preserved", limit=2, cursor=first_page["nextCursor"]),
+        )
 
     # Rebuilding the same destination exercises replacement of both the
     # persistent database and its sidecar manifest.

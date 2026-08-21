@@ -15,15 +15,42 @@ import os
 import re
 import subprocess
 import sys
-import urllib.error
-import urllib.request
 from pathlib import Path
+from pathlib import PurePosixPath
 from typing import Any, Callable
 
 try:
     from qualification_evidence import validate_source_feature_closure
 except ImportError:  # pragma: no cover
     from tools.qualification_evidence import validate_source_feature_closure
+
+try:
+    from github_issue_state import (
+        AUDIT_ISSUE_NUMBERS,
+        IssueStateError,
+        REPOSITORY as GITHUB_REPOSITORY,
+        derive_release_boundary,
+        evidence_close_time_blockers,
+        load_snapshot,
+        resolve_issue_state,
+        validate_snapshot,
+    )
+except ImportError:  # pragma: no cover
+    from tools.github_issue_state import (
+        AUDIT_ISSUE_NUMBERS,
+        IssueStateError,
+        REPOSITORY as GITHUB_REPOSITORY,
+        derive_release_boundary,
+        evidence_close_time_blockers,
+        load_snapshot,
+        resolve_issue_state,
+        validate_snapshot,
+    )
+
+try:
+    from release_attestation import AttestationError, load_and_validate_attestation, validate_attestation
+except ImportError:  # pragma: no cover
+    from tools.release_attestation import AttestationError, load_and_validate_attestation, validate_attestation
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -48,6 +75,43 @@ SCHEMA_PATH = ROOT / "schemas" / "document-form-ir.schema.json"
 EXAMPLES_PATH = ROOT / "examples"
 CLEAN_ROOM_REPLAY_PATH = ROOT / "e2e" / ".run" / "clean-room-replay.json"
 AUDIT_RECOVERY_ISSUES = tuple(range(87, 106))
+QUALIFICATION_ISSUES = tuple(range(88, 106))
+SOURCE_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+DIRECT_QUERY_INDEX_SCHEMA = "fdir/document-form-index"
+DIRECT_QUERY_INDEX_VERSION = "1.3.0"
+INDEPENDENT_QUERY_INDEX_SCHEMA = "fdir/independent-sqlite-index"
+INDEPENDENT_QUERY_INDEX_VERSION = "1.1.0"
+
+# These are the assertions emitted by the generic bundle builder.  They are
+# useful integrity checks, but they do not prove that a requirement was
+# exercised.  A release bundle must contain at least one assertion and one
+# test case from the issue-specific qualification runner as well.
+GENERIC_BUNDLE_ASSERTIONS = {
+    "qualification-command-exits-zero",
+    "declared-output-files-bound",
+    "source-sha-is-current-head",
+}
+GENERIC_BUNDLE_ORACLES = {
+    "the declared qualification command exits with code zero and all declared outputs are bound",
+    "the evidence report is generated from and bound to the current commit SHA",
+}
+PLACEHOLDER_RE = re.compile(
+    r"(?:<[^>\r\n]+>|\b(?:todo|tbd|fixme|placeholder|replace[-_ ]?me|not[-_ ]?implemented|unresolved)\b)",
+    re.IGNORECASE,
+)
+
+QUALIFICATION_COMMANDS = {
+    "python tools/validate_design.py",
+    "python tools/run_acceptance.py --all",
+    "python tools/run_e2e.py --all",
+    "python tools/run_e2e.py --all --json",
+    "python tools/mutation_qualification.py --json",
+    "python tools/query_qualification.py",
+    "python tools/independent_corpus.py --json",
+    "python tools/strict_completion_gate.py",
+    "python tools/release_gate.py",
+}
 
 EXPECTED_REQUIREMENTS = 134
 EXPECTED_FAMILIES = 16
@@ -122,62 +186,140 @@ FORBIDDEN_PRODUCT_VALUE_PATTERNS = (
 class GateError(Exception):
     """A deterministic, user-facing release-gate failure."""
 
+    def __init__(self, message: str, code: str = "GATE_ERROR"):
+        self.code = code
+        self.detail = message
+        super().__init__(message)
+
 
 def relative(path: Path) -> str:
     return path.relative_to(ROOT).as_posix()
 
 
-def require(condition: bool, message: str) -> None:
+def require(condition: bool, message: str, code: str = "GATE_ERROR") -> None:
     if not condition:
-        raise GateError(message)
+        raise GateError(message, code)
+
+
+def git_output(*arguments: str) -> str:
+    """Return a Git value or fail closed with a stable diagnostic."""
+
+    try:
+        result = subprocess.run(
+            ["git", "-c", "core.fsmonitor=false", *arguments],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+    except OSError as exc:
+        raise GateError(f"cannot execute git {' '.join(arguments)}: {exc}") from exc
+    require(result.returncode == 0, f"git {' '.join(arguments)} failed: {(result.stdout + result.stderr).strip()}")
+    return result.stdout.strip()
+
+
+def current_head() -> str:
+    head = git_output("rev-parse", "HEAD")
+    require(SOURCE_SHA_RE.fullmatch(head) is not None, f"git HEAD is not a 40-character lowercase SHA: {head!r}")
+    return head
+
+
+def working_tree_status() -> list[str]:
+    output = git_output("status", "--porcelain=v1", "--untracked-files=all")
+    return [line for line in output.splitlines() if line.strip()]
+
+
+def check_clean_tree() -> dict[str, int | bool]:
+    """Reject release qualification from any non-clean checkout.
+
+    Generated products live under the ignored ``e2e/.run`` directory and are
+    therefore intentionally absent from this status.  Tracked edits and
+    untracked files elsewhere are evidence drift, not a harmless local detail.
+    """
+
+    status = working_tree_status()
+    require(not status, "release qualification requires a clean working tree: " + "; ".join(status[:8]))
+    return {"dirty_tree": False, "status_entries": 0}
+
+
+def check_ci_binding() -> dict[str, str | bool]:
+    """Bind an Actions run to the exact checkout that the gate inspected."""
+
+    head = current_head()
+    actions = os.environ.get("GITHUB_ACTIONS", "").casefold() == "true"
+    if not actions:
+        return {"provider": "local", "source_sha": head, "actions": False}
+
+    declared_sha = os.environ.get("GITHUB_SHA", "")
+    require(SOURCE_SHA_RE.fullmatch(declared_sha) is not None, "GITHUB_SHA is not a 40-character lowercase SHA")
+    require(declared_sha == head, f"GitHub Actions SHA {declared_sha} does not match checkout HEAD {head}")
+    require(os.environ.get("GITHUB_REPOSITORY") == "horiyamayoh/fdir", "GitHub Actions repository is not horiyamayoh/fdir")
+    for name in ("GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_JOB"):
+        require(os.environ.get(name), f"GitHub Actions identity is missing {name}")
+    return {"provider": "github-actions", "source_sha": head, "actions": True}
+
+
+def contains_placeholder(value: Any) -> bool:
+    return isinstance(value, str) and PLACEHOLDER_RE.search(value) is not None
+
+
+def require_no_placeholder(value: Any, label: str) -> None:
+    require(not contains_placeholder(value), f"placeholder value is not release evidence: {label}")
+
+
+def safe_repository_path(value: Any) -> bool:
+    if not isinstance(value, str) or not value or "\\" in value or "\x00" in value:
+        return False
+    if value.startswith("/") or re.match(r"^[A-Za-z]:", value):
+        return False
+    parts = PurePosixPath(value).parts
+    return bool(parts) and "." not in parts and ".." not in parts
+
+
+def validate_mutation_report(report: dict[str, Any]) -> dict[str, int]:
+    """Require a non-empty, case-level mutation result with zero survivors."""
+
+    require(report.get("schema") == "fdir/mutation-qualification-report", "mutation report schema is invalid")
+    require(report.get("version") == "1.0.0", "mutation report version is invalid")
+    cases = report.get("cases")
+    require(isinstance(cases, list) and cases, "mutation report has no executable cases")
+    total = report.get("total")
+    killed = report.get("killed")
+    survivors = report.get("survivors")
+    require(isinstance(total, int) and not isinstance(total, bool) and total > 0, "mutation report total must be a positive integer")
+    require(total == len(cases), "mutation report total does not match its case inventory")
+    require(isinstance(killed, int) and not isinstance(killed, bool), "mutation report killed count is invalid")
+    require(isinstance(survivors, list) and survivors == [], "mutation report contains surviving mutations")
+    killed_cases = 0
+    for case in cases:
+        require(isinstance(case, dict), "mutation report contains a malformed case")
+        require(isinstance(case.get("mutation"), str) and case.get("mutation"), "mutation case has no stable id")
+        require(isinstance(case.get("class"), str) and case.get("class"), "mutation case has no class")
+        require(case.get("status") in {"killed"}, f"mutation case did not get killed: {case.get('mutation')}")
+        killed_cases += 1
+    require(killed == killed_cases == total, "mutation report killed/total counts are inconsistent")
+    require(report.get("mutationScore") == 1.0, "mutation report score is not exactly 1.0")
+    coverage = report.get("coverage")
+    require(isinstance(coverage, dict) and coverage, "mutation report has no mutation-class coverage")
+    return {"mutation_cases": total}
 
 
 def fetch_live_audit_issue_state() -> dict[str, Any]:
-    """Read the audit issue state from GitHub instead of trusting repository JSON.
+    """Compatibility wrapper returning a verified live snapshot.
 
-    The recovery plan is intentionally only a local projection.  In
-    particular, a stale ``releaseBlocked`` flag must not be able to turn an
-    open/reopened issue into release evidence.  GitHub Actions supplies a
-    read-only token through the workflow; public repositories can also be
-    checked without one for local diagnostics.
+    Older callers used this name directly.  Keep it as a thin adapter so no
+    caller can accidentally regain the old static-JSON authority.
     """
 
-    repository = os.environ.get("GITHUB_REPOSITORY", "horiyamayoh/fdir")
-    require(re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository) is not None,
-            "GITHUB_REPOSITORY is invalid")
-    api_base = os.environ.get("GITHUB_API_URL", "https://api.github.com").rstrip("/")
-    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
-    states: list[dict[str, Any]] = []
-    for issue_number in AUDIT_RECOVERY_ISSUES:
-        request = urllib.request.Request(
-            f"{api_base}/repos/{repository}/issues/{issue_number}",
-            headers={
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-                **({"Authorization": f"Bearer {token}"} if token else {}),
-                "User-Agent": "fdir-release-gate/1.0",
-            },
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=20) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-        except (OSError, urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError) as exc:
-            raise GateError(f"cannot read live GitHub issue #{issue_number}: {type(exc).__name__}: {exc}") from exc
-        require(isinstance(payload, dict), f"GitHub issue #{issue_number} response is not an object")
-        require(payload.get("number") == issue_number, f"GitHub returned the wrong issue for #{issue_number}")
-        state = payload.get("state")
-        state_reason = payload.get("state_reason")
-        require(state in {"open", "closed"}, f"GitHub issue #{issue_number} has an invalid state")
-        require(state_reason in {"completed", "not_planned", "duplicate", "reopened", None},
-                f"GitHub issue #{issue_number} has an invalid state reason")
-        states.append({
-            "issueNumber": issue_number,
-            "state": state,
-            "stateReason": state_reason,
-            "closedAt": payload.get("closed_at"),
-            "updatedAt": payload.get("updated_at"),
-        })
-    return {"repository": repository, "issues": states}
+    try:
+        source_sha = current_head()
+        resolved = resolve_issue_state(source_sha=source_sha)
+        snapshot = resolved["snapshot"]
+        return {"repository": snapshot["repository"], "issues": snapshot["issues"], "snapshot": snapshot, "authority": resolved["authority"]}
+    except IssueStateError as exc:
+        raise GateError(exc.detail, exc.code) from exc
 
 
 def check_source_closure_report(report: dict[str, Any], label: str) -> None:
@@ -417,14 +559,34 @@ def check_phase2_contracts() -> dict[str, int]:
     query_contract = load_json(QUERY_CONTRACT_PATH)
     operations = query_contract.get("operations") if isinstance(query_contract, dict) else None
     require(isinstance(operations, list) and {"list-entities", "get-entity", "rebuild-index", "get-text"}.issubset(set(operations)), "typed query contract is incomplete")
-    require(query_contract.get("index", {}).get("schema") == "fdir/document-form-index", "query index contract is missing")
+    index_contract = query_contract.get("index") if isinstance(query_contract, dict) else None
+    require(isinstance(index_contract, dict), "query index contract is missing", "QUERY_CONTRACT_INDEX_MISSING")
+    require(index_contract.get("schema") == INDEPENDENT_QUERY_INDEX_SCHEMA, "query contract independent index schema is stale or missing", "QUERY_CONTRACT_INDEX_SCHEMA")
+    require(index_contract.get("version") == INDEPENDENT_QUERY_INDEX_VERSION, "query contract independent index version is stale", "QUERY_CONTRACT_INDEX_VERSION")
+    require(index_contract.get("authority") == "non-authoritative deterministic projection", "query contract independent index authority is not explicit", "QUERY_CONTRACT_INDEX_AUTHORITY")
+    required_index_fields = index_contract.get("requiredFields")
+    require(isinstance(required_index_fields, list) and {"schema", "source", "bindings", "integrity", "databaseSha256"}.issubset(set(required_index_fields)), "query contract independent index fields are incomplete", "QUERY_CONTRACT_INDEX_FIELDS")
+
+    # There are deliberately two query layers.  ``query_ir`` is the direct,
+    # in-memory representation used for authoritative query semantics;
+    # ``independent_index`` is the rebuildable SQLite projection declared by
+    # machine/query-contract.json.  Do not compare their schema names or one
+    # layer will silently invalidate the other.
+    try:
+        from query_ir import INDEX_SCHEMA as direct_schema, INDEX_VERSION as direct_version
+        from independent_index import INDEX_SCHEMA as independent_schema, INDEX_VERSION as independent_version
+    except ImportError:  # pragma: no cover
+        from tools.query_ir import INDEX_SCHEMA as direct_schema, INDEX_VERSION as direct_version
+        from tools.independent_index import INDEX_SCHEMA as independent_schema, INDEX_VERSION as independent_version
+    require(direct_schema == DIRECT_QUERY_INDEX_SCHEMA and direct_version == DIRECT_QUERY_INDEX_VERSION, "direct query layer schema/version is stale", "QUERY_DIRECT_LAYER_SCHEMA")
+    require(independent_schema == INDEPENDENT_QUERY_INDEX_SCHEMA and independent_version == INDEPENDENT_QUERY_INDEX_VERSION, "independent SQLite query layer schema/version is stale", "QUERY_INDEPENDENT_LAYER_SCHEMA")
 
     try:
         from extension_registry import validate_registry_integrity
     except ImportError:  # pragma: no cover
         from tools.extension_registry import validate_registry_integrity
     extension_details = validate_registry_integrity()
-    return {"phase2_issues": len(numbers), "capability_profiles": len(profiles), "references": len(references), "extension_entries": extension_details["entries"], "canonical_entity_collections": len(canonicalization["entityCollections"]), "query_operations": len(operations)}
+    return {"phase2_issues": len(numbers), "capability_profiles": len(profiles), "references": len(references), "extension_entries": extension_details["entries"], "canonical_entity_collections": len(canonicalization["entityCollections"]), "query_operations": len(operations), "query_layers": 2}
 
 
 def check_release_claims() -> dict[str, int]:
@@ -432,6 +594,30 @@ def check_release_claims() -> dict[str, int]:
     require(manifest.get("schema") == "fdir/document-form-release-claim-manifest", "release claim manifest schema is missing")
     release = manifest.get("release")
     require(isinstance(release, dict) and release.get("policy") == "fail-closed", "release claim policy is not fail-closed")
+    require(release.get("releaseBlocked") in {True, False}, "release claim has no boolean releaseBlocked state")
+    require(release.get("status") in {"release-blocked", "release-ready"}, "release claim has an invalid release status")
+    claim_policy = release.get("claimPolicy")
+    require(isinstance(claim_policy, dict), "release claim policy details are missing")
+    for policy in (
+        "implementedSurfaceIsNotQualifiedEvidence",
+        "closedStateIsNotEvidence",
+        "fileExistenceIsNotEvidence",
+        "fieldOrEnumPresenceIsNotEvidence",
+        "commandExitOnlyIsNotEvidence",
+        "releaseClaimsRequireAllRecoveryChildren",
+    ):
+        require(claim_policy.get(policy) is True, f"release claim policy is weak: {policy}")
+    binding = release.get("qualificationBinding")
+    require(isinstance(binding, dict), "release claim qualification binding is missing")
+    if release.get("releaseBlocked") is True:
+        require(binding.get("status") in {"blocked", "pending", "not-qualified"},
+                "blocked release cannot publish a passed qualification binding")
+    else:
+        require(binding.get("status") == "passed", "release-ready claim has no passed qualification binding")
+        require(binding.get("manifestPath") == "qualification/<source-sha>/manifest.json",
+                "release-ready claim qualification path is not source-SHA templated")
+        require(binding.get("sourceShaPolicy") == "exact-bundle-manifest",
+                "release-ready claim qualification SHA policy is not exact-bundle-manifest")
     claims = manifest.get("issueClaims")
     plan = load_json(PHASE2_ISSUE_PLAN_PATH)
     plan_numbers = {entry.get("issueNumber") for entry in plan.get("issues", []) if isinstance(entry, dict)}
@@ -440,10 +626,18 @@ def check_release_claims() -> dict[str, int]:
     require(claim_numbers == plan_numbers - {69}, "release claims do not cover every phase2 child issue")
     for claim in claims:
         require(isinstance(claim, dict) and isinstance(claim.get("claim"), str) and claim.get("claim"), "release claim is malformed")
-        for command in claim.get("evidenceCommands", []):
-            require(isinstance(command, str) and command, "release claim evidence command is malformed")
-        for relative in claim.get("evidencePaths", []):
-            require((ROOT / relative).is_file(), f"release claim evidence path is missing: {relative}")
+        evidence_commands = claim.get("evidenceCommands")
+        evidence_paths = claim.get("evidencePaths")
+        require(isinstance(evidence_commands, list) and evidence_commands, f"release claim has no evidence commands: #{claim.get('issueNumber')}")
+        require(isinstance(evidence_paths, list) and evidence_paths, f"release claim has no evidence paths: #{claim.get('issueNumber')}")
+        for command in evidence_commands:
+            require(isinstance(command, str) and command in QUALIFICATION_COMMANDS,
+                    f"release claim uses an unapproved or command-exit-only command: {command!r}")
+            require_no_placeholder(command, f"issue claim command #{claim.get('issueNumber')}")
+        for evidence_path in evidence_paths:
+            require(safe_repository_path(evidence_path), f"release claim evidence path is unsafe: {evidence_path!r}")
+            require_no_placeholder(evidence_path, f"issue claim path #{claim.get('issueNumber')}")
+            require((ROOT / evidence_path).is_file(), f"release claim evidence path is missing: {evidence_path}")
     capability_claims = manifest.get("capabilityClaims")
     capability = load_json(CAPABILITY_PROFILE_PATH)
     profile_ids = {profile.get("id") for profile in capability.get("profiles", []) if isinstance(profile, dict)}
@@ -456,7 +650,11 @@ def check_release_claims() -> dict[str, int]:
     require({case.get("caseClass") for case in all_corpus_cases} >= {"positive", "malformed", "unsupported"}, "independent corpus lacks a positive/malformed/unsupported matrix")
     require({case.get("format") for case in all_corpus_cases} == required_formats, "independent negative corpus format matrix is incomplete")
     require(isinstance(corpus.get("negativeChecks"), list) and any(item.get("id") == "resource-limit" for item in corpus["negativeChecks"] if isinstance(item, dict)), "independent resource-limit evidence is missing")
-    require(manifest.get("independentEvidence", {}).get("runner") == "tools/independent_corpus.py", "independent corpus runner is not claimed")
+    independent_evidence = manifest.get("independentEvidence")
+    require(isinstance(independent_evidence, dict) and independent_evidence.get("runner") == "tools/independent_corpus.py", "independent corpus runner is not claimed")
+    require(independent_evidence.get("releaseEligible") is False, "independent evidence must not be release-eligible without the bundle")
+    require(set(independent_evidence.get("requiredRecoveryIssues", [])) == set(QUALIFICATION_ISSUES) - {89},
+            "independent evidence recovery scope is incomplete")
     strict_contract = load_json(STRICT_COMPLETION_CONTRACT_PATH)
     require(strict_contract.get("schema") == "fdir/document-form-strict-completion-contract", "strict completion contract is missing")
     require(strict_contract.get("closurePolicy", {}).get("closedStateIsNotEvidence") is True and strict_contract.get("closurePolicy", {}).get("fileExistenceIsNotEvidence") is True, "strict completion closure policy is weak")
@@ -467,66 +665,105 @@ def check_release_claims() -> dict[str, int]:
     return {"child_claims": len(claims), "capability_claims": len(capability_claims), "independent_positive_cases": len(corpus["cases"]), "independent_negative_cases": len(corpus.get("negativeCases", [])), "strict_issue_bindings": len(strict_issue_evidence)}
 
 
-def check_audit_recovery_release_boundary() -> dict[str, int]:
-    """Require an explicit, contract-complete recovery qualification binding."""
+def check_audit_recovery_release_boundary(
+    *,
+    issue_state: dict[str, Any] | None = None,
+    issue_snapshot: Path | None = None,
+    evidence_times: dict[int, str] | None = None,
+) -> dict[str, Any]:
+    """Derive the recovery barrier from verified GitHub state.
+
+    ``machine/audit-recovery-plan.json`` and the release claim manifest are
+    checked for shape and contradiction only.  Their status fields never
+    override the live response or a verified snapshot.
+    """
 
     recovery = load_json(AUDIT_RECOVERY_PATH)
-    require(isinstance(recovery, dict), "audit recovery plan root is not an object")
-    require(recovery.get("schema") == "fdir/audit-recovery-plan", "audit recovery plan schema is missing")
-    require(recovery.get("umbrellaIssue") == 87, "audit recovery plan is not bound to issue #87")
+    require(isinstance(recovery, dict), "audit recovery plan root is not an object", "RECOVERY_PLAN_INVALID")
+    require(recovery.get("schema") == "fdir/audit-recovery-plan", "audit recovery plan schema is missing", "RECOVERY_PLAN_INVALID")
+    require(recovery.get("umbrellaIssue") == 87, "audit recovery plan is not bound to issue #87", "RECOVERY_PLAN_INVALID")
+    require(recovery.get("repository") == GITHUB_REPOSITORY, "audit recovery plan repository is wrong", "RECOVERY_PLAN_REPOSITORY")
     children = recovery.get("children")
-    require(isinstance(children, list), "audit recovery children are missing")
-    child_numbers = {
-        child.get("issueNumber")
-        for child in children
-        if isinstance(child, dict)
-    }
+    require(isinstance(children, list), "audit recovery children are missing", "RECOVERY_PLAN_INVALID")
+    child_by_number = {child.get("issueNumber"): child for child in children if isinstance(child, dict)}
     required_children = set(range(88, 106))
-    require(child_numbers == required_children, "audit recovery plan does not cover #88-#105 exactly")
-    live = fetch_live_audit_issue_state()
-    live_issues = live["issues"]
-    open_issues = [
-        int(item["issueNumber"])
-        for item in live_issues
-        if item.get("state") != "closed" or item.get("stateReason") != "completed"
-    ]
-    release_blocked = bool(open_issues)
-    require(recovery.get("releaseBlocked") is release_blocked,
-            "audit recovery releaseBlocked does not match live GitHub issue state")
+    require(set(child_by_number) == required_children, "audit recovery plan does not cover #88-#105 exactly", "RECOVERY_PLAN_SCOPE")
+
+    source_sha = current_head()
+    try:
+        if issue_state is None:
+            resolved = resolve_issue_state(source_sha=source_sha, snapshot_path=issue_snapshot)
+            snapshot = resolved["snapshot"]
+            authority = resolved["authority"]
+        else:
+            snapshot = issue_state.get("snapshot") if isinstance(issue_state.get("snapshot"), dict) else issue_state
+            validate_snapshot(snapshot, expected_repository=GITHUB_REPOSITORY, expected_source_sha=source_sha)
+            authority = issue_state.get("authority", "verified-snapshot") if isinstance(issue_state, dict) else "verified-snapshot"
+    except IssueStateError as exc:
+        raise GateError(exc.detail, exc.code) from exc
+
+    boundary = derive_release_boundary(snapshot)
+    live_by_number = {int(item["issueNumber"]): item for item in snapshot.get("issues", [])}
+    require(set(live_by_number) == set(AUDIT_RECOVERY_ISSUES), "verified GitHub audit state is incomplete", "ISSUE_STATE_SCOPE")
+
+    # A stale committed completion flag is itself a release failure.  It is
+    # never used to make an open issue pass, but it must be visible as a
+    # contradiction rather than silently ignored.
+    if recovery.get("releaseBlocked") is not boundary.get("releaseBlocked"):
+        raise GateError("committed audit recovery releaseBlocked contradicts verified GitHub state", "STATIC_RELEASE_STATE_CONTRADICTION")
+    for issue_number, child in child_by_number.items():
+        live_issue = live_by_number[issue_number]
+        live_complete = live_issue.get("state") == "closed" and live_issue.get("stateReason") == "completed" and live_issue.get("closedAt") is not None
+        if child.get("status") == "completed" and not live_complete:
+            raise GateError(f"committed completion status cannot override live issue #{issue_number}", "STATIC_COMPLETION_CONTRADICTION")
+        if live_complete and child.get("status") not in {"completed", "closed"}:
+            raise GateError(f"closed live issue #{issue_number} has no completed recovery projection", "STATIC_COMPLETION_CONTRADICTION")
+
     qualification = recovery.get("qualificationEvidence")
-    require(isinstance(qualification, dict), "audit recovery plan has no qualification evidence binding")
-    require(qualification.get("manifestPath") == "qualification/<source-sha>/manifest.json",
-            "audit recovery qualification manifest path is not source-SHA templated")
+    require(isinstance(qualification, dict), "audit recovery plan has no qualification evidence binding", "RECOVERY_QUALIFICATION_BINDING")
+    require(qualification.get("manifestPath") == "qualification/<source-sha>/manifest.json", "audit recovery qualification manifest path is not source-SHA templated", "RECOVERY_QUALIFICATION_BINDING")
     contract = load_json(QUALIFICATION_CONTRACT_PATH)
     expected_evidence = set(contract.get("scope", {}).get("requiredEvidenceIds", []))
-    require(set(qualification.get("requiredEvidenceIds", [])) == expected_evidence,
-            "audit recovery qualification evidence IDs do not match the contract")
+    require(set(qualification.get("requiredEvidenceIds", [])) == expected_evidence, "audit recovery qualification evidence IDs do not match the contract", "RECOVERY_QUALIFICATION_BINDING")
 
     claims = load_json(RELEASE_CLAIM_MANIFEST_PATH)
     release = claims.get("release") if isinstance(claims, dict) else None
-    require(isinstance(release, dict), "release claim manifest has no release state")
-    if release_blocked:
-        require(release.get("releaseBlocked") is True and release.get("status") == "release-blocked",
-                "open audit issues must publish a release-blocked claim")
-        for child in children:
-            require(child.get("status") in {"open", "reopened", "blocked", "pending"},
-                    f"blocked audit child has a completion status despite an open issue: #{child.get('issueNumber')}")
+    require(isinstance(release, dict), "release claim manifest has no release state", "RELEASE_CLAIM_INVALID")
+    expected_status = "release-blocked" if boundary.get("releaseBlocked") else "release-ready"
+    if release.get("releaseBlocked") is not boundary.get("releaseBlocked") or release.get("status") != expected_status:
+        raise GateError("release claim manifest state contradicts the verified issue boundary", "STATIC_MANIFEST_CONTRADICTION")
+    binding = release.get("qualificationBinding")
+    require(isinstance(binding, dict), "release claim manifest has no qualification binding", "RELEASE_CLAIM_INVALID")
+    if boundary.get("releaseBlocked"):
+        if qualification.get("status") not in {"blocked", "pending", "not-qualified"} or binding.get("status") not in {"blocked", "pending", "not-qualified"}:
+            raise GateError("blocked live recovery cannot use passed static qualification claims", "STATIC_MANIFEST_CONTRADICTION")
     else:
-        require(release.get("releaseBlocked") is False and release.get("status") == "release-ready",
-                "closed audit issues must publish a release-ready claim")
-        require(qualification.get("status") == "passed",
-                "closed audit plan has no passed qualification evidence binding")
-        for child in children:
-            require(child.get("status") == "completed" and isinstance(child.get("evidenceIds"), list) and len(child["evidenceIds"]) == 1,
-                    f"closed audit child is not evidence-bound: #{child.get('issueNumber')}")
-        binding = release.get("qualificationBinding")
-        require(isinstance(binding, dict) and binding.get("status") == "passed",
-                "release claim manifest has no passed qualification binding")
-        require(binding.get("manifestPath") == "qualification/<source-sha>/manifest.json",
-                "release claim qualification manifest path is not source-SHA templated")
-        require(set(binding.get("requiredEvidenceIds", [])) == expected_evidence,
-                "release claim qualification evidence IDs do not match the contract")
-    return {"recovery_children": len(children), "umbrella_issue": 87, "live_open_issues": len(open_issues)}
+        require(qualification.get("status") == "passed", "closed audit plan has no passed qualification evidence binding", "RECOVERY_QUALIFICATION_BINDING")
+        require(binding.get("status") == "passed", "release claim manifest has no passed qualification binding", "RELEASE_CLAIM_INVALID")
+        require(binding.get("manifestPath") == "qualification/<source-sha>/manifest.json", "release claim qualification path is not source-SHA templated", "RELEASE_CLAIM_INVALID")
+        require(set(binding.get("requiredEvidenceIds", [])) == expected_evidence, "release claim qualification evidence IDs do not match the contract", "RELEASE_CLAIM_INVALID")
+        for policy_name in ("issueClaimsPolicy", "capabilityClaimsPolicy"):
+            policy = claims.get(policy_name)
+            if isinstance(policy, dict) and policy.get("releaseEligible") is not True:
+                raise GateError(f"release-ready claim has {policy_name}.releaseEligible=false", "STATIC_MANIFEST_CONTRADICTION")
+        independent = claims.get("independentEvidence")
+        if isinstance(independent, dict) and independent.get("releaseEligible") is not True:
+            raise GateError("release-ready claim has independent evidence marked not-qualified", "STATIC_MANIFEST_CONTRADICTION")
+
+    close_blockers = evidence_close_time_blockers(snapshot, evidence_times or {})
+    if close_blockers:
+        raise GateError(json.dumps(close_blockers, ensure_ascii=False, sort_keys=True), "GITHUB_ISSUE_CLOSED_BEFORE_EVIDENCE")
+    return {
+        "recovery_children": len(children),
+        "umbrella_issue": 87,
+        "live_open_issues": len(boundary.get("openIssues", [])),
+        "releaseBlocked": boundary.get("releaseBlocked"),
+        "status": boundary.get("status"),
+        "authority": authority,
+        "snapshotDigest": snapshot.get("snapshotDigest"),
+        "retrievedAt": snapshot.get("retrievedAt"),
+        "blockingIssues": boundary.get("blockingIssues", []),
+    }
 
 
 def check_schema() -> dict[str, int]:
@@ -626,28 +863,29 @@ def check_real_input_e2e_assets() -> dict[str, int]:
 def check_clean_room_replay() -> dict[str, int | str]:
     """Require two successful, same-SHA clean-room E2E runs with no diff."""
 
+    check_clean_tree()
     report = load_json(CLEAN_ROOM_REPLAY_PATH)
     require(report.get("schema") == "fdir/clean-room-replay-report", "clean-room replay report schema is missing")
-    require(report.get("version") == "1.0.0", "clean-room replay report version is invalid")
-    expected_sha = subprocess.run(
-        ["git", "-c", "core.fsmonitor=false", "rev-parse", "HEAD"],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        check=False,
-    ).stdout.strip()
+    require(report.get("version") == "1.1.0", "clean-room replay report version is invalid")
+    expected_sha = current_head()
     require(report.get("sourceSha") == expected_sha, "clean-room replay source SHA does not match HEAD")
     runs = report.get("runs")
     require(isinstance(runs, list) and len(runs) == 2, "clean-room replay must contain exactly two runs")
     for run in runs:
         require(isinstance(run, dict) and run.get("status") == "passed" and run.get("returnCode") == 0 and run.get("timedOut") is False, "clean-room replay contains a non-passing run")
         require(isinstance(run.get("reportDigest"), str) and re.fullmatch(r"[0-9a-f]{64}", run["reportDigest"]), "clean-room run report digest is invalid")
+        artifact_digest = run.get("artifactDigest")
+        require(isinstance(artifact_digest, str) and SHA256_RE.fullmatch(artifact_digest), "clean-room deterministic artifact digest is invalid")
+        artifact_files = run.get("artifactFiles")
+        require(isinstance(artifact_files, list) and artifact_files, "clean-room deterministic artifact inventory is missing")
+        for artifact in artifact_files:
+            require(isinstance(artifact, dict) and safe_repository_path(artifact.get("path")), "clean-room artifact path is unsafe")
+            require(isinstance(artifact.get("sha256"), str) and SHA256_RE.fullmatch(artifact["sha256"]), "clean-room artifact SHA-256 is invalid")
     comparison = report.get("comparison")
     require(isinstance(comparison, dict) and comparison.get("status") == "passed" and comparison.get("differenceCount") == 0 and comparison.get("differences") == [], "clean-room replay has an unexpected deterministic diff")
     diff_digest = comparison.get("diffDigest")
-    require(isinstance(diff_digest, str) and re.fullmatch(r"[0-9a-f]{64}", diff_digest), "clean-room diff digest is invalid")
+    require(isinstance(diff_digest, str) and SHA256_RE.fullmatch(diff_digest), "clean-room diff digest is invalid")
+    require(isinstance(comparison.get("scope"), list) and comparison["scope"], "clean-room comparison scope is missing")
     require(report.get("status") == "passed", "clean-room replay report is not passed")
     return {"runs": len(runs), "difference_count": int(comparison["differenceCount"]), "diff_digest": diff_digest}
 
@@ -773,25 +1011,181 @@ def check_runtime_evidence(commands: list[dict[str, Any]]) -> dict[str, int]:
     query = report("query_qualification")
     e2e = report("real_input_e2e")
     strict = report("strict_completion")
-    require(mutation.get("status") == "passed" and mutation.get("survivors") == [] and mutation.get("killed") == mutation.get("total"), "mutation report is not fully green")
-    require(corpus.get("status") == "passed" and len(corpus.get("cases", [])) >= 4, "independent corpus report is incomplete")
+    mutation_details = validate_mutation_report(mutation)
+    require(corpus.get("schema") == "fdir/independent-fidelity-corpus-report" and corpus.get("version") == "1.0.0", "independent corpus report schema is invalid")
+    corpus_cases = corpus.get("cases")
+    require(corpus.get("status") == "passed" and isinstance(corpus_cases, list) and len(corpus_cases) >= 4, "independent corpus report is incomplete")
+    require({case.get("format") for case in corpus_cases if isinstance(case, dict)} == {"docx", "xlsx", "pdf", "markdown"}, "independent corpus report format matrix is incomplete")
+    negative_checks = corpus.get("negativeChecks")
+    require(isinstance(negative_checks, list) and any(item.get("id") == "resource-limit" for item in negative_checks if isinstance(item, dict)), "independent corpus resource-limit evidence is missing")
     check_source_closure_report(corpus, "independent corpus")
+    require(query.get("schema") == "fdir/query-qualification-report" and query.get("version") == "1.3.0", "query report schema is invalid")
     require(query.get("status") == "passed" and query.get("parity", {}).get("status") == "passed" and query.get("unqueryableFacts") == [], "query report is not fully green")
+    require(isinstance(query.get("operations"), list) and query["operations"], "query report has no executed operations")
+    require(e2e.get("schema") == "fdir/e2e-report" and e2e.get("version") == "1.0.0", "real-input E2E report schema is invalid")
     require(e2e.get("status") == "passed" and set(e2e.get("formats", [])) == {"docx", "xlsx", "pdf", "markdown"}, "real-input E2E report is not fully green")
+    e2e_cases = e2e.get("cases")
+    require(isinstance(e2e_cases, list) and len(e2e_cases) == 16, "real-input E2E case inventory is incomplete")
+    require(all(isinstance(case, dict) and isinstance(case.get("id"), str) and case.get("id") for case in e2e_cases), "real-input E2E case inventory is malformed")
     check_source_closure_report(e2e, "real-input E2E")
+    require(strict.get("schema") == "fdir/strict-completion-gate-report", "strict completion report schema is invalid")
     require(strict.get("status") == "passed" and strict.get("blockers") == [], "strict completion report is not fully green")
     return {
-        "mutation_cases": int(mutation.get("total", 0)),
-        "independent_cases": len(corpus.get("cases", [])),
-        "independent_negative_checks": len(corpus.get("negativeChecks", [])),
+        **mutation_details,
+        "independent_cases": len(corpus_cases),
+        "independent_negative_checks": len(negative_checks),
         "query_sources": len(query.get("sources", [])),
-        "e2e_cases": len(e2e.get("cases", [])),
+        "e2e_cases": len(e2e_cases),
         "strict_issues": len(strict.get("issues", [])),
     }
 
 
+def bundle_output_path(report: dict[str, Any], basename: str) -> str:
+    matches = sorted(
+        str(item.get("path"))
+        for item in report.get("outputs", [])
+        if isinstance(item, dict)
+        and isinstance(item.get("path"), str)
+        and PurePosixPath(item["path"]).name == basename
+    )
+    require(len(matches) == 1, f"evidence report {report.get('evidenceId')} must bind exactly one {basename}: {matches}")
+    return matches[0]
+
+
+def load_bundle_output(bundle_root: Path, report: dict[str, Any], basename: str) -> dict[str, Any]:
+    path = bundle_output_path(report, basename)
+    target = bundle_root / Path(*PurePosixPath(path).parts)
+    value = load_json(target)
+    require(isinstance(value, dict), f"bundle output is not a JSON object: {path}")
+    return value
+
+
+def semantic_assertion_count(value: dict[str, Any]) -> int:
+    assertions = value.get("assertions")
+    require(isinstance(assertions, list) and assertions, "evidence output has no assertions")
+    semantic = 0
+    for assertion in assertions:
+        require(isinstance(assertion, dict), "evidence output contains a malformed assertion")
+        assertion_id = assertion.get("assertionId", assertion.get("id"))
+        if assertion_id not in GENERIC_BUNDLE_ASSERTIONS:
+            semantic += 1
+        require(assertion.get("status") == "passed", f"evidence output assertion is not passed: {assertion_id}")
+    require(semantic > 0, "evidence output contains command-exit-only assertions")
+    return semantic
+
+
+def check_qualification_bundle(bundle_manifest: Path) -> dict[str, int]:
+    """Check the semantic and identity properties beyond the generic bundle schema."""
+
+    manifest_path = bundle_manifest.resolve()
+    bundle_root = manifest_path.parent
+    manifest = load_json(manifest_path)
+    require(isinstance(manifest, dict), "qualification bundle manifest is not an object")
+    source_sha = manifest.get("sourceSha")
+    require(isinstance(source_sha, str) and SOURCE_SHA_RE.fullmatch(source_sha), "qualification bundle source SHA is invalid")
+    require(source_sha == current_head(), "qualification bundle source SHA does not match HEAD")
+    require(manifest.get("dirtyTree") is False, "qualification bundle is not bound to a clean tree")
+
+    contract = load_json(QUALIFICATION_CONTRACT_PATH)
+    scope = contract.get("scope") if isinstance(contract, dict) else None
+    required_ids = set(scope.get("requiredEvidenceIds", [])) if isinstance(scope, dict) else set()
+    require(required_ids, "qualification contract has no required Evidence IDs")
+    require(set(scope.get("issueNumbers", [])) == set(QUALIFICATION_ISSUES), "qualification contract scope is not #88-#105")
+
+    reports_dir = bundle_root / "reports"
+    report_paths = sorted(reports_dir.glob("*.json")) if reports_dir.is_dir() else []
+    require(report_paths, "qualification bundle has no Evidence reports")
+    reports: dict[str, dict[str, Any]] = {}
+    for path in report_paths:
+        value = load_json(path)
+        require(isinstance(value, dict), f"qualification Evidence report is not an object: {path.name}")
+        evidence_id = value.get("evidenceId")
+        require(isinstance(evidence_id, str) and evidence_id not in reports, f"qualification Evidence ID is invalid or duplicated: {evidence_id!r}")
+        require(evidence_id in required_ids, f"qualification bundle contains an unscoped Evidence ID: {evidence_id}")
+        require(value.get("sourceSha") == source_sha, f"qualification Evidence source SHA mismatch: {evidence_id}")
+        require(value.get("dirtyTree") is False, f"qualification Evidence is dirty: {evidence_id}")
+        require(value.get("status") == "passed" and value.get("failureCount") == 0, f"qualification Evidence is not passed: {evidence_id}")
+        require_no_placeholder(value.get("generator"), f"Evidence generator {evidence_id}")
+        for field in ("command", "inputs", "outputs"):
+            entries = value.get(field)
+            require(isinstance(entries, list) and entries, f"qualification Evidence has no {field}: {evidence_id}")
+            for entry in entries:
+                if isinstance(entry, str):
+                    require_no_placeholder(entry, f"Evidence {evidence_id} {field}")
+                elif isinstance(entry, dict):
+                    require_no_placeholder(entry.get("path"), f"Evidence {evidence_id} {field} path")
+        reports[evidence_id] = value
+
+    require(set(reports) == required_ids, "qualification bundle Evidence IDs do not exactly match #88-#105")
+
+    # The contract still contains a #105 output for compatibility with the
+    # existing bundle builder.  It is only a Phase-A blocked receipt.  A
+    # report that claims a bundle-less release result is the old circular
+    # self-qualification path and is rejected before any release claim is
+    # considered.
+    try:
+        try:
+            from release_attestation import _candidate_105_receipt
+        except ImportError:  # pragma: no cover
+            from tools.release_attestation import _candidate_105_receipt
+        _candidate_105_receipt(bundle_root, reports["issue-105-release-quality"])
+    except Exception as exc:
+        raise GateError(str(exc), getattr(exc, "code", "CIRCULAR_105_EVIDENCE")) from exc
+
+    ci_records: list[tuple[Any, ...]] = []
+    actions = os.environ.get("GITHUB_ACTIONS", "").casefold() == "true"
+    for evidence_id, report in sorted(reports.items()):
+        ci = report.get("ci")
+        require(isinstance(ci, dict), f"qualification Evidence has no CI binding: {evidence_id}")
+        record = tuple(ci.get(field) for field in ("provider", "repository", "sourceSha", "runId", "runUrl", "jobId", "attempt", "status"))
+        ci_records.append(record)
+        require(ci.get("sourceSha") == source_sha and ci.get("repository") == "horiyamayoh/fdir", f"qualification Evidence CI binding mismatch: {evidence_id}")
+        require(ci.get("status") == "completed", f"qualification Evidence CI status is not completed: {evidence_id}")
+        if actions:
+            require(ci.get("provider") == "github-actions", f"qualification Evidence is not bound to GitHub Actions: {evidence_id}")
+            require(isinstance(ci.get("runId"), str) and re.fullmatch(r"[1-9][0-9]*", ci["runId"]), f"qualification Evidence run ID is invalid: {evidence_id}")
+            require(isinstance(ci.get("runUrl"), str) and re.fullmatch(r"https://github\.com/horiyamayoh/fdir/actions/runs/[1-9][0-9]*", ci["runUrl"]), f"qualification Evidence run URL is invalid: {evidence_id}")
+        else:
+            require(ci.get("provider") == "local" and isinstance(ci.get("runUrl"), str) and ci["runUrl"].startswith("local://"), f"local qualification Evidence CI binding is invalid: {evidence_id}")
+    require(len(set(ci_records)) == 1, "qualification bundle mixes CI runs or environments")
+
+    recovery_contract = load_json(ROOT / "machine" / "recovery-report-contract.json")
+    required_reports = recovery_contract.get("reports") if isinstance(recovery_contract, dict) else None
+    require(isinstance(required_reports, dict), "recovery report contract is missing")
+    semantic_count = 0
+    named_output_count = 0
+    for issue_text, names in sorted(required_reports.items(), key=lambda item: str(item[0])):
+        issue_number = int(issue_text)
+        issue_reports = [report for report in reports.values() if issue_number in report.get("issueNumbers", [])]
+        require(issue_reports, f"qualification bundle has no report for issue #{issue_number}")
+        for name in names:
+            matches = [report for report in issue_reports if any(PurePosixPath(str(item.get("path"))).name == name for item in report.get("outputs", []) if isinstance(item, dict))]
+            require(len(matches) == 1, f"issue #{issue_number} requires exactly one semantic report {name!r}")
+            value = load_bundle_output(bundle_root, matches[0], name)
+            require(value.get("status") == "passed", f"issue #{issue_number} report {name} is not passed")
+            require(value.get("sourceSha") == source_sha, f"issue #{issue_number} report {name} has the wrong source SHA")
+            semantic_count += semantic_assertion_count(value)
+            named_output_count += 1
+
+    mutation_report = load_bundle_output(bundle_root, reports["issue-89-defect-injection"], "defect-injection-campaign.json")
+    require(mutation_report.get("schema") == "fdir/defect-injection-campaign-report", "#89 campaign report schema is invalid")
+    require(mutation_report.get("status") == "passed" and mutation_report.get("sourceSha") == source_sha, "#89 defect-injection campaign is not passed and SHA-bound")
+    require(mutation_report.get("undetected") == [], "#89 defect-injection campaign has undetected mutations")
+    completion = mutation_report.get("completion")
+    require(isinstance(completion, dict) and completion.get("must_undetected_zero") is True and completion.get("coverage_complete") is True, "#89 mutation completion is incomplete")
+    require(isinstance(mutation_report.get("cases"), list) and mutation_report["cases"], "#89 campaign has no executable mutation cases")
+
+    return {"bundle_evidence": len(reports), "bundle_named_reports": named_output_count, "bundle_semantic_assertions": semantic_count}
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the FDIR design and acceptance release gate.")
+    parser.add_argument(
+        "--mode",
+        choices=("smoke", "release"),
+        default=None,
+        help="smoke is development-only; release requires a bundle or final attestation",
+    )
     parser.add_argument(
         "--summary",
         type=Path,
@@ -802,15 +1196,98 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--bundle",
         type=Path,
         metavar="MANIFEST",
-        help="also require a commit-bound qualification bundle manifest to validate",
+        help="commit-bound qualification bundle manifest; selecting this enables release mode",
+    )
+    parser.add_argument(
+        "--attestation",
+        type=Path,
+        metavar="JSON",
+        help="final external release attestation; selecting this enables release mode",
+    )
+    parser.add_argument(
+        "--issue-snapshot",
+        type=Path,
+        metavar="JSON",
+        help="verified GitHub issue-state snapshot to use instead of making live API calls",
     )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    has_release_authority = args.bundle is not None or args.attestation is not None
+    release_mode = args.mode == "release" or has_release_authority
+    if not release_mode or (args.mode == "release" and not has_release_authority):
+        # This is the only intentionally cheap path.  The bundle builder uses
+        # it for the #105 Phase-A receipt; it must be a successful command with
+        # a blocked result, never a release-ready result.
+        summary = {
+            "schema": "fdir/release-gate-summary",
+            "version": "1.1.0",
+            "status": "blocked",
+            "releaseReady": False,
+            "mode": "smoke" if not (args.mode == "release" and not has_release_authority) else "release",
+            "exit_code": 1,
+            "diagnostics": [{
+                "code": "RELEASE_AUTHORITY_REQUIRED",
+                "detail": "release qualification requires --bundle or --attestation; this invocation is development smoke only",
+            }],
+            "checks": [],
+            "commands": [],
+        }
+        if args.summary is not None:
+            summary_path = args.summary if args.summary.is_absolute() else ROOT / args.summary
+            try:
+                summary_path.parent.mkdir(parents=True, exist_ok=True)
+                summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
+            except OSError:
+                pass
+        rendered = json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+        stdout_buffer = getattr(sys.stdout, "buffer", None)
+        if stdout_buffer is not None:
+            stdout_buffer.write(rendered.encode("utf-8"))
+        else:  # pragma: no cover
+            sys.stdout.write(rendered)
+        # Smoke is not a release result and is allowed to be consumed as the
+        # explicit blocked #105 receipt.  Explicit release mode still fails.
+        return 1 if args.mode == "release" else 0
     checks: list[dict[str, Any]] = []
     commands: list[dict[str, Any]] = []
+
+    attestation_snapshot: dict[str, Any] | None = None
+    attestation_validation: dict[str, Any] | None = None
+    authority_checks: list[dict[str, Any]] = []
+    if args.attestation is not None:
+        try:
+            attestation_value = load_json(args.attestation)
+            expected_attempt: Any = os.environ.get("GITHUB_RUN_ATTEMPT")
+            if isinstance(expected_attempt, str) and expected_attempt.isdigit():
+                expected_attempt = int(expected_attempt)
+            attestation_validation = validate_attestation(
+                attestation_value,
+                bundle_manifest_path=args.bundle,
+                expected_source_sha=current_head(),
+                expected_run_id=os.environ.get("GITHUB_RUN_ID") if os.environ.get("GITHUB_ACTIONS", "").casefold() == "true" else None,
+                expected_attempt=expected_attempt if os.environ.get("GITHUB_ACTIONS", "").casefold() == "true" else None,
+                repo_root=ROOT,
+            )
+            attestation_snapshot = attestation_validation.get("snapshot")
+        except (GateError, AttestationError, IssueStateError) as exc:
+            authority_checks.append({"name": "release_attestation", "status": "failed", "error": str(exc), "code": getattr(exc, "code", "ATTESTATION_INVALID")})
+        except Exception as exc:  # pragma: no cover - defensive fail-closed path
+            authority_checks.append({"name": "release_attestation", "status": "failed", "error": f"unexpected {type(exc).__name__}: {exc}", "code": "ATTESTATION_INVALID"})
+        else:
+            authority_checks.append({"name": "release_attestation", "status": "passed", "details": {"attestationDigest": attestation_validation.get("attestationDigest"), "snapshotDigest": attestation_snapshot.get("snapshotDigest") if isinstance(attestation_snapshot, dict) else None}})
+    checks.extend(authority_checks)
+
+    strict_command = ["tools/strict_completion_gate.py"]
+    strict_display = "python tools/strict_completion_gate.py"
+    if args.bundle is not None:
+        strict_command.extend(["--bundle", str(args.bundle)])
+        strict_display += f" --bundle {args.bundle}"
+    if args.attestation is not None:
+        strict_command.extend(["--attestation", str(args.attestation)])
+        strict_display += f" --attestation {args.attestation}"
 
     for name, display, command in (
         ("design_validation", "python tools/validate_design.py", ["tools/validate_design.py"]),
@@ -822,7 +1299,7 @@ def main(argv: list[str] | None = None) -> int:
         ("mutation_qualification", "python tools/mutation_qualification.py --json", ["tools/mutation_qualification.py", "--json"]),
         ("query_qualification", "python tools/query_qualification.py", ["tools/query_qualification.py"]),
         ("independent_corpus", "python tools/independent_corpus.py --json", ["tools/independent_corpus.py", "--json"]),
-        ("strict_completion", "python tools/strict_completion_gate.py", ["tools/strict_completion_gate.py"]),
+        ("strict_completion", strict_display, strict_command),
     ):
         command_result = run_command(name, display, command)
         commands.append(command_result)
@@ -841,17 +1318,19 @@ def main(argv: list[str] | None = None) -> int:
     try:
         runtime_details = check_runtime_evidence(commands)
     except GateError as exc:
-        checks.append({"name": "runtime_evidence", "status": "failed", "error": str(exc)})
+        checks.append({"name": "runtime_evidence", "status": "failed", "error": str(exc), "code": exc.code})
         runtime_details = {"mutation_cases": 0, "independent_cases": 0, "independent_negative_checks": 0, "query_sources": 0, "e2e_cases": 0, "strict_issues": 0}
     else:
         checks.append({"name": "runtime_evidence", "status": "passed", "details": runtime_details})
 
-    check_functions: tuple[tuple[str, Callable[[], dict[str, int]]], ...] = (
+    check_functions: tuple[tuple[str, Callable[[], dict[str, Any]]], ...] = (
+        ("clean_worktree", check_clean_tree),
+        ("ci_binding", check_ci_binding),
         ("design_catalog", check_design_catalog),
         ("issue_plan_and_github_map", check_issue_plan),
         ("phase2_contracts", check_phase2_contracts),
         ("release_claims", check_release_claims),
-        ("audit_recovery_release_boundary", check_audit_recovery_release_boundary),
+        ("audit_recovery_release_boundary", lambda: check_audit_recovery_release_boundary(issue_state=attestation_snapshot, issue_snapshot=args.issue_snapshot)),
         ("traceability", check_traceability),
         ("schema", check_schema),
         ("examples", check_examples),
@@ -863,7 +1342,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             details = function()
         except GateError as exc:
-            checks.append({"name": name, "status": "failed", "error": str(exc)})
+            checks.append({"name": name, "status": "failed", "error": str(exc), "code": exc.code})
         except Exception as exc:  # pragma: no cover - defensive fail-closed path
             checks.append({"name": name, "status": "failed", "error": f"unexpected {type(exc).__name__}: {exc}"})
         else:
@@ -877,17 +1356,25 @@ def main(argv: list[str] | None = None) -> int:
                 from tools.validate_qualification_bundle import validate_bundle
             bundle_result = validate_bundle(args.bundle, repo_root=ROOT)
             if bundle_result.get("status") != "passed":
-                raise GateError(json.dumps(bundle_result.get("diagnostics", []), ensure_ascii=False))
+                raise GateError(json.dumps(bundle_result.get("diagnostics", []), ensure_ascii=False), "QUALIFICATION_BUNDLE_INVALID")
+            bundle_details = check_qualification_bundle(args.bundle)
         except Exception as exc:
-            checks.append({"name": "qualification_bundle", "status": "failed", "error": str(exc)})
+            checks.append({"name": "qualification_bundle", "status": "failed", "error": str(exc), "code": getattr(exc, "code", "QUALIFICATION_BUNDLE_INVALID")})
         else:
-            checks.append({"name": "qualification_bundle", "status": "passed", "details": {"manifest": str(args.bundle)}})
+            checks.append({"name": "qualification_bundle", "status": "passed", "details": {"manifest": str(args.bundle), **bundle_details}})
+    else:
+        audit_check = next((item for item in checks if item.get("name") == "audit_recovery_release_boundary"), None)
+        audit_details = audit_check.get("details") if isinstance(audit_check, dict) else None
+        if isinstance(audit_details, dict) and audit_details.get("live_open_issues") == 0:
+            checks.append({"name": "qualification_bundle", "status": "failed", "error": "release-ready gate requires --bundle for exact-SHA Evidence validation"})
 
     passed = all(check["status"] == "passed" for check in checks)
     summary: dict[str, Any] = {
         "schema": "fdir/release-gate-summary",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "status": "passed" if passed else "failed",
+        "releaseReady": bool(passed),
+        "mode": "release",
         "exit_code": 0 if passed else 1,
         "reproducibility": {
             "repository_root": ".",

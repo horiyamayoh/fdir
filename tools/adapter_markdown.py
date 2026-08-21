@@ -8,6 +8,7 @@ it does not infer business meaning from Markdown.
 from __future__ import annotations
 
 import html
+from dataclasses import dataclass
 from pathlib import Path
 import mimetypes
 import re
@@ -18,9 +19,192 @@ try:
     from adapter_common import AdapterError, AdapterLimits, DocumentBuilder, input_limit_check, safe_id
 except ImportError:  # pragma: no cover
     from tools.adapter_common import AdapterError, AdapterLimits, DocumentBuilder, input_limit_check, safe_id
+try:
+    from extension_registry import ExtensionPayload, build_extension
+except ImportError:  # pragma: no cover
+    from tools.extension_registry import ExtensionPayload, build_extension
 
 
 _MAX_MARKDOWN_NESTING = 32
+
+
+@dataclass(frozen=True)
+class _MarkdownLine:
+    """A physical Markdown line with its original source coordinates."""
+
+    number: int
+    text: str
+    start: int
+    content_end: int
+    end: int
+    ending: str
+
+
+@dataclass(frozen=True)
+class _MarkdownSourceIndex:
+    """Map Unicode code-point positions to the original UTF-8 byte stream.
+
+    ``Path.read_text()`` uses universal-newline translation by default.  That
+    is useful for ordinary text processing but it destroys the information a
+    source-faithful adapter needs for CRLF/CR spans.  The Markdown adapter
+    therefore decodes the original bytes itself and keeps half-open source
+    ranges in both code points and UTF-8 bytes.
+    """
+
+    source: str
+    data: bytes
+    byte_offsets: tuple[int, ...]
+    lines: tuple[_MarkdownLine, ...]
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> "_MarkdownSourceIndex":
+        source = data.decode("utf-8")
+        byte_offsets = [0]
+        for character in source:
+            byte_offsets.append(byte_offsets[-1] + len(character.encode("utf-8")))
+
+        lines: list[_MarkdownLine] = []
+        cursor = 0
+        line_number = 1
+        while cursor < len(source):
+            start = cursor
+            while cursor < len(source) and source[cursor] not in "\r\n":
+                cursor += 1
+            content_end = cursor
+            ending = "none"
+            if cursor < len(source):
+                if source[cursor] == "\r" and cursor + 1 < len(source) and source[cursor + 1] == "\n":
+                    cursor += 2
+                    ending = "CRLF"
+                elif source[cursor] == "\r":
+                    cursor += 1
+                    ending = "CR"
+                else:
+                    cursor += 1
+                    ending = "LF"
+            lines.append(_MarkdownLine(line_number, source[start:content_end], start, content_end, cursor, ending))
+            line_number += 1
+
+        return cls(source, data, tuple(byte_offsets), tuple(lines))
+
+    def _line(self, number: int) -> _MarkdownLine | None:
+        if 1 <= number <= len(self.lines):
+            return self.lines[number - 1]
+        return None
+
+    def code_point_position(self, line: int, column: int) -> int:
+        record = self._line(line)
+        if record is None:
+            return 0
+        offset = min(max(column - 1, 0), len(record.text))
+        return record.start + offset
+
+    def locate(self, code_point_offset: int) -> tuple[int, int]:
+        offset = min(max(code_point_offset, 0), len(self.source))
+        for record in self.lines:
+            if record.start <= offset <= record.content_end:
+                return record.number, offset - record.start + 1
+            if record.content_end < offset < record.end:
+                return record.number, len(record.text) + 1
+        if self.lines:
+            last = self.lines[-1]
+            return last.number, len(last.text) + 1
+        return 1, 1
+
+    def span(self, line: int, column: int, end_line: int, end_column: int) -> dict[str, Any]:
+        start = self.code_point_position(line, column)
+        end = self.code_point_position(end_line, end_column)
+        if end < start:
+            end = start
+        endings = [
+            record.ending
+            for record in self.lines[max(0, line - 1) : max(0, end_line - 1)]
+            if record.ending != "none"
+        ]
+        unique_endings = sorted(set(endings))
+        return {
+            "coordinateUnit": "unicode-code-point",
+            "endExclusive": True,
+            "byteStart": self.byte_offsets[start],
+            "byteEnd": self.byte_offsets[end],
+            "codePointStart": start,
+            "codePointEnd": end,
+            "lineEnding": unique_endings[0] if len(unique_endings) == 1 else "mixed" if unique_endings else "none",
+        }
+
+
+@dataclass(frozen=True)
+class _MarkdownDialect:
+    """The explicitly selected syntax boundary for one conversion.
+
+    The IR has no shared Markdown dialect schema.  Keep the policy local to
+    the adapter and be conservative for unknown profile ids: a construct is
+    either enabled by a known profile or it is retained with a diagnostic.
+    """
+
+    profile_id: str
+    name: str
+    tables: bool
+    task_lists: bool
+    strikethrough: bool
+    footnotes: bool
+    front_matter: bool
+    known: bool = True
+
+
+def _dialect_for_profile(profile: str | None) -> _MarkdownDialect:
+    if profile is None or profile in {"commonmark", "fdir-commonmark-0.31.2-bounded"}:
+        return _MarkdownDialect(
+            "fdir-commonmark-0.31.2-bounded",
+            "CommonMark 0.31.2 plus bounded fdir extensions",
+            tables=True,
+            task_lists=False,
+            strikethrough=False,
+            footnotes=True,
+            front_matter=True,
+        )
+    if profile in {"gfm-0.29", "gfm-table-extension"}:
+        return _MarkdownDialect(
+            profile,
+            "GitHub Flavored Markdown 0.29 bounded table profile"
+            if profile == "gfm-table-extension"
+            else "GitHub Flavored Markdown 0.29",
+            tables=True,
+            task_lists=True,
+            strikethrough=True,
+            footnotes=False,
+            front_matter=False,
+        )
+    if profile == "commonmark-frontmatter-yaml-scalar":
+        return _MarkdownDialect(
+            profile,
+            "CommonMark 0.31.2 plus fdir YAML scalar front matter",
+            tables=False,
+            task_lists=False,
+            strikethrough=False,
+            footnotes=False,
+            front_matter=True,
+        )
+    if profile in {"commonmark-0.31.2-core", "commonmark-no-table-extension"}:
+        return _MarkdownDialect(
+            profile,
+            "CommonMark 0.31.2 core",
+            tables=False,
+            task_lists=False,
+            strikethrough=False,
+            footnotes=False,
+            front_matter=False,
+        )
+    return _MarkdownDialect(
+        str(profile),
+        "unknown Markdown profile",
+        tables=False,
+        task_lists=False,
+        strikethrough=False,
+        footnotes=False,
+        front_matter=False,
+        known=False,
+    )
 
 
 def _find_unescaped(value: str, needle: str, start: int) -> int:
@@ -35,6 +219,45 @@ def _find_unescaped(value: str, needle: str, start: int) -> int:
             continue
         if value.startswith(needle, index):
             return index
+    return -1
+
+
+def _find_bracket_close(value: str, start: int) -> int:
+    """Find a link-label close while retaining CommonMark bracket nesting."""
+
+    depth = 0
+    escaped = False
+    for index in range(start, len(value)):
+        character = value[index]
+        if escaped:
+            escaped = False
+            continue
+        if character == "\\":
+            escaped = True
+            continue
+        if character == "[":
+            depth += 1
+        elif character == "]":
+            if depth == 0:
+                return index
+            depth -= 1
+    return -1
+
+
+def _find_tilde_close(value: str, marker: str, start: int) -> int:
+    """Find an exact one- or two-tilde closing delimiter."""
+
+    cursor = start
+    while cursor < len(value):
+        close = _find_unescaped(value, marker, cursor)
+        if close < 0:
+            return -1
+        before_is_tilde = close > 0 and value[close - 1] == "~"
+        after = close + len(marker)
+        after_is_tilde = after < len(value) and value[after] == "~"
+        if not before_is_tilde and not after_is_tilde:
+            return close
+        cursor = close + 1
     return -1
 
 
@@ -113,8 +336,13 @@ def _destination(value: str) -> tuple[str, str]:
     return target, title
 
 
-def _inline_tokens(value: str, references: dict[str, tuple[str, str]] | None = None) -> list[dict[str, Any]]:
-    """Tokenize the bounded inline dialect and retain local source spans."""
+def _inline_tokens(
+    value: str,
+    references: dict[str, tuple[str, str]] | None = None,
+    *,
+    allow_strikethrough: bool = False,
+) -> list[dict[str, Any]]:
+    """Tokenize the selected inline dialect and retain local source spans."""
     references = references or {}
     tokens: list[dict[str, Any]] = []
     text_start = 0
@@ -148,6 +376,30 @@ def _inline_tokens(value: str, references: dict[str, tuple[str, str]] | None = N
             emit("unclosed-code", index, len(value), marker=marker, content=value[marker_end:])
             index = len(value)
             continue
+        if value[index] == "~":
+            tilde_end = index
+            while tilde_end < len(value) and value[tilde_end] == "~":
+                tilde_end += 1
+            tilde_count = tilde_end - index
+            # GFM accepts exactly one or two tildes.  A longer run remains
+            # literal text (GFM 0.29, strikethrough examples).
+            if tilde_count in {1, 2}:
+                marker = value[index:tilde_end]
+                close = _find_tilde_close(value, marker, tilde_end)
+                if close > tilde_end:
+                    content = value[tilde_end:close]
+                    if content and not content[0].isspace() and not content[-1].isspace():
+                        emit(
+                            "strikethrough" if allow_strikethrough else "unsupported-strikethrough",
+                            index,
+                            close + len(marker),
+                            marker=marker,
+                            content=content,
+                        )
+                        index = close + len(marker)
+                        continue
+            index = tilde_end
+            continue
         if value.startswith("[^", index):
             label_end = _find_unescaped(value, "]", index + 2)
             if label_end >= 0:
@@ -160,7 +412,7 @@ def _inline_tokens(value: str, references: dict[str, tuple[str, str]] | None = N
         if value.startswith("![", index) or value[index] == "[":
             image = value.startswith("![", index)
             label_start = index + 2 if image else index + 1
-            label_end = _find_unescaped(value, "]", label_start)
+            label_end = _find_bracket_close(value, label_start)
             if label_end >= 0:
                 after = label_end + 1
                 if after < len(value) and value[after] == "(":
@@ -175,7 +427,7 @@ def _inline_tokens(value: str, references: dict[str, tuple[str, str]] | None = N
                     index = len(value)
                     continue
                 if not image and after < len(value) and value[after] == "[":
-                    reference_end = _find_unescaped(value, "]", after + 1)
+                    reference_end = _find_bracket_close(value, after + 1)
                     if reference_end >= 0:
                         label = _unescape(value[label_start:label_end])
                         reference = _unescape(value[after + 1 : reference_end]) or label
@@ -235,12 +487,13 @@ def _inline_tokens(value: str, references: dict[str, tuple[str, str]] | None = N
 def inspect(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any]:
     limits = input_limit_check(Path(path), limits)
     data = Path(path).read_bytes()
-    text = data.decode("utf-8")
+    source_index = _MarkdownSourceIndex.from_bytes(data)
     return {
         "format": "markdown",
         "version": "commonmark",
         "bytes": len(data),
-        "lines": text.count("\n") + 1,
+        "lines": len(source_index.lines) or 1,
+        "profile": "fdir-commonmark-0.31.2-bounded",
         "capabilities": [
             "blocks", "inline", "links", "images", "tables", "lists", "footnotes",
             "front-matter", "authoring", "references", "raw-html", "source-maps",
@@ -249,18 +502,31 @@ def inspect(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
     }
 
 
-def _strip_inline(value: str, references: dict[str, tuple[str, str]] | None = None, *, depth: int = 0) -> str:
+def _strip_inline(
+    value: str,
+    references: dict[str, tuple[str, str]] | None = None,
+    *,
+    depth: int = 0,
+    allow_strikethrough: bool = False,
+) -> str:
     if depth >= _MAX_MARKDOWN_NESTING:
         return html.unescape(_unescape(value))
     normalized: list[str] = []
-    for token in _inline_tokens(value, references):
+    for token in _inline_tokens(value, references, allow_strikethrough=allow_strikethrough):
         kind = token["kind"]
         if kind == "text":
             normalized.append(html.unescape(_unescape(token["raw"])))
         elif kind == "code":
             normalized.append(token["content"])
-        elif kind in {"emphasis", "link", "reference-link", "image"}:
-            normalized.append(_strip_inline(token.get("content", token.get("label", "")), references, depth=depth + 1))
+        elif kind in {"emphasis", "strikethrough", "unsupported-strikethrough", "link", "reference-link", "image"}:
+            normalized.append(
+                _strip_inline(
+                    token.get("content", token.get("label", "")),
+                    references,
+                    depth=depth + 1,
+                    allow_strikethrough=allow_strikethrough,
+                )
+            )
         elif kind in {"footnote-ref", "raw-html"}:
             normalized.append(token["raw"])
         else:
@@ -268,20 +534,18 @@ def _strip_inline(value: str, references: dict[str, tuple[str, str]] | None = No
     return "".join(normalized)
 
 
-def _extension(builder: DocumentBuilder, target_id: str, extension_type: str, payload: dict[str, Any], *, criticality: str = "non-critical") -> None:
+def _extension(builder: DocumentBuilder, target_id: str, extension_type: str, payload: ExtensionPayload, *, criticality: str = "non-critical") -> None:
     extension_id = safe_id("extension", f"markdown-{extension_type}-{len(builder.document['extensions'])}")
     builder.add_item(
         "extensions",
-        {
-            "extensionId": extension_id,
-            "targetId": target_id,
-            "namespace": "urn:fdir:format:markdown",
-            "type": extension_type,
-            "schemaVersion": "1.0.0",
-            "schemaId": f"urn:fdir:schema:markdown-{extension_type}",
-            "payload": payload,
-            "criticality": criticality,
-        },
+        build_extension(
+            extension_id=extension_id,
+            target_id=target_id,
+            namespace="urn:fdir:format:markdown",
+            extension_type=extension_type,
+            payload=payload,
+            criticality=criticality,
+        ),
         "extensionId",
     )
 
@@ -303,7 +567,8 @@ def _linked_resource(builder: DocumentBuilder, url: str, *, kind: str, identity:
         derived_handle = f"data:{media_type}"
     elif external:
         availability = "unavailable"
-        media_type = mimetypes.guess_type(Path(parsed.path).name)[0] or "application/octet-stream"
+        media_type = mimetypes.guess_type(Path(parsed.path).name)[0] if kind == "image" else None
+        media_type = media_type or "application/octet-stream"
         external_target = url
         derived_handle = url
     else:
@@ -312,20 +577,115 @@ def _linked_resource(builder: DocumentBuilder, url: str, *, kind: str, identity:
         # exists.  A caller that wants local-resource resolution must provide
         # a separate, explicitly authorized resolver.
         availability = "unavailable"
-        media_type = mimetypes.guess_type(Path(unquote(parsed.path or url)).name)[0] or "application/octet-stream"
-        external_target = url
+        media_type = mimetypes.guess_type(Path(unquote(parsed.path or url)).name)[0] if kind == "image" else None
+        media_type = media_type or "application/octet-stream"
+        external_target = ""
         derived_handle = url
-    item: dict[str, Any] = {"resourceId": resource_id, "kind": kind, "mediaType": media_type, "availability": availability, "derivedHandle": derived_handle}
+    item: dict[str, Any] = {
+        "resourceId": resource_id,
+        "kind": kind,
+        "mediaType": media_type,
+        "packagePresence": False,
+        "rawPayloadAvailable": False,
+        "decodability": "not-attempted",
+        "embeddedOrExternal": "external" if external else "linked",
+        "availability": availability,
+        "networkAvailability": "unknown" if external else "not-applicable",
+        "derivedHandle": derived_handle,
+    }
     if external_target:
         item["externalTarget"] = external_target
     builder.add_item("resources", item, "resourceId")
     return resource_id
 
 
-def _link_relation(builder: DocumentBuilder, source_id: str, target_id: str, identity: str, *, status: str = "preserved") -> None:
+def _resource_observation(builder: DocumentBuilder, resource_id: str) -> None:
+    """Record that availability was intentionally not resolved at this boundary."""
+
+    observation_id = safe_id("observation", f"markdown-resource-resolution-{resource_id}")
+    if builder.find("observations", "observationId", observation_id) is None:
+        builder.add_item(
+            "observations",
+            {
+                "observationId": observation_id,
+                "kind": "measurement",
+                "targetId": resource_id,
+                "method": "filesystem-resolution-not-configured",
+                "engine": "none",
+                "status": "unavailable",
+            },
+            "observationId",
+        )
+
+
+def _link_relation(
+    builder: DocumentBuilder,
+    source_id: str,
+    target_id: str,
+    identity: str,
+    *,
+    status: str = "preserved",
+    kind: str = "links",
+    source_occurrence_id: str | None = None,
+    relation_type: str | None = None,
+    target: str | None = None,
+    target_mode: str | None = None,
+) -> None:
     relation_id = safe_id("relation", identity)
     if builder.find("relations", "relationId", relation_id) is None:
-        builder.add_item("relations", {"relationId": relation_id, "kind": "links", "fromId": source_id, "toId": target_id, "status": status}, "relationId")
+        relation: dict[str, Any] = {
+            "relationId": relation_id,
+            "kind": kind,
+            "fromId": source_id,
+            "toId": target_id,
+            "status": status,
+        }
+        if source_occurrence_id is not None:
+            relation["sourceOccurrenceId"] = source_occurrence_id
+        if relation_type is not None:
+            relation["type"] = relation_type
+        if target is not None:
+            relation["target"] = target
+        if target_mode is not None:
+            relation["targetMode"] = target_mode
+        builder.add_item("relations", relation, "relationId")
+        owner = builder.find("parts", "partId", source_id)
+        if owner is not None and relation_id not in owner.setdefault("relationshipIds", []):
+            owner["relationshipIds"].append(relation_id)
+
+
+def _target_is_external(target: str) -> bool:
+    parsed = urlparse(target)
+    return bool(parsed.scheme or target.startswith("//"))
+
+
+def _source_occurrence_id(state: dict[str, Any], kind: str, target: str, token: dict[str, Any]) -> str:
+    """Allocate the bounded Markdown source occurrence vocabulary.
+
+    The first occurrence keeps the authored corpus identifiers (``md-*``);
+    repeated constructs receive a deterministic suffix instead of colliding.
+    """
+
+    if kind == "reference-link":
+        base = "md-reference-link"
+    elif kind == "image":
+        base = "md-external-image" if _target_is_external(target) else "md-local-image"
+    elif token.get("autolink"):
+        base = "md-autolink"
+    else:
+        base = "md-inline-external" if _target_is_external(target) else "md-inline-internal"
+    counts = state.setdefault("sourceOccurrenceCounts", {})
+    ordinal = int(counts.get(base, 0))
+    counts[base] = ordinal + 1
+    return base if ordinal == 0 else f"{base}-{ordinal + 1}"
+
+
+def _link_type(kind: str, token: dict[str, Any]) -> str:
+    if kind == "reference-link":
+        return "reference-link"
+    if kind == "image":
+        return "image"
+    return "autolink" if token.get("autolink") else "inline-link"
 
 
 def _split_table_cells(line: str) -> list[dict[str, Any]]:
@@ -368,15 +728,72 @@ def _split_table_row(line: str) -> list[str]:
     return [cell["value"] for cell in _split_table_cells(line)]
 
 
-def _heading_parts(line: str) -> tuple[int, str] | None:
-    value = line.lstrip(" ")
+def _heading_parts(line: str) -> tuple[int, str, int] | None:
+    """Return ATX level, inline content, and content's zero-based offset.
+
+    CommonMark permits an empty ATX heading and an optional closing sequence
+    of ``#`` characters.  The offset lets the node retain the full authored
+    marker span while its inline runs point only at the content.
+    """
+
+    leading = len(line) - len(line.lstrip(" "))
+    value = line[leading:]
     count = 0
     while count < len(value) and value[count] == "#":
         count += 1
-    if not 1 <= count <= 6 or count == len(value) or not value[count].isspace():
+    if not 1 <= count <= 6:
         return None
-    content = value[count:].strip()
-    return (count, content) if content else None
+    if count == len(value):
+        return count, "", leading + count
+    if value[count] not in " \t":
+        return None
+    content_start = count
+    while content_start < len(value) and value[content_start] in " \t":
+        content_start += 1
+    content = value[content_start:].rstrip(" \t")
+    if content:
+        closing = re.search(r"[ \t]+#+[ \t]*$", content)
+        if closing:
+            content = content[: closing.start()].rstrip(" \t")
+        content_offset = leading + content_start
+    else:
+        content_offset = leading + content_start
+    return count, content, content_offset
+
+
+def _thematic_break_parts(line: str) -> dict[str, Any] | None:
+    """Return authored facts for the bounded CommonMark thematic-break rule."""
+
+    leading = len(line) - len(line.lstrip(" \t"))
+    if leading > 3:
+        return None
+    value = line[leading:]
+    marker_chars = [character for character in value if character not in " \t"]
+    if len(marker_chars) < 3 or marker_chars[0] not in "*-_" or any(character != marker_chars[0] for character in marker_chars):
+        return None
+    return {
+        "marker": marker_chars[0],
+        "count": len(marker_chars),
+        "leadingWhitespace": line[:leading],
+        "raw": line,
+    }
+
+
+def _indented_code_line(line: str) -> bool:
+    """Identify an indented-code candidate outside the enabled block subset."""
+
+    if not line.strip():
+        return False
+    prefix = line[: len(line) - len(line.lstrip(" \t"))]
+    expanded = prefix.expandtabs(4)
+    return len(expanded) >= 4
+
+
+def _html_block_start(line: str) -> bool:
+    """Recognize block HTML separately from the preserved inline HTML lane."""
+
+    value = line.lstrip(" \t")
+    return bool(re.match(r"^</?(?:address|article|aside|blockquote|details|dialog|div|dl|fieldset|figcaption|figure|footer|form|h[1-6]|header|hr|main|nav|ol|p|pre|section|table|ul)(?:\s|/?>)", value, re.IGNORECASE))
 
 
 def _list_parts(line: str) -> tuple[str, str, int] | None:
@@ -395,13 +812,17 @@ def _list_parts(line: str) -> tuple[str, str, int] | None:
 
 
 def _reference_parts(line: str) -> tuple[str, str, str] | None:
-    if not line.startswith("["):
+    leading = len(line) - len(line.lstrip(" "))
+    if leading > 3:
         return None
-    label_end = _find_unescaped(line, "]", 1)
-    if label_end < 0 or label_end + 1 >= len(line) or line[label_end + 1] != ":":
+    value = line[leading:]
+    if not value.startswith("["):
         return None
-    destination, title = _destination(line[label_end + 2 :])
-    return (_unescape(line[1:label_end]), destination, title) if destination else None
+    label_end = _find_bracket_close(value, 1)
+    if label_end < 0 or label_end + 1 >= len(value) or value[label_end + 1] != ":":
+        return None
+    destination, title = _destination(value[label_end + 2 :])
+    return (_unescape(value[1:label_end]), destination, title) if destination else None
 
 
 def _footnote_parts(line: str) -> tuple[str, str] | None:
@@ -437,11 +858,11 @@ def _is_closing_fence(line: str, opening: str) -> bool:
     return count >= len(opening) and not value[count:].strip()
 
 
-def _is_table_separator(line: str) -> bool:
+def _is_table_separator(line: str, expected_columns: int | None = None) -> bool:
     if "|" not in line:
         return False
     cells = _split_table_row(line)
-    if not cells:
+    if not cells or (expected_columns is not None and len(cells) != expected_columns):
         return False
     for cell in cells:
         value = cell.strip()
@@ -454,17 +875,37 @@ def _is_table_separator(line: str) -> bool:
     return True
 
 
+def _task_parts(content: str) -> tuple[bool, str, str, int] | None:
+    """Return GFM task state, marker, body, and body offset in item content."""
+
+    match = re.match(r"^\[([ xX])\](?:(?P<space>[ \t]+)(?P<body>.*)|$)", content)
+    if not match:
+        return None
+    whitespace = match.group("space") or ""
+    body = match.group("body") or ""
+    if body and not whitespace:
+        return None
+    marker = content[: 3]
+    return match.group(1).casefold() == "x", marker, body, match.end() - len(body)
+
+
 def _source_map(builder: DocumentBuilder, target_id: str, line: int, column: int, end_line: int, end_column: int, *, token_start: int = 0, token_end: int | None = None) -> dict[str, Any]:
+    locator = {
+        "lineStart": line,
+        "columnStart": max(1, column),
+        "lineEnd": end_line,
+        "columnEnd": max(1, end_column),
+        "tokenStart": max(0, token_start),
+        "tokenEnd": max(0, token_end if token_end is not None else end_column - column),
+    }
+    source_index = getattr(builder, "_markdown_source_index", None)
+    if isinstance(source_index, _MarkdownSourceIndex):
+        locator.update(source_index.span(line, column, end_line, end_column))
+        if end_line != line:
+            locator["tokenEnd"] = max(0, locator["codePointEnd"] - locator["codePointStart"])
     return builder.add_source_map(
         target_id,
-        {
-            "lineStart": line,
-            "columnStart": max(1, column),
-            "lineEnd": end_line,
-            "columnEnd": max(1, end_column),
-            "tokenStart": max(0, token_start),
-            "tokenEnd": max(0, token_end if token_end is not None else end_column - column),
-        },
+        locator,
     )
 
 
@@ -489,8 +930,11 @@ def _add_inline(
 ) -> tuple[str, str]:
     references = references or {}
     footnotes = footnotes or {}
-    state = state or {"resourceGaps": set(), "forcePartial": False}
-    tokens = _inline_tokens(raw, references) or [{"kind": "text", "raw": raw, "start": 0, "end": len(raw)}]
+    state = state or {"resourceGaps": set(), "forcePartial": False, "referenceDefinitions": {}}
+    dialect = state.get("dialect")
+    allow_strikethrough = bool(getattr(dialect, "strikethrough", False))
+    allow_footnotes = bool(getattr(dialect, "footnotes", True))
+    tokens = _inline_tokens(raw, references, allow_strikethrough=allow_strikethrough) or [{"kind": "text", "raw": raw, "start": 0, "end": len(raw)}]
     first_run = ""
     first_source = ""
     for token in tokens:
@@ -498,10 +942,14 @@ def _add_inline(
         token_raw = token["raw"]
         token_start = int(token["start"])
         token_end = int(token["end"])
-        run_status = "unsupported" if kind.startswith("unclosed-") else "preserved"
-        if kind == "reference-link" and _normalize_label(token.get("reference", "")) not in references:
+        run_status = "unsupported" if kind.startswith(("unclosed-", "unsupported-")) else "preserved"
+        reference_key = _normalize_label(token.get("reference", "")) if kind == "reference-link" else ""
+        reference_binding = state.get("referenceDefinitions", {}).get(reference_key) if reference_key else None
+        if kind == "reference-link" and reference_key not in references:
             run_status = "ambiguous"
-        if kind == "footnote-ref" and token.get("label", "") not in footnotes:
+        if kind == "footnote-ref" and not allow_footnotes:
+            run_status = "unsupported"
+        if kind == "footnote-ref" and token.get("label", "") not in footnotes and allow_footnotes:
             run_status = "ambiguous"
         run_id = safe_id("node", f"markdown-run-{line}-{column}-{token_start}-{len(builder.document['nodes'])}")
         builder.add_node("run", run_id, parent_id=parent_id, status=run_status)
@@ -520,13 +968,13 @@ def _add_inline(
         source_map = _source_map(builder, run_id, line, column + token_start, line, column + token_end, token_start=token_start, token_end=token_end)
         if not first_run:
             first_run, first_source = run_id, source_id
-        normalized = _strip_inline(token_raw, references)
+        normalized = _strip_inline(token_raw, references, allow_strikethrough=allow_strikethrough)
         if normalized != token_raw and not kind.startswith("unclosed-"):
             normalized_id = safe_id("text", f"markdown-normalized-{line}-{column}-{token_start}-{len(builder.document['texts'])}")
             builder.add_text(normalized_id, normalized, representation="normalized", provenance="decoded", source_text_id=source_id, source_range={"start": source_start, "end": source_end}, transformations=[{"kind": "normalize", "sourceStart": 0, "sourceEnd": len(token_raw), "targetStart": 0, "targetEnd": len(normalized)}], status="normalized")
             builder.link_text(run_id, normalized_id)
 
-        if kind.startswith("unclosed-"):
+        if kind.startswith(("unclosed-", "unsupported-")):
             code = {
                 "unclosed-code": "DFIR-MD-UNCLOSED-CODE-SPAN",
                 "unclosed-link": "DFIR-MD-UNCLOSED-LINK",
@@ -534,34 +982,107 @@ def _add_inline(
                 "unclosed-footnote-ref": "DFIR-MD-UNCLOSED-FOOTNOTE-REF",
                 "unclosed-html": "DFIR-MD-UNCLOSED-HTML",
                 "unclosed-emphasis": "DFIR-MD-UNCLOSED-EMPHASIS",
+                "unsupported-strikethrough": "DFIR-MD-STRIKETHROUGH-UNSUPPORTED",
             }.get(kind, "DFIR-MD-UNCLOSED-INLINE")
-            diagnostic_id = _diagnostic(builder, code, f"Unclosed Markdown inline construct: {kind}.", target_id=run_id, source_map_id=source_map["sourceMapId"])
+            message = (
+                "GFM strikethrough is outside the enabled Markdown profile."
+                if kind == "unsupported-strikethrough"
+                else f"Unclosed Markdown inline construct: {kind}."
+            )
+            diagnostic_id = _diagnostic(builder, code, message, target_id=run_id, source_map_id=source_map["sourceMapId"])
             builder.add_feature("inline-syntax", "unsupported", target_id=run_id, diagnostic_ids=[diagnostic_id])
+        elif kind == "footnote-ref" and not allow_footnotes:
+            diagnostic_id = _diagnostic(builder, "DFIR-MD-FOOTNOTE-UNSUPPORTED", "Footnote syntax is outside the selected Markdown dialect.", target_id=run_id, source_map_id=source_map["sourceMapId"])
+            builder.add_feature("footnote", "unsupported", target_id=run_id, diagnostic_ids=[diagnostic_id])
+            state["forcePartial"] = True
         elif kind == "reference-link" and run_status == "ambiguous":
             diagnostic_id = _diagnostic(builder, "DFIR-MD-REFERENCE-UNRESOLVED", "Reference-style link has no matching definition.", target_id=run_id, source_map_id=source_map["sourceMapId"])
             builder.add_feature("reference-link", "ambiguous", target_id=run_id, diagnostic_ids=[diagnostic_id])
         elif kind == "footnote-ref" and run_status == "ambiguous":
             diagnostic_id = _diagnostic(builder, "DFIR-MD-FOOTNOTE-UNRESOLVED", "Footnote reference has no matching definition.", target_id=run_id, source_map_id=source_map["sourceMapId"])
             builder.add_feature("footnote", "ambiguous", target_id=run_id, diagnostic_ids=[diagnostic_id])
-        elif kind == "footnote-ref":
+        elif kind == "footnote-ref" and allow_footnotes:
             annotation_id = safe_id("annotation", f"markdown-footnote-ref-{line}-{column}-{token_start}-{token.get('label', '')}")
-            builder.add_item("annotations", {"annotationId": annotation_id, "kind": "footnote", "targetIds": [run_id], "body": footnotes[token["label"]], "referenceId": token["label"], "status": "preserved"}, "annotationId")
+            builder.add_item(
+                "annotations",
+                {
+                    "annotationId": annotation_id,
+                    "kind": "footnote",
+                    "targetIds": [run_id],
+                    "body": footnotes[token["label"]],
+                    "referenceId": token["label"],
+                    "sourceSubtype": "markdown:footnote",
+                    "anchor": {"kind": "reference", "label": token["label"], "resolved": True},
+                    "status": "preserved",
+                },
+                "annotationId",
+            )
             builder.add_feature("footnote", "preserved", target_id=run_id)
         elif kind in {"link", "image", "reference-link"} and (kind != "reference-link" or run_status != "ambiguous"):
             if kind == "reference-link":
                 target, _title = references[_normalize_label(token["reference"])]
             else:
                 target = token["target"]
-            resource_id = _linked_resource(builder, target, kind="image" if kind == "image" else "linkedObject", identity=f"markdown-{kind}-{line}-{column}-{token_start}-{target}")
+            source_occurrence_id = _source_occurrence_id(state, kind, target, token)
+            relation_type = _link_type(kind, token)
+            target_mode = "external" if _target_is_external(target) else "internal"
+            resource_identity = (
+                f"markdown-reference-target-{reference_key}"
+                if kind == "reference-link"
+                else f"markdown-{kind}-{line}-{column}-{token_start}-{target}"
+            )
+            resource_id = _linked_resource(builder, target, kind="image" if kind == "image" else "linkedObject", identity=resource_identity)
             node = builder.find("nodes", "nodeId", run_id)
             if node is not None:
                 node.setdefault("resourceIds", []).append(resource_id)
             resource = builder.find("resources", "resourceId", resource_id)
             available = bool(resource and resource.get("availability") == "available")
-            _link_relation(builder, run_id, resource_id, f"markdown-{kind}-{line}-{column}-{token_start}-{resource_id}-relation", status="preserved" if available else "unavailable")
+            _resource_observation(builder, resource_id)
+            _link_relation(
+                builder,
+                state.get("relationshipOwnerId", run_id),
+                resource_id,
+                f"markdown-{source_occurrence_id}-{resource_id}-relation",
+                status="preserved" if available else "unavailable",
+                source_occurrence_id=source_occurrence_id,
+                relation_type=relation_type,
+                target=target,
+                target_mode=target_mode,
+            )
+            if kind == "reference-link" and reference_binding:
+                _link_relation(
+                    builder,
+                    run_id,
+                    reference_binding["annotationId"],
+                    f"markdown-reference-use-{line}-{column}-{token_start}-{reference_binding['annotationId']}",
+                    kind="references",
+                )
             annotation_id = safe_id("annotation", f"markdown-{kind}-{line}-{column}-{token_start}-{target}")
-            builder.add_item("annotations", {"annotationId": annotation_id, "kind": "hyperlink", "targetIds": [run_id, resource_id], "body": target, "status": "preserved" if available else "ambiguous", "referenceId": token.get("reference") if kind == "reference-link" else None}, "annotationId")
+            builder.add_item(
+                "annotations",
+                {
+                    "annotationId": annotation_id,
+                    "kind": "hyperlink",
+                    "targetIds": [run_id, resource_id],
+                    "body": target,
+                    "displayText": token.get("label", target),
+                    "destination": target,
+                    "status": "preserved",
+                    "referenceId": token.get("reference") if kind == "reference-link" else None,
+                },
+                "annotationId",
+            )
             resource_diagnostics: list[str] = []
+            scheme = urlparse(target).scheme.casefold()
+            if scheme in {"javascript", "vbscript", "data"}:
+                unsafe_diagnostic = _diagnostic(
+                    builder,
+                    "DFIR-MD-UNSAFE-URI-PRESERVED",
+                    "Potentially unsafe Markdown URI was preserved as authored text and was not executed or dereferenced.",
+                    target_id=run_id,
+                    source_map_id=source_map["sourceMapId"],
+                )
+                resource_diagnostics.append(unsafe_diagnostic)
             if not available:
                 diagnostic_id = _diagnostic(builder, "DFIR-MD-RESOURCE-UNAVAILABLE", "Linked Markdown resource was not available during conversion.", target_id=run_id, source_map_id=source_map["sourceMapId"])
                 resource_diagnostics.append(diagnostic_id)
@@ -574,11 +1095,29 @@ def _add_inline(
             _extension(builder, run_id, "raw-html", {"source": token["source"]})
             builder.add_feature("raw-html", "preserved", target_id=run_id)
 
+        if kind in {"strikethrough", "unsupported-strikethrough"}:
+            if kind == "strikethrough":
+                builder.add_feature("strikethrough", "preserved", target_id=run_id)
+            else:
+                builder.add_feature("strikethrough", "unsupported", target_id=run_id)
+                state["forcePartial"] = True
+
         delimiters = [token.get("marker", "")] if token.get("marker") else []
-        _extension(builder, run_id, "authoring-facts", {"delimiter": delimiters[0] if delimiters else "", "delimiters": delimiters, "escaping": ["backslash"] if "\\" in token_raw else [], "lineBreak": "hard" if token_raw.endswith("  ") or token_raw.endswith("\\") else "soft", "referenceStyle": token.get("referenceStyle", "")})
+        authoring_facts: dict[str, Any] = {
+            "delimiter": delimiters[0] if delimiters else "",
+            "delimiters": delimiters,
+            "escaping": ["backslash"] if "\\" in token_raw else [],
+            "lineBreak": "hard" if token_raw.endswith("  ") or token_raw.endswith("\\") else "soft",
+            "referenceStyle": token.get("referenceStyle", ""),
+        }
+        if kind == "reference-link":
+            authoring_facts["referenceLabel"] = token.get("reference", "")
+            if reference_binding:
+                authoring_facts["referenceDefinitionId"] = reference_binding["annotationId"]
+        _extension(builder, run_id, "authoring-facts", authoring_facts)
         if "&" in token_raw:
             _extension(builder, run_id, "entity-or-escaping", {"source": token_raw})
-        builder.add_feature("inline", "preserved", target_id=run_id)
+        builder.add_feature("inline", run_status, target_id=run_id)
     return first_run, first_source
 
 
@@ -594,6 +1133,11 @@ def _paragraph(
     footnotes: dict[str, str] | None = None,
     state: dict[str, Any] | None = None,
     status: str = "preserved",
+    source_line: int | None = None,
+    source_column: int | None = None,
+    source_end_line: int | None = None,
+    source_end_column: int | None = None,
+    source_token_end: int | None = None,
 ) -> str:
     node_id = safe_id("node", f"markdown-{kind}-{line}-{len(builder.document['nodes'])}")
     builder.add_node(kind, node_id, parent_id=parent_id, status=status)
@@ -601,8 +1145,45 @@ def _paragraph(
     for offset, segment in enumerate(segments):
         _add_inline(builder, node_id, segment, line + offset, column if offset == 0 else 1, references, footnotes, state)
     end_column = column + len(segments[0]) if len(segments) == 1 else len(segments[-1]) + 1
-    builder.add_source_map(node_id, {"lineStart": line, "columnStart": column, "lineEnd": line + len(segments) - 1, "columnEnd": max(1, end_column), "tokenStart": 0, "tokenEnd": len(text)})
+    _source_map(
+        builder,
+        node_id,
+        source_line if source_line is not None else line,
+        source_column if source_column is not None else column,
+        source_end_line if source_end_line is not None else line + len(segments) - 1,
+        max(1, source_end_column if source_end_column is not None else end_column),
+        token_start=0,
+        token_end=source_token_end if source_token_end is not None else len(text),
+    )
     return node_id
+
+
+def _task_annotation(
+    builder: DocumentBuilder,
+    target_id: str,
+    line: int,
+    column: int,
+    marker: str,
+    checked: bool,
+) -> None:
+    """Represent a GFM checkbox using the existing form annotation vocabulary."""
+
+    annotation_id = safe_id("annotation", f"markdown-task-{line}-{column}-{marker}")
+    builder.add_item(
+        "annotations",
+        {
+            "annotationId": annotation_id,
+            "kind": "form",
+            "targetIds": [target_id],
+            "body": "checked" if checked else "unchecked",
+            "referenceId": "task-list-item",
+            "sourceSubtype": "markdown:task-list-item",
+            "anchor": {"kind": "checkbox", "checked": checked, "marker": marker},
+            "status": "preserved",
+        },
+        "annotationId",
+    )
+    _source_map(builder, annotation_id, line, column, line, column + len(marker), token_start=column - 1, token_end=len(marker))
 
 
 def _table(
@@ -620,10 +1201,6 @@ def _table(
     row_ids: list[str] = []
     column_count = max((len(_split_table_row(line)) for line in row_lines), default=1)
     column_ids: list[str] = []
-    for index in range(column_count):
-        column_id = safe_id("node", f"markdown-column-{start_line}-{index}")
-        builder.add_node("column", column_id, parent_id=table_node, status="preserved")
-        column_ids.append(column_id)
     cell_ids: list[str] = []
     for row_offset, line in enumerate(row_lines):
         row_id = safe_id("node", f"markdown-row-{start_line}-{row_offset}")
@@ -641,30 +1218,135 @@ def _table(
             _add_inline(builder, cell_id, cell_text, row_number, cell_column, references, footnotes, state)
             _source_map(builder, cell_id, row_number, cell_column, row_number, cell["end"] + 1, token_start=cell["start"], token_end=cell["end"])
             cell_ids.append(cell_id)
-    builder.add_item("tables", {"tableId": safe_id("table", f"markdown-{start_line}"), "nodeId": table_node, "rowIds": row_ids, "columnIds": column_ids, "cellIds": cell_ids, "status": "preserved"}, "tableId")
-    builder.add_source_map(table_node, {"lineStart": start_line, "columnStart": 1, "lineEnd": start_line + len(lines) - 1, "columnEnd": max(1, len(lines[-1]) + 1), "tokenStart": 0, "tokenEnd": sum(len(line) for line in lines)})
+    for index in range(column_count):
+        column_id = safe_id("node", f"markdown-column-{start_line}-{index}")
+        builder.add_node("column", column_id, parent_id=table_node, status="preserved")
+        column_ids.append(column_id)
+    _source_map(
+        builder,
+        table_node,
+        start_line,
+        1,
+        start_line + len(lines) - 1,
+        max(1, len(lines[-1]) + 1),
+        token_start=0,
+        token_end=sum(len(line) for line in lines),
+    )
     alignment = []
     if len(lines) >= 2:
         for cell in _split_table_row(lines[1]):
             value = cell.strip()
             alignment.append("center" if value.startswith(":") and value.endswith(":") else "right" if value.endswith(":") else "left")
-    _extension(builder, table_node, "table-authoring", {"delimiter": "|", "alignment": alignment or ["source"]})
+    table_id = safe_id("table", f"markdown-{start_line}")
+    separator_present = len(lines) >= 2 and _is_table_separator(lines[1])
+    row_source_lines = [
+        start_line + offset
+        for offset in range(len(lines))
+        if not (separator_present and offset == 1)
+    ]
+    builder.add_item(
+        "tables",
+        {
+            "tableId": table_id,
+            "nodeId": table_node,
+            "ownerSurfaceId": next((item.get("surfaceId") for item in builder.document.get("surfaces", []) if isinstance(item, dict)), None),
+            "range": {"rowStart": 1, "rowEnd": len(row_lines), "columnStart": 1, "columnEnd": column_count},
+            "rowIds": row_ids,
+            "columnIds": column_ids,
+            "cellIds": cell_ids,
+            "separatorLines": [start_line + 1] if separator_present else [],
+            "rowSourceLines": row_source_lines,
+            "alignment": alignment or ["source"],
+            "separatorIsMetadata": separator_present,
+            "status": "preserved",
+        },
+        "tableId",
+    )
+    _extension(
+        builder,
+        table_node,
+        "table-authoring",
+        {
+            "delimiter": "|",
+            "alignment": alignment or ["source"],
+            "headerLine": start_line,
+            "separatorLine": start_line + 1 if len(lines) >= 2 and _is_table_separator(lines[1]) else None,
+            "dataRowLines": [start_line + offset for offset in range(2, len(lines))],
+        },
+    )
     return table_node
 
 
-def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any]:
+def convert(path: Path, *, limits: AdapterLimits | None = None, profile: str | None = None) -> dict[str, Any]:
     path = Path(path)
     limits = input_limit_check(path, limits)
     try:
-        source = path.read_text(encoding="utf-8")
+        source_index = _MarkdownSourceIndex.from_bytes(path.read_bytes())
     except UnicodeDecodeError as exc:
         builder = DocumentBuilder(path, "markdown", "commonmark", limits=limits)
         diagnostic = builder.add_diagnostic("DFIR-MD-UTF8-FAILED", str(exc), severity="error", phase="parse")
         builder.add_feature("source-decoding", "failed", diagnostic_ids=[diagnostic])
         return builder.finish(status="failed")
 
+    source = source_index.source
     builder = DocumentBuilder(path, "markdown", "commonmark", limits=limits)
-    lines = source.splitlines()
+    builder._markdown_source_index = source_index
+    dialect = _dialect_for_profile(profile)
+    profile_name = dialect.profile_id
+    part_id = safe_id("part", "markdown-document")
+    surface_id = safe_id("surface", "markdown-document")
+    builder.add_item(
+        "parts",
+        {
+            "partId": part_id,
+            "kind": "document",
+            "name": "Markdown document",
+            "storyType": "document",
+            "rootNodeIds": [builder.root_id],
+            "surfaceIds": [surface_id],
+            "status": "preserved",
+        },
+        "partId",
+    )
+    # Relationship reciprocity is owned by a part in the shared IR contract.
+    # Keep the inline source symbol stable for the bounded Markdown
+    # qualification lane while the annotations and nodes retain their exact
+    # token-level targets.
+    relationship_owner_id = safe_id("part", "markdown-inline-links")
+    builder.add_item(
+        "parts",
+        {
+            "partId": relationship_owner_id,
+            "kind": "inline-links",
+            "name": "markdown-run",
+            "parentPartId": part_id,
+            "rootNodeIds": [],
+            "relationshipIds": [],
+            "status": "preserved",
+        },
+        "partId",
+    )
+    builder.add_item(
+        "surfaces",
+        {
+            "surfaceId": surface_id,
+            "partId": part_id,
+            "kind": "story",
+            "ordinal": 0,
+            "dialect": profile_name,
+            "status": "preserved",
+        },
+        "surfaceId",
+    )
+    if not dialect.known:
+        diagnostic = _diagnostic(
+            builder,
+            "DFIR-MD-UNKNOWN-PROFILE",
+            f"Unknown Markdown profile {profile!r}; only conservative CommonMark source preservation is enabled.",
+            target_id=builder.root_id,
+        )
+        builder.add_feature("dialect", "unsupported", target_id=builder.root_id, diagnostic_ids=[diagnostic])
+    lines = [record.text for record in source_index.lines]
     if not lines:
         source_map = _source_map(builder, builder.root_id, 1, 1, 1, 1, token_start=0, token_end=0)
         diagnostic = _diagnostic(builder, "DFIR-MD-EMPTY-SOURCE", "Markdown source is empty.", target_id=builder.root_id, source_map_id=source_map["sourceMapId"], severity="error", phase="parse")
@@ -673,8 +1355,7 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
     if "\x00" in source:
         full_map = _source_map(builder, builder.root_id, 1, 1, len(lines), len(lines[-1]) + 1, token_start=0, token_end=len(source))
         nul_offset = source.index("\x00")
-        nul_line = source.count("\n", 0, nul_offset) + 1
-        nul_column = nul_offset - (source.rfind("\n", 0, nul_offset) + 1) + 1
+        nul_line, nul_column = source_index.locate(nul_offset)
         nul_map = _source_map(builder, builder.root_id, nul_line, nul_column, nul_line, nul_column + 1, token_start=nul_column - 1, token_end=nul_column)
         # Keep the exact NUL source map while targeting the emitted document
         # root.  Qualification requires parser diagnostics to point at an
@@ -686,23 +1367,53 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
         return builder.finish(status="failed")
 
     references: dict[str, tuple[str, str]] = {}
+    reference_definitions: dict[str, dict[str, Any]] = {}
     footnotes: dict[str, str] = {}
-    for item in lines:
+    open_fence: str | None = None
+    for number, item in enumerate(lines, start=1):
+        fence = _fence_parts(item)
+        if open_fence:
+            if fence and fence[0].startswith(open_fence[0]) and _is_closing_fence(item, open_fence):
+                open_fence = None
+            continue
+        if fence:
+            open_fence = fence[0]
+            continue
         reference = _reference_parts(item)
         if reference:
             label, target, title = reference
-            references.setdefault(_normalize_label(label), (target, title))
+            key = _normalize_label(label)
+            if key not in references:
+                references[key] = (target, title)
+                reference_definitions[key] = {
+                    "annotationId": safe_id("annotation", f"markdown-reference-{number}-{key}"),
+                    "definitionLine": number,
+                    "label": label,
+                    "target": target,
+                    "title": title,
+                }
         footnote = _footnote_parts(item)
         if footnote:
             label, body = footnote
             footnotes.setdefault(label, body)
-    state: dict[str, Any] = {"resourceGaps": set(), "forcePartial": False}
+    state: dict[str, Any] = {
+        "resourceGaps": set(),
+        "forcePartial": False,
+        "dialect": dialect,
+        "referenceDefinitions": reference_definitions,
+        "relationshipOwnerId": relationship_owner_id,
+        "sourceOccurrenceCounts": {},
+    }
 
     start_index = 0
-    if lines[0].strip() == "---":
-        end = next((candidate for candidate in range(1, len(lines)) if lines[candidate].strip() == "---"), None)
+    if dialect.front_matter and lines[0] == "---":
+        # ``---`` is a CommonMark thematic break by default.  In this bounded
+        # profile it becomes front matter only when a closing delimiter and
+        # at least one scalar key/value entry are both present.  This avoids
+        # consuming an ordinary thematic break as metadata, while malformed
+        # metadata-looking input is still diagnosed rather than completed.
+        end = next((candidate for candidate in range(1, len(lines)) if lines[candidate] == "---"), None)
         close_line = end + 1 if end is not None else len(lines)
-        front_map = _source_map(builder, builder.root_id, 1, 1, close_line, len(lines[close_line - 1]) + 1, token_start=0, token_end=sum(len(item) for item in lines[:close_line]))
         entries: list[dict[str, str]] = []
         malformed = False
         for item in lines[1 : end if end is not None else len(lines)]:
@@ -711,20 +1422,44 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
                 entries.append({"key": match.group(1), "value": match.group(2)})
             elif item.strip():
                 malformed = True
-        _extension(builder, builder.root_id, "front-matter", {"entries": entries})
-        if end is None:
-            diagnostic = _diagnostic(builder, "DFIR-MD-UNCLOSED-FRONT-MATTER", "Front matter has no closing --- delimiter.", target_id=builder.root_id, source_map_id=front_map["sourceMapId"])
-            builder.add_feature("front-matter", "unsupported", target_id=builder.root_id, diagnostic_ids=[diagnostic])
-            state["forcePartial"] = True
-            start_index = len(lines)
-        elif malformed:
-            diagnostic = _diagnostic(builder, "DFIR-MD-FRONT-MATTER-UNSUPPORTED", "Front matter contains a value outside the bounded scalar key/value dialect.", target_id=builder.root_id, source_map_id=front_map["sourceMapId"])
-            builder.add_feature("front-matter", "ambiguous", target_id=builder.root_id, diagnostic_ids=[diagnostic])
-            state["forcePartial"] = True
-            start_index = end + 1
-        else:
+        looks_like_front_matter = bool(entries) or any(
+            re.match(r"\s*[A-Za-z0-9_.-]+\s*:", item) for item in lines[1 : end if end is not None else len(lines)]
+        )
+        if end is not None and entries and not malformed:
+            front_map = _source_map(builder, builder.root_id, 1, 1, close_line, len(lines[close_line - 1]) + 1, token_start=0, token_end=sum(len(item) for item in lines[:close_line]))
+            _extension(
+                builder,
+                builder.root_id,
+                "front-matter",
+                {"syntax": "yaml-scalar", "opening": "---", "closing": "---", "entries": entries, "status": "preserved"},
+            )
             builder.add_feature("front-matter", "preserved", target_id=builder.root_id)
             start_index = end + 1
+        elif looks_like_front_matter:
+            front_map = _source_map(builder, builder.root_id, 1, 1, close_line, len(lines[close_line - 1]) + 1, token_start=0, token_end=sum(len(item) for item in lines[:close_line]))
+            _extension(
+                builder,
+                builder.root_id,
+                "front-matter",
+                {
+                    "syntax": "yaml-scalar",
+                    "opening": "---",
+                    "closing": "---" if end is not None else "",
+                    "entries": entries,
+                    "status": "unsupported" if end is None else "ambiguous",
+                    "rawLines": lines[:close_line],
+                },
+            )
+            code = "DFIR-MD-UNCLOSED-FRONT-MATTER" if end is None else "DFIR-MD-FRONT-MATTER-UNSUPPORTED"
+            message = "Front matter has no closing --- delimiter." if end is None else "Front matter contains a value outside the bounded scalar key/value dialect."
+            diagnostic = _diagnostic(builder, code, message, target_id=builder.root_id, source_map_id=front_map["sourceMapId"])
+            builder.add_feature("front-matter", "unsupported" if end is None else "ambiguous", target_id=builder.root_id, diagnostic_ids=[diagnostic])
+            state["forcePartial"] = True
+            if end is not None:
+                # The closed metadata envelope has already been represented by
+                # the diagnosed extension.  Do not reinterpret its opening or
+                # closing delimiter as additional thematic-break nodes.
+                start_index = end + 1
 
     records = [(item, number, 1) for number, item in enumerate(lines[start_index:], start=start_index + 1)]
 
@@ -734,11 +1469,24 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
 
     def block_start(index: int) -> bool:
         item = records[index][0]
-        if directive_start(item) or _fence_parts(item) or _heading_parts(item) or _list_parts(item) or item.lstrip().startswith(">"):
+        if (
+            directive_start(item)
+            or _fence_parts(item)
+            or _heading_parts(item)
+            or _list_parts(item)
+            or _thematic_break_parts(item)
+            or _indented_code_line(item)
+            or _html_block_start(item)
+            or item.lstrip().startswith(">")
+        ):
             return True
         if _reference_parts(item) or _footnote_parts(item):
             return True
-        return index + 1 < len(records) and "|" in item and _is_table_separator(records[index + 1][0])
+        return (
+            index + 1 < len(records)
+            and "|" in item
+            and _is_table_separator(records[index + 1][0], expected_columns=len(_split_table_row(item)))
+        )
 
     def parse_list(index: int, parent_id: str) -> int:
         first = _list_parts(records[index][0])
@@ -767,13 +1515,40 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
             marker, content, level = parts
             content_position = records[index][0].find(content, level + len(marker)) if content else level + len(marker) + 1
             item_column = max(1, content_position + 1)
-            task = bool(re.match(r"^\[(?: |x|X)\](?:\s+|$)", content))
-            item_id = _paragraph(builder, list_id, content, records[index][1], column=item_column, references=references, footnotes=footnotes, state=state, status="unsupported" if task else "preserved")
+            task_parts = _task_parts(content)
+            task = task_parts is not None
+            task_checked = task_parts[0] if task_parts else False
+            task_marker = task_parts[1] if task_parts else ""
+            task_body = task_parts[2] if task_parts else content
+            task_body_column = item_column + (task_parts[3] if task_parts else 0)
+            task_enabled = task and dialect.task_lists
+            item_status = "preserved" if not task or task_enabled else "unsupported"
+            item_id = _paragraph(
+                builder,
+                list_id,
+                task_body if task_enabled else content,
+                records[index][1],
+                column=task_body_column if task_enabled else item_column,
+                references=references,
+                footnotes=footnotes,
+                state=state,
+                status=item_status,
+                source_line=records[index][1] if task_enabled else None,
+                source_column=item_column if task_enabled else None,
+                source_end_line=records[index][1] if task_enabled else None,
+                source_end_column=(len(records[index][0]) + 1) if task_enabled else None,
+                source_token_end=len(records[index][0]) - item_column + 1 if task_enabled else None,
+            )
             _extension(builder, item_id, "list-marker", {"marker": marker, "level": level})
             if task:
-                item_map = builder.find("sourceMaps", "targetId", item_id)
-                diagnostic = _diagnostic(builder, "DFIR-MD-TASK-LIST-UNSUPPORTED", "GFM task-list marker is outside the declared Markdown dialect.", target_id=item_id, source_map_id=item_map["sourceMapId"] if item_map else None)
-                builder.add_feature("task-list", "unsupported", target_id=item_id, diagnostic_ids=[diagnostic])
+                if task_enabled:
+                    _task_annotation(builder, item_id, records[index][1], item_column, task_marker, task_checked)
+                    builder.add_feature("task-list", "preserved", target_id=item_id)
+                else:
+                    item_map = builder.find("sourceMaps", "targetId", item_id)
+                    diagnostic = _diagnostic(builder, "DFIR-MD-TASK-LIST-UNSUPPORTED", "GFM task-list marker is outside the selected Markdown dialect.", target_id=item_id, source_map_id=item_map["sourceMapId"] if item_map else None)
+                    builder.add_feature("task-list", "unsupported", target_id=item_id, diagnostic_ids=[diagnostic])
+                    state["forcePartial"] = True
             last_index = item_id
             index += 1
             if index < len(records) and _list_parts(records[index][0]) is not None and _list_parts(records[index][0])[2] > base_level:
@@ -798,8 +1573,23 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
                 final = end if end is not None else len(records) - 1
                 body = records[index + 1 : end] if end is not None else records[index + 1 :]
                 node_records = body or records[index : index + 1]
-                node = _paragraph(builder, parent_id, "\n".join(item[0] for item in node_records), node_records[0][1], column=node_records[0][2], references=references, footnotes=footnotes, state=state, status="unsupported")
-                source_map = _source_map(builder, node, number, column, records[final][1], len(records[final][0]) + 1, token_start=0, token_end=sum(len(item[0]) for item in records[index : final + 1]))
+                node = _paragraph(
+                    builder,
+                    parent_id,
+                    "\n".join(item[0] for item in node_records),
+                    node_records[0][1],
+                    column=node_records[0][2],
+                    references=references,
+                    footnotes=footnotes,
+                    state=state,
+                    status="unsupported",
+                    source_line=number,
+                    source_column=column,
+                    source_end_line=records[final][1],
+                    source_end_column=records[final][2] + len(records[final][0]),
+                    source_token_end=sum(len(item[0]) for item in records[index : final + 1]),
+                )
+                source_map = builder.find("sourceMaps", "targetId", node)
                 diagnostics = [_diagnostic(builder, "DFIR-MD-DIRECTIVE-UNSUPPORTED", "Markdown directive syntax is outside the bounded CommonMark adapter.", target_id=node, source_map_id=source_map["sourceMapId"])]
                 if end is None:
                     diagnostics.append(_diagnostic(builder, "DFIR-MD-UNCLOSED-DIRECTIVE", "Markdown directive has no closing ::: delimiter.", target_id=node, source_map_id=source_map["sourceMapId"]))
@@ -820,8 +1610,23 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
                 final = end if end is not None else len(records) - 1
                 content = records[index + 1 : end] if end is not None else records[index + 1 :]
                 node_records = content or records[index : index + 1]
-                node = _paragraph(builder, parent_id, "\n".join(item[0] for item in node_records), node_records[0][1], column=node_records[0][2], references=references, footnotes=footnotes, state=state, status="preserved" if end is not None else "unsupported")
-                source_map = _source_map(builder, node, number, column, records[final][1], len(records[final][0]) + 1, token_start=0, token_end=sum(len(item[0]) for item in records[index : final + 1]))
+                node = _paragraph(
+                    builder,
+                    parent_id,
+                    "\n".join(item[0] for item in node_records),
+                    node_records[0][1],
+                    column=node_records[0][2],
+                    references=references,
+                    footnotes=footnotes,
+                    state=state,
+                    status="preserved" if end is not None else "unsupported",
+                    source_line=number,
+                    source_column=column,
+                    source_end_line=records[final][1],
+                    source_end_column=records[final][2] + len(records[final][0]),
+                    source_token_end=sum(len(item[0]) for item in records[index : final + 1]),
+                )
+                source_map = builder.find("sourceMaps", "targetId", node)
                 _extension(builder, node, "code-block", {"fence": fence[0], "language": fence[1], "content": "\n".join(item[0] for item in content)})
                 if end is None:
                     diagnostic = _diagnostic(builder, "DFIR-MD-UNCLOSED-FENCE", "Fenced code block has no matching closing delimiter.", target_id=node, source_map_id=source_map["sourceMapId"])
@@ -830,45 +1635,160 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
                     builder.add_feature("code-block", "preserved", target_id=node)
                 index = final + 1
                 continue
+            thematic_break = _thematic_break_parts(text)
+            if thematic_break:
+                node_id = safe_id("node", f"markdown-thematic-break-{number}-{len(builder.document['nodes'])}")
+                builder.add_node("thematicBreak", node_id, parent_id=parent_id, status="preserved")
+                _source_map(builder, node_id, number, column, number, len(text) + 1, token_start=0, token_end=len(text))
+                _extension(
+                    builder,
+                    node_id,
+                    "thematic-break-authoring",
+                    {
+                        "marker": thematic_break["marker"],
+                        "count": thematic_break["count"],
+                        "leadingWhitespace": thematic_break["leadingWhitespace"],
+                    },
+                )
+                builder.add_feature("thematic-break", "preserved", target_id=node_id)
+                index += 1
+                continue
             heading = _heading_parts(text)
             if heading:
-                node = _paragraph(builder, parent_id, heading[1], number, kind="heading", column=max(1, text.find(heading[1]) + 1 if heading[1] else 2), references=references, footnotes=footnotes, state=state)
+                content_column = column + heading[2]
+                node = _paragraph(
+                    builder,
+                    parent_id,
+                    heading[1],
+                    number,
+                    kind="heading",
+                    column=max(1, content_column),
+                    references=references,
+                    footnotes=footnotes,
+                    state=state,
+                    source_line=number,
+                    source_column=column,
+                    source_end_line=number,
+                    source_end_column=column + len(text),
+                    source_token_end=len(text),
+                )
                 _extension(builder, node, "heading-authoring", {"level": heading[0], "marker": "#" * heading[0]})
                 builder.add_feature("heading", "preserved", target_id=node)
                 index += 1
                 continue
             if index + 1 < len(records) and text.strip() and re.fullmatch(r" {0,3}(?:=+|-+)\s*", records[index + 1][0]) and not ("|" in records[index + 1][0] and _is_table_separator(records[index + 1][0])):
                 level = 1 if "=" in records[index + 1][0] else 2
-                node = _paragraph(builder, parent_id, text, number, kind="heading", column=column, references=references, footnotes=footnotes, state=state)
+                node = _paragraph(
+                    builder,
+                    parent_id,
+                    text,
+                    number,
+                    kind="heading",
+                    column=column,
+                    references=references,
+                    footnotes=footnotes,
+                    state=state,
+                    source_line=number,
+                    source_column=column,
+                    source_end_line=records[index + 1][1],
+                    source_end_column=records[index + 1][2] + len(records[index + 1][0]),
+                    source_token_end=len(text) + len(records[index + 1][0]),
+                )
                 _extension(builder, node, "heading-authoring", {"level": level, "marker": "=" if level == 1 else "-"})
                 builder.add_feature("heading", "preserved", target_id=node)
-                _source_map(builder, node, number, column, records[index + 1][1], len(records[index + 1][0]) + 1, token_start=0, token_end=len(text) + len(records[index + 1][0]))
                 index += 2
+                continue
+            if _indented_code_line(text):
+                node = _paragraph(builder, parent_id, text, number, column=column, references=references, footnotes=footnotes, state=state, status="unsupported")
+                source_map = builder.find("sourceMaps", "targetId", node)
+                diagnostic = _diagnostic(
+                    builder,
+                    "DFIR-MD-INDENTED-CODE-UNSUPPORTED",
+                    "Indented code blocks are outside the bounded Markdown profile.",
+                    target_id=node,
+                    source_map_id=source_map["sourceMapId"] if source_map else None,
+                )
+                builder.add_feature("indented-code", "unsupported", target_id=node, diagnostic_ids=[diagnostic])
+                state["forcePartial"] = True
+                index += 1
+                continue
+            if _html_block_start(text):
+                node = _paragraph(builder, parent_id, text, number, column=column, references=references, footnotes=footnotes, state=state, status="unsupported")
+                source_map = builder.find("sourceMaps", "targetId", node)
+                diagnostic = _diagnostic(
+                    builder,
+                    "DFIR-MD-HTML-BLOCK-UNSUPPORTED",
+                    "Block HTML is preserved as source text but is outside the bounded block profile.",
+                    target_id=node,
+                    source_map_id=source_map["sourceMapId"] if source_map else None,
+                )
+                builder.add_feature("raw-html-block", "unsupported", target_id=node, diagnostic_ids=[diagnostic])
+                state["forcePartial"] = True
+                index += 1
                 continue
             footnote = _footnote_parts(text)
             if footnote:
                 label, body = footnote
-                annotation_id = safe_id("annotation", f"markdown-footnote-{number}-{label}")
-                builder.add_item("annotations", {"annotationId": annotation_id, "kind": "footnote", "targetIds": [parent_id], "body": body, "referenceId": label, "status": "preserved"}, "annotationId")
-                _source_map(builder, annotation_id, number, column, number, len(text) + 1, token_start=0, token_end=len(text))
-                builder.add_feature("footnote", "preserved", target_id=annotation_id)
+                if dialect.footnotes:
+                    annotation_id = safe_id("annotation", f"markdown-footnote-{number}-{label}")
+                    builder.add_item(
+                        "annotations",
+                        {
+                            "annotationId": annotation_id,
+                            "kind": "footnote",
+                            "targetIds": [parent_id],
+                            "body": body,
+                            "referenceId": label,
+                            "sourceSubtype": "markdown:footnote",
+                            "anchor": {"kind": "definition", "label": label, "resolved": True},
+                            "status": "preserved",
+                        },
+                        "annotationId",
+                    )
+                    _source_map(builder, annotation_id, number, column, number, len(text) + 1, token_start=0, token_end=len(text))
+                    builder.add_feature("footnote", "preserved", target_id=annotation_id)
+                else:
+                    source_map = _source_map(builder, builder.root_id, number, column, number, column + len(text), token_start=column - 1, token_end=len(text))
+                    diagnostic = _diagnostic(builder, "DFIR-MD-FOOTNOTE-UNSUPPORTED", "Footnote definitions are outside the selected Markdown dialect.", target_id=builder.root_id, source_map_id=source_map["sourceMapId"])
+                    builder.add_feature("footnote", "unsupported", target_id=builder.root_id, diagnostic_ids=[diagnostic])
+                    state["forcePartial"] = True
                 index += 1
                 continue
             reference = _reference_parts(text)
             if reference:
                 label, target, title = reference
-                annotation_id = safe_id("annotation", f"markdown-reference-{number}-{_normalize_label(label)}")
-                builder.add_item("annotations", {"annotationId": annotation_id, "kind": "bookmark", "targetIds": [parent_id], "body": target, "referenceId": label, "status": "preserved"}, "annotationId")
+                reference_key = _normalize_label(label)
+                annotation_id = safe_id("annotation", f"markdown-reference-{number}-{reference_key}")
+                binding = state.get("referenceDefinitions", {}).get(reference_key)
+                authoritative = not binding or binding.get("annotationId") == annotation_id
+                annotation_status = "preserved" if authoritative else "ambiguous"
+                builder.add_item(
+                    "annotations",
+                    {"annotationId": annotation_id, "kind": "bookmark", "targetIds": [parent_id], "body": target, "referenceId": label, "status": annotation_status},
+                    "annotationId",
+                )
                 _source_map(builder, annotation_id, number, column, number, len(text) + 1, token_start=0, token_end=len(text))
-                _extension(builder, parent_id, "reference-definition", {"label": label, "destination": target, "title": title})
-                builder.add_feature("reference-definition", "preserved", target_id=annotation_id)
+                resource_id = _linked_resource(builder, target, kind="linkedObject", identity=f"markdown-reference-target-{reference_key}")
+                _resource_observation(builder, resource_id)
+                _extension(
+                    builder,
+                    parent_id,
+                    "reference-definition",
+                    {"label": label, "destination": target, "title": title, "annotationId": annotation_id, "definitionLine": number},
+                )
+                if authoritative:
+                    builder.add_feature("reference-definition", "preserved", target_id=annotation_id)
+                else:
+                    diagnostic = _diagnostic(builder, "DFIR-MD-DUPLICATE-REFERENCE-DEFINITION", "A later reference definition is ignored because the first definition wins.", target_id=annotation_id)
+                    builder.add_feature("reference-definition", "ambiguous", target_id=annotation_id, diagnostic_ids=[diagnostic])
                 index += 1
                 continue
             parts = _list_parts(text)
             if parts:
                 index = parse_list(index, parent_id)
                 continue
-            if index + 1 < len(records) and "|" in text and _is_table_separator(records[index + 1][0]):
+            table_enabled = dialect.tables
+            if table_enabled and index + 1 < len(records) and "|" in text and _is_table_separator(records[index + 1][0], expected_columns=len(_split_table_row(text))):
                 table_lines = [text, records[index + 1][0]]
                 index += 2
                 while index < len(records) and records[index][0].strip() and "|" in records[index][0]:
@@ -913,6 +1833,6 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
         records = saved_records
 
     parse_blocks(records, builder.root_id)
-    builder.add_item("orders", {"orderId": safe_id("order", "markdown-source"), "kind": "source", "ownerId": builder.root_id, "items": [{"id": node["nodeId"], "ordinal": ordinal} for ordinal, node in enumerate(builder.document["nodes"][1:])], "status": "preserved"}, "orderId")
+    builder.add_item("orders", {"orderId": safe_id("order", "markdown-source"), "kind": "source", "ownerId": builder.root_id, "items": [{"id": node["nodeId"], "ordinal": ordinal} for ordinal, node in enumerate(builder.document["nodes"][1:])], "ordinalBase": 0, "status": "preserved"}, "orderId")
     builder.add_feature("block-structure", "preserved", target_id=builder.root_id)
     return builder.finish(status="partial" if state["forcePartial"] else None)

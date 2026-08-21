@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/horiyamayoh/fdir/schemas/qualification-issue-104-summary.schema.json",
+  "title": "FDIR issue 104 qualification summary",
+  "type": "object",
+  "required": ["schema", "issueNumber", "status", "completionStatus", "unmetRequirements", "implementedScope", "reportDirectory"],
+  "properties": {
+    "schema": {"const": "fdir/qualification-issue-104-summary"},
+    "issueNumber": {"const": 104},
+    "status": {"enum": ["passed", "failed"]},
+    "completionStatus": {"enum": ["qualified", "incomplete-strict-gate"]},
+    "unmetRequirements": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "implementedScope": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "reportDirectory": {"type": "string", "minLength": 1}
+  }
+}

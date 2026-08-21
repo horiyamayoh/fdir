@@ -1,0 +1,292 @@
+{
+  "schema": "fdir/qualification-issue-99-corpus",
+  "version": "1.0.0",
+  "issueNumber": 99,
+  "qualificationScope": "bounded-docx-profile-qualification",
+  "profile": {
+    "profileId": "docx-ecma376-transitional-bounded-relationship-story-layout-v1",
+    "name": "ECMA-376 Transitional DOCX bounded relationship/story/layout profile",
+    "edition": "ECMA-376 5th edition",
+    "conformanceClass": "Transitional package with explicit preserve-or-diagnose policy",
+    "profileBoundary": "OPC parts and relationships, WordprocessingML stories, bounded structure/style/layout, unsupported occurrence accounting, and security limits"
+  },
+  "oracle": {
+    "identity": "literal authored OOXML source facts plus independent ZIP/XML enumeration",
+    "expectedValuesAreRuntimeIndependent": true,
+    "adapterHelpersUsedForExpected": false,
+    "sourceConstruction": "authored-stdlib-zip-xml-package",
+    "sourceKind": "synthetic/standards-focused DOCX vectors; no converter output is used to author expected values",
+    "forbiddenDerivations": [
+      "tools/adapter_docx.py::_rels",
+      "tools/adapter_docx.py::_drawing",
+      "tools/adapter_docx.py::_parse_story_part",
+      "tools/adapter_docx.py::_resolve_styles",
+      "tools/adapter_common.py::DocumentBuilder",
+      "tools/convert_document.py::convert_path"
+    ],
+    "externalFetchPolicy": "never fetch external relationship targets; external and missing targets remain unavailable"
+  },
+  "producerPolicy": {
+    "syntheticOnly": true,
+    "description": "Every checked-in fixture is synthetic and standards-focused. It is not a Word, LibreOffice, or Google Docs export.",
+    "realProducerCorpusAvailable": false,
+    "availableRealProducers": [],
+    "requiredRealProducers": [
+      "Microsoft Word for Windows (multiple versions)",
+      "Microsoft Word for Mac or Word Online",
+      "LibreOffice export",
+      "Google Docs export"
+    ],
+    "noRealProducerPassRule": true
+  },
+  "requirements": [
+    {
+      "id": "DOCX99-PROFILE-MATRIX",
+      "description": "Every authored DOCX profile case must compare the public converter IR with the independent ZIP/XML oracle at zero mismatch.",
+      "gate": "all positive profile, closure, story, structure, style-layout, accounting, resource, and security assertions pass"
+    },
+    {
+      "id": "DOCX99-NEGATIVE-DETECTION",
+      "description": "Every authored negative mutation must be detected by the qualification comparison.",
+      "gate": "negativeMutationFailureCount equals zero in every report"
+    },
+    {
+      "id": "DOCX99-REAL-PRODUCERS",
+      "description": "The bounded profile must be exercised against the required independent producer families before it can qualify.",
+      "gate": "realProducerCorpusCount is at least the number of requiredRealProducers"
+    },
+    {
+      "id": "DOCX99-DIFFERENTIAL",
+      "description": "The multi-producer report must contain an independently authored differential corpus rather than synthetic-only fixtures.",
+      "gate": "producer.synthetic-differential-zero passes with real producer fixtures present"
+    },
+    {
+      "id": "DOCX99-FAIL-CLOSED",
+      "description": "No report may claim a qualified profile while any mismatch, unaccounted occurrence, unsupported loss, false completion, or missing producer evidence remains.",
+      "gate": "status is passed only when all selected assertions, negative mutations, and producer gates pass"
+    }
+  ],
+  "unmetRequirements": [
+    "DOCX99-REAL-PRODUCERS: 0 real producer fixture families are available; 4 are required.",
+    "DOCX99-DIFFERENTIAL: no Microsoft Word, Word Online/Mac, LibreOffice, or Google Docs authored export is present for differential qualification.",
+    "DOCX99-DEPENDENCIES: dependent issue qualification evidence is not bundled into this bounded lane and must be verified before issue #99 completion."
+  ],
+  "reportNames": [
+    "docx-profile-matrix.json",
+    "docx-part-relationship-closure.json",
+    "docx-story-corpus.json",
+    "docx-structure-style-layout.json",
+    "docx-unsupported-occurrences.json",
+    "docx-multi-producer-differential.json"
+  ],
+  "fixtures": [
+    {
+      "fixtureId": "docx-issue99-standards-rich",
+      "format": "docx",
+      "producer": "synthetic-standards-focused",
+      "sourceKind": "synthetic/standards-focused",
+      "provenance": "authored for issue #99; not emitted by a converter or real producer",
+      "payloadKind": "zip",
+      "parts": {
+        "[Content_Types].xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Default Extension=\"png\" ContentType=\"image/png\"/><Default Extension=\"bin\" ContentType=\"application/octet-stream\"/><Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/><Override PartName=\"/word/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml\"/><Override PartName=\"/word/theme/theme1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.theme+xml\"/><Override PartName=\"/word/header1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml\"/><Override PartName=\"/word/footer1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml\"/><Override PartName=\"/word/footnotes.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml\"/><Override PartName=\"/word/endnotes.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml\"/><Override PartName=\"/word/comments.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml\"/><Override PartName=\"/word/numbering.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml\"/><Override PartName=\"/word/settings.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml\"/><Override PartName=\"/word/media/image1.png\" ContentType=\"image/png\"/><Override PartName=\"/word/embeddings/oleObject1.bin\" ContentType=\"application/vnd.openxmlformats-officedocument.oleObject\"/></Types>",
+        "_rels/.rels": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rIdDoc\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"word/document.xml\"/></Relationships>",
+        "word/_rels/document.xml.rels": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rIdStyles\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/><Relationship Id=\"rIdHeader\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/header\" Target=\"header1.xml\"/><Relationship Id=\"rIdFooter\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer\" Target=\"footer1.xml\"/><Relationship Id=\"rIdFootnotes\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes\" Target=\"footnotes.xml\"/><Relationship Id=\"rIdEndnotes\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes\" Target=\"endnotes.xml\"/><Relationship Id=\"rIdComments\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments\" Target=\"comments.xml\"/><Relationship Id=\"rIdImage\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" Target=\"media/image1.png\"/><Relationship Id=\"rIdHyper\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink\" Target=\"https://example.invalid/issue99/nested\" TargetMode=\"External\"/><Relationship Id=\"rIdMissing\" Type=\"http://example.invalid/relationships/missing\" Target=\"missing/ghost.xml\"/><Relationship Id=\"rIdCustom\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml\" Target=\"customXml/item1.xml\"/><Relationship Id=\"rIdUnknown\" Type=\"http://example.invalid/relationships/unknown\" Target=\"unknown.xml\"/><Relationship Id=\"rIdOle\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject\" Target=\"embeddings/oleObject1.bin\"/><Relationship Id=\"rIdSettings\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings\" Target=\"settings.xml\"/><Relationship Id=\"rIdNumbering\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering\" Target=\"numbering.xml\"/></Relationships>",
+        "word/_rels/styles.xml.rels": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rIdTheme\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme\" Target=\"theme/theme1.xml\"/></Relationships>",
+        "word/document.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:w14=\"http://schemas.microsoft.com/office/word/2010/wordml\" xmlns:wp=\"http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing\" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:pic=\"http://schemas.openxmlformats.org/drawingml/2006/picture\" mc:Ignorable=\"w14\"><w:body><w:p><w:pPr><w:pStyle w:val=\"BodyText\"/><w:sectPr><w:pgSz w:w=\"16838\" w:h=\"11906\" w:orient=\"landscape\"/><w:pgMar w:top=\"1440\" w:right=\"1440\" w:bottom=\"1440\" w:left=\"1440\" w:header=\"720\" w:footer=\"720\" w:gutter=\"0\"/><w:cols w:num=\"2\" w:space=\"720\"/><w:lnNumType w:countBy=\"1\"/></w:sectPr></w:pPr><w:r><w:rPr><w:b/><w:color w:themeColor=\"accent1\" w:themeTint=\"33\"/></w:rPr><w:t>Lead</w:t></w:r><w:hyperlink r:id=\"rIdHyper\"><w:r><w:rPr><w:b/></w:rPr><w:t>Click</w:t></w:r><w:r><w:tab/></w:r><w:r><w:br w:type=\"page\"/><w:t>Here</w:t></w:r></w:hyperlink><w:r><w:drawing><wp:anchor distT=\"0\" distB=\"0\" distL=\"0\" distR=\"0\"><wp:extent cx=\"914400\" cy=\"457200\"/><wp:positionH relativeFrom=\"column\"><wp:posOffset>100</wp:posOffset></wp:positionH><wp:positionV relativeFrom=\"paragraph\"><wp:posOffset>200</wp:posOffset></wp:positionV><wp:wrapSquare wrapText=\"bothSides\"/><wp:docPr id=\"9\" name=\"Picture 9\"/><a:graphic><a:graphicData uri=\"http://schemas.openxmlformats.org/drawingml/2006/picture\"><pic:pic><pic:nvPicPr><pic:cNvPr id=\"9\" name=\"image1.png\"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed=\"rIdImage\"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x=\"10\" y=\"20\"/><a:ext cx=\"914400\" cy=\"457200\"/></a:xfrm><a:prstGeom prst=\"rect\"/></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r><w:commentRangeStart w:id=\"7\"/><w:r><w:t>Annotated</w:t></w:r><w:commentRangeEnd w:id=\"7\"/><w:r><w:commentReference w:id=\"7\"/></w:r><w:r><w:footnoteReference w:id=\"1\"/></w:r><w:r><w:endnoteReference w:id=\"1\"/></w:r><w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText xml:space=\"preserve\"> IF 1 = 1 </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText xml:space=\"preserve\"> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:t>7</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:t>7</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r><mc:AlternateContent><mc:Choice Requires=\"w14\"><w:customChoice w:mystery=\"yes\"><w:r><w:t>choice</w:t></w:r></w:customChoice></mc:Choice><mc:Fallback><w:p><w:r><w:t>fallback</w:t></w:r></w:p></mc:Fallback></mc:AlternateContent></w:p><w:tbl><w:tblPr><w:tblStyle w:val=\"TableGrid\"/></w:tblPr><w:tblGrid><w:gridCol w:w=\"1000\"/><w:gridCol w:w=\"1000\"/><w:gridCol w:w=\"1000\"/></w:tblGrid><w:tr><w:trPr><w:gridAfter w:val=\"0\"/></w:trPr><w:tc><w:tcPr><w:gridSpan w:val=\"2\"/></w:tcPr><w:p><w:r><w:t>Outer span</w:t></w:r></w:p><w:tbl><w:tblGrid><w:gridCol w:w=\"800\"/><w:gridCol w:w=\"800\"/></w:tblGrid><w:tr><w:tc><w:p><w:r><w:t>Nested A</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>Nested B</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:tc><w:tc><w:p><w:r><w:t>Outer third</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:tcPr><w:vMerge w:val=\"restart\"/></w:tcPr><w:p><w:r><w:t>Merge start</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>R2C2</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:tcPr><w:vMerge/></w:tcPr><w:p><w:r><w:t>Merge follower</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>R3C2</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p><w:r><w:t>Body two</w:t></w:r></w:p><w:sectPr><w:pgSz w:w=\"11906\" w:h=\"16838\" w:orient=\"portrait\"/><w:pgMar w:top=\"1440\" w:right=\"1440\" w:bottom=\"1440\" w:left=\"1440\" w:header=\"720\" w:footer=\"720\" w:gutter=\"0\"/><w:cols w:num=\"1\" w:space=\"720\"/></w:sectPr><w:unknownBlock w:foo=\"bar\"/></w:body></w:document>",
+        "word/header1.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><w:hdr xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:p><w:r><w:t>Header owned</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>Header table</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:hdr>",
+        "word/footer1.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><w:ftr xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:p><w:r><w:t>Footer owned</w:t></w:r></w:p></w:ftr>",
+        "word/footnotes.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><w:footnotes xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:footnote w:id=\"1\"><w:p><w:r><w:t>Footnote owned</w:t></w:r></w:p></w:footnote></w:footnotes>",
+        "word/endnotes.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><w:endnotes xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:endnote w:id=\"1\"><w:p><w:r><w:t>Endnote owned</w:t></w:r></w:p></w:endnote></w:endnotes>",
+        "word/comments.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><w:comments xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:comment w:id=\"7\"><w:p><w:r><w:t>Comment owned</w:t></w:r></w:p></w:comment></w:comments>",
+        "word/styles.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><w:styles xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii=\"Aptos\" w:hAnsi=\"Aptos\"/><w:sz w:val=\"22\"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type=\"paragraph\" w:styleId=\"BodyText\"><w:name w:val=\"Body Text\"/><w:rPr><w:rFonts w:ascii=\"Aptos\"/><w:color w:themeColor=\"accent1\"/><w:sz w:val=\"24\"/></w:rPr></w:style><w:style w:type=\"character\" w:styleId=\"Hyperlink\"><w:name w:val=\"Hyperlink\"/><w:basedOn w:val=\"BodyText\"/><w:rPr><w:u w:val=\"single\"/></w:rPr></w:style><w:style w:type=\"table\" w:styleId=\"TableGrid\"><w:name w:val=\"Table Grid\"/><w:tblStylePr w:type=\"firstRow\"><w:rPr><w:b/></w:rPr></w:tblStylePr><w:tblStylePr w:type=\"lastRow\"><w:rPr><w:i/></w:rPr></w:tblStylePr></w:style></w:styles>",
+        "word/theme/theme1.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><a:theme xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" name=\"Issue99 Theme\"><a:themeElements><a:clrScheme name=\"Issue99\"><a:dk1><a:sysClr val=\"windowText\" lastClr=\"000000\"/></a:dk1><a:lt1><a:sysClr val=\"window\" lastClr=\"FFFFFF\"/></a:lt1><a:accent1><a:srgbClr val=\"1F4E79\"/></a:accent1></a:clrScheme></a:themeElements></a:theme>",
+        "word/numbering.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><w:numbering xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:abstractNum w:abstractNumId=\"0\"><w:lvl w:ilvl=\"0\"><w:numFmt w:val=\"decimal\"/></w:lvl></w:abstractNum></w:numbering>",
+        "word/settings.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><w:settings xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:compat/><w:doNotTrackFormatting/></w:settings>",
+        "word/customXml/item1.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><c:payload xmlns:c=\"urn:issue99:custom\"><c:opaque>opaque content</c:opaque></c:payload>",
+        "word/unknown.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><u:customUnsupported xmlns:u=\"urn:issue99:unknown\"><u:data>unknown</u:data></u:customUnsupported>",
+        "word/media/image1.png": {"encoding": "base64", "value": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="},
+        "word/embeddings/oleObject1.bin": {"encoding": "base64", "value": "AAECAwQFBgcICQ=="}
+      },
+      "expected": {
+        "parts": [
+          {"name": "[Content_Types].xml", "contentType": "application/xml"},
+          {"name": "_rels/.rels", "contentType": "application/vnd.openxmlformats-package.relationships+xml"},
+          {"name": "word/_rels/document.xml.rels", "contentType": "application/vnd.openxmlformats-package.relationships+xml"},
+          {"name": "word/_rels/styles.xml.rels", "contentType": "application/vnd.openxmlformats-package.relationships+xml"},
+          {"name": "word/comments.xml", "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml"},
+          {"name": "word/customXml/item1.xml", "contentType": "application/xml"},
+          {"name": "word/document.xml", "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"},
+          {"name": "word/embeddings/oleObject1.bin", "contentType": "application/vnd.openxmlformats-officedocument.oleObject"},
+          {"name": "word/endnotes.xml", "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml"},
+          {"name": "word/footer1.xml", "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"},
+          {"name": "word/footnotes.xml", "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"},
+          {"name": "word/header1.xml", "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"},
+          {"name": "word/media/image1.png", "contentType": "image/png"},
+          {"name": "word/numbering.xml", "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"},
+          {"name": "word/settings.xml", "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"},
+          {"name": "word/styles.xml", "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"},
+          {"name": "word/theme/theme1.xml", "contentType": "application/vnd.openxmlformats-officedocument.theme+xml"},
+          {"name": "word/unknown.xml", "contentType": "application/xml"}
+        ],
+        "relationships": [
+          {"source": "[package]", "id": "rIdDoc", "type": "officeDocument", "target": "word/document.xml", "resolvedTarget": "word/document.xml", "targetKind": "part", "targetMode": "Internal"},
+          {"source": "word/document.xml", "id": "rIdStyles", "type": "styles", "target": "styles.xml", "resolvedTarget": "word/styles.xml", "targetKind": "part", "targetMode": "Internal"},
+          {"source": "word/document.xml", "id": "rIdHeader", "type": "header", "target": "header1.xml", "resolvedTarget": "word/header1.xml", "targetKind": "part", "targetMode": "Internal"},
+          {"source": "word/document.xml", "id": "rIdFooter", "type": "footer", "target": "footer1.xml", "resolvedTarget": "word/footer1.xml", "targetKind": "part", "targetMode": "Internal"},
+          {"source": "word/document.xml", "id": "rIdFootnotes", "type": "footnotes", "target": "footnotes.xml", "resolvedTarget": "word/footnotes.xml", "targetKind": "part", "targetMode": "Internal"},
+          {"source": "word/document.xml", "id": "rIdEndnotes", "type": "endnotes", "target": "endnotes.xml", "resolvedTarget": "word/endnotes.xml", "targetKind": "part", "targetMode": "Internal"},
+          {"source": "word/document.xml", "id": "rIdComments", "type": "comments", "target": "comments.xml", "resolvedTarget": "word/comments.xml", "targetKind": "part", "targetMode": "Internal"},
+          {"source": "word/document.xml", "id": "rIdImage", "type": "image", "target": "media/image1.png", "resolvedTarget": "word/media/image1.png", "targetKind": "part", "targetMode": "Internal"},
+          {"source": "word/document.xml", "id": "rIdHyper", "type": "hyperlink", "target": "https://example.invalid/issue99/nested", "resolvedTarget": "https://example.invalid/issue99/nested", "targetKind": "external", "targetMode": "External"},
+          {"source": "word/document.xml", "id": "rIdMissing", "type": "missing", "target": "missing/ghost.xml", "resolvedTarget": "word/missing/ghost.xml", "targetKind": "missing", "targetMode": "Internal"},
+          {"source": "word/document.xml", "id": "rIdCustom", "type": "customXml", "target": "customXml/item1.xml", "resolvedTarget": "word/customXml/item1.xml", "targetKind": "part", "targetMode": "Internal"},
+          {"source": "word/document.xml", "id": "rIdUnknown", "type": "unknown", "target": "unknown.xml", "resolvedTarget": "word/unknown.xml", "targetKind": "part", "targetMode": "Internal"},
+          {"source": "word/document.xml", "id": "rIdOle", "type": "oleObject", "target": "embeddings/oleObject1.bin", "resolvedTarget": "word/embeddings/oleObject1.bin", "targetKind": "part", "targetMode": "Internal"},
+          {"source": "word/document.xml", "id": "rIdSettings", "type": "settings", "target": "settings.xml", "resolvedTarget": "word/settings.xml", "targetKind": "part", "targetMode": "Internal"},
+          {"source": "word/document.xml", "id": "rIdNumbering", "type": "numbering", "target": "numbering.xml", "resolvedTarget": "word/numbering.xml", "targetKind": "part", "targetMode": "Internal"},
+          {"source": "word/styles.xml", "id": "rIdTheme", "type": "theme", "target": "theme/theme1.xml", "resolvedTarget": "word/theme/theme1.xml", "targetKind": "part", "targetMode": "Internal"}
+        ],
+        "hyperlinks": [
+          {"hyperlinkId": "hyperlink-1", "relationshipId": "rIdHyper", "destination": "https://example.invalid/issue99/nested", "displayText": "Click\t\nHere", "runCount": 3, "tokens": ["Click", "\t", "\n", "Here"]}
+        ],
+        "drawings": [
+          {"drawingId": "drawing-1", "container": "run", "kind": "image", "anchor": "anchor", "extent": {"cx": "914400", "cy": "457200"}, "resource": "word/media/image1.png", "transform": {"off": {"x": "10", "y": "20"}, "ext": {"cx": "914400", "cy": "457200"}}}
+        ],
+        "tables": [
+          {"tableId": "table-1", "gridColumns": ["1000", "1000", "1000"], "rows": [
+            {"rowId": "table-1-row-1", "cells": [
+              {"cellId": "table-1-row-1-cell-1", "gridSpan": 2, "vMerge": "none", "text": "Outer spanNested ANested B", "nestedTableIds": ["table-2"]},
+              {"cellId": "table-1-row-1-cell-2", "gridSpan": 1, "vMerge": "none", "text": "Outer third", "nestedTableIds": []}
+            ]},
+            {"rowId": "table-1-row-2", "cells": [
+              {"cellId": "table-1-row-2-cell-1", "gridSpan": 1, "vMerge": "restart", "text": "Merge start", "nestedTableIds": []},
+              {"cellId": "table-1-row-2-cell-2", "gridSpan": 1, "vMerge": "none", "text": "R2C2", "nestedTableIds": []}
+            ]},
+            {"rowId": "table-1-row-3", "cells": [
+              {"cellId": "table-1-row-3-cell-1", "gridSpan": 1, "vMerge": "continue", "text": "Merge follower", "nestedTableIds": []},
+              {"cellId": "table-1-row-3-cell-2", "gridSpan": 1, "vMerge": "none", "text": "R3C2", "nestedTableIds": []}
+            ]}
+          ]},
+          {"tableId": "table-2", "gridColumns": ["800", "800"], "rows": [
+            {"rowId": "table-2-row-1", "cells": [
+              {"cellId": "table-2-row-1-cell-1", "gridSpan": 1, "vMerge": "none", "text": "Nested A", "nestedTableIds": []},
+              {"cellId": "table-2-row-1-cell-2", "gridSpan": 1, "vMerge": "none", "text": "Nested B", "nestedTableIds": []}
+            ]}
+          ]}
+        ],
+        "fields": [
+          {"fieldId": "field-1", "depth": 0, "events": [{"type": "begin", "depth": 0}, {"type": "instruction", "depth": 0, "value": "IF 1 = 1"}, {"type": "instruction", "depth": 0, "value": "PAGE"}, {"type": "result", "depth": 0, "value": "7"}, {"type": "separate", "depth": 0}, {"type": "result", "depth": 0, "value": "7"}, {"type": "end", "depth": 0}]},
+          {"fieldId": "field-2", "depth": 1, "events": [{"type": "begin", "depth": 1}, {"type": "instruction", "depth": 1, "value": "PAGE"}, {"type": "separate", "depth": 1}, {"type": "result", "depth": 1, "value": "7"}, {"type": "end", "depth": 1}]}
+        ],
+        "stories": [
+          {"storyId": "comments", "kind": "comment", "part": "word/comments.xml", "owner": "word/document.xml", "rootTexts": ["Comment owned"], "bodyElementCounts": {"comment": 1}, "items": [{"id": "7", "texts": ["Comment owned"], "paragraphCount": 1}]},
+          {"storyId": "endnotes", "kind": "endnote", "part": "word/endnotes.xml", "owner": "word/document.xml", "rootTexts": ["Endnote owned"], "bodyElementCounts": {"endnote": 1}, "items": [{"id": "1", "texts": ["Endnote owned"], "paragraphCount": 1}]},
+          {"storyId": "footer1", "kind": "footer", "part": "word/footer1.xml", "owner": "word/document.xml", "rootTexts": ["Footer owned"], "bodyElementCounts": {"p": 1}, "items": [{"id": "root", "texts": ["Footer owned"], "paragraphCount": 1}]},
+          {"storyId": "footnotes", "kind": "footnote", "part": "word/footnotes.xml", "owner": "word/document.xml", "rootTexts": ["Footnote owned"], "bodyElementCounts": {"footnote": 1}, "items": [{"id": "1", "texts": ["Footnote owned"], "paragraphCount": 1}]},
+          {"storyId": "header1", "kind": "header", "part": "word/header1.xml", "owner": "word/document.xml", "rootTexts": ["Header owned"], "bodyElementCounts": {"p": 1, "tbl": 1}, "items": [{"id": "root", "texts": ["Header owned", "Header table"], "paragraphCount": 2}]}
+        ],
+        "sections": [
+          {"sectionId": "section-1", "pgSz": {"w": "16838", "h": "11906", "orient": "landscape"}, "pgMar": {"top": "1440", "right": "1440", "bottom": "1440", "left": "1440", "header": "720", "footer": "720", "gutter": "0"}, "columns": {"num": "2", "space": "720"}, "lineNumbering": {"countBy": "1"}},
+          {"sectionId": "section-2", "pgSz": {"w": "11906", "h": "16838", "orient": "portrait"}, "pgMar": {"top": "1440", "right": "1440", "bottom": "1440", "left": "1440", "header": "720", "footer": "720", "gutter": "0"}, "columns": {"num": "1", "space": "720"}, "lineNumbering": {}}
+        ],
+        "styles": [
+          {"styleId": "docDefaults", "basedOn": "", "font": "Aptos", "size": "22", "themeColor": "", "conditional": []},
+          {"styleId": "BodyText", "basedOn": "", "font": "Aptos", "size": "24", "themeColor": "accent1", "color": "", "conditional": []},
+          {"styleId": "Hyperlink", "basedOn": "BodyText", "font": "", "size": "", "themeColor": "", "color": "", "conditional": []},
+          {"styleId": "TableGrid", "basedOn": "", "font": "", "size": "", "themeColor": "", "color": "", "conditional": ["firstRow", "lastRow"]}
+        ],
+        "unsupported": [
+          {"token": "unknownBlock", "part": "word/document.xml", "disposition": "diagnose"},
+          {"token": "attribute:foo", "part": "word/document.xml", "disposition": "diagnose"},
+          {"token": "AlternateContent", "part": "word/document.xml", "disposition": "diagnose"},
+          {"token": "AlternateContent:Choice", "part": "word/document.xml", "disposition": "diagnose"},
+          {"token": "customChoice", "part": "word/document.xml", "disposition": "diagnose"},
+          {"token": "AlternateContent:Fallback", "part": "word/document.xml", "disposition": "diagnose"},
+          {"token": "customUnsupported", "part": "word/unknown.xml", "disposition": "diagnose"}
+        ],
+        "resources": [
+          {"target": "word/embeddings/oleObject1.bin", "kind": "embedding", "availability": "available"},
+          {"target": "https://example.invalid/issue99/nested", "kind": "external", "availability": "unavailable"},
+          {"target": "word/media/image1.png", "kind": "media", "availability": "available"},
+          {"target": "word/missing/ghost.xml", "kind": "missing", "availability": "unavailable"}
+        ],
+        "completionClaims": [{"requiredCompletionStatus": "not-complete", "falseCompleteCount": 0}]
+      },
+      "cases": [
+        {"caseId": "opc-parts-and-relationships", "category": "profile", "projection": "parts"},
+        {"caseId": "nested-drawing-in-run", "category": "structure", "projection": "drawings"},
+        {"caseId": "nested-hyperlink-content", "category": "structure", "projection": "hyperlinks"},
+        {"caseId": "gridspan-vmerge-nested-table", "category": "structure", "projection": "tables"},
+        {"caseId": "complex-nested-field", "category": "structure", "projection": "fields"},
+        {"caseId": "story-owner-anchor", "category": "story", "projection": "stories"},
+        {"caseId": "section-page-properties", "category": "style-layout", "projection": "sections"},
+        {"caseId": "missing-external-relationship", "category": "closure", "projection": "relationships"},
+        {"caseId": "unknown-alternatecontent-accounting", "category": "accounting", "projection": "unsupported"},
+        {"caseId": "style-cascade-and-conditional-table", "category": "style-layout", "projection": "styles"},
+        {"caseId": "resource-availability-closure", "category": "resource", "projection": "resources"}
+      ]
+    },
+    {
+      "fixtureId": "docx-issue99-hostile-dtd",
+      "format": "docx",
+      "producer": "synthetic-security-focused",
+      "sourceKind": "synthetic/standards-focused hostile OPC/XML",
+      "provenance": "authored malformed/hostile package for bounded parser policy; not a real producer export",
+      "payloadKind": "zip",
+      "parts": {
+        "[Content_Types].xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/></Types>",
+        "_rels/.rels": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rIdDoc\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"word/document.xml\"/></Relationships>",
+        "word/document.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><!DOCTYPE w:document [<!ENTITY bomb \"blocked\">]><w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body><w:p><w:r><w:t>&bomb;</w:t></w:r></w:p></w:body></w:document>"
+      },
+      "expected": {
+        "parts": [
+          {"name": "[Content_Types].xml", "contentType": "application/xml"},
+          {"name": "_rels/.rels", "contentType": "application/vnd.openxmlformats-package.relationships+xml"},
+          {"name": "word/document.xml", "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"}
+        ],
+        "relationships": [
+          {"source": "[package]", "id": "rIdDoc", "type": "officeDocument", "target": "word/document.xml", "resolvedTarget": "word/document.xml", "targetKind": "part", "targetMode": "Internal"}
+        ],
+        "hyperlinks": [],
+        "drawings": [],
+        "tables": [],
+        "fields": [],
+        "stories": [],
+        "sections": [],
+        "styles": [],
+        "unsupported": [],
+        "resources": [],
+        "completionClaims": [{"requiredCompletionStatus": "not-complete", "falseCompleteCount": 0}]
+      },
+      "cases": [
+        {"caseId": "hostile-dtd-rejected", "category": "security", "projection": "completionClaims"}
+      ]
+    }
+  ],
+  "securityCases": [
+    {"caseId": "resource-security-limits", "fixtureId": "docx-issue99-standards-rich", "limits": {"max-zip-entries": 4}, "expectedOutcome": "failed"},
+    {"caseId": "zip-entry-limit", "fixtureId": "docx-issue99-standards-rich", "limits": {"max-zip-entries": 4}, "expectedOutcome": "failed"},
+    {"caseId": "xml-part-limit", "fixtureId": "docx-issue99-standards-rich", "limits": {"max-xml-parts": 4}, "expectedOutcome": "failed"},
+    {"caseId": "xml-depth-limit", "fixtureId": "docx-issue99-standards-rich", "limits": {"max-xml-depth": 4}, "expectedOutcome": "failed"},
+    {"caseId": "xml-node-limit", "fixtureId": "docx-issue99-standards-rich", "limits": {"max-xml-nodes": 5}, "expectedOutcome": "failed"},
+    {"caseId": "xml-text-limit", "fixtureId": "docx-issue99-standards-rich", "limits": {"max-text-chars": 24}, "expectedOutcome": "failed"},
+    {"caseId": "zip-expansion-limit", "fixtureId": "docx-issue99-standards-rich", "limits": {"max-zip-uncompressed-bytes": 128}, "expectedOutcome": "failed"},
+    {"caseId": "zip-entry-size-limit", "fixtureId": "docx-issue99-standards-rich", "limits": {"max-zip-entry-bytes": 128}, "expectedOutcome": "failed"},
+    {"caseId": "input-size-limit", "fixtureId": "docx-issue99-standards-rich", "limits": {"max-input-bytes": 128}, "expectedOutcome": "failed"}
+  ],
+  "negativeCases": [
+    {"caseId": "relation-target-reassigned", "fixtureId": "docx-issue99-standards-rich", "projection": "relationships", "expectedDefectCode": "FABRICATED-RELATION-TARGET", "mutation": {"op": "set", "selector": {"id": "rIdMissing"}, "path": "resolvedTarget", "value": "word/fabricated.xml"}},
+    {"caseId": "missing-target-preserved-available", "fixtureId": "docx-issue99-standards-rich", "projection": "relationships", "expectedDefectCode": "MISSING-TARGET-AVAILABLE", "mutation": {"op": "set", "selector": {"id": "rIdMissing"}, "path": "targetKind", "value": "part"}},
+    {"caseId": "external-target-available", "fixtureId": "docx-issue99-standards-rich", "projection": "resources", "expectedDefectCode": "EXTERNAL-RESOURCE-AVAILABLE", "mutation": {"op": "set", "selector": {"kind": "external"}, "path": "availability", "value": "available"}},
+    {"caseId": "hyperlink-content-traversal-disabled", "fixtureId": "docx-issue99-standards-rich", "projection": "hyperlinks", "expectedDefectCode": "HYPERLINK-DISPLAY-CONTENT-LOSS", "mutation": {"op": "set", "selector": {"hyperlinkId": "hyperlink-1"}, "path": "displayText", "value": "ClickHere"}},
+    {"caseId": "anchor-deleted", "fixtureId": "docx-issue99-standards-rich", "projection": "stories", "expectedDefectCode": "STORY-ANCHOR-LOSS", "mutation": {"op": "set", "selector": {"storyId": "comments"}, "path": "items", "value": []}},
+    {"caseId": "gridspan-dropped", "fixtureId": "docx-issue99-standards-rich", "projection": "tables", "expectedDefectCode": "GRIDSPAN-LOSS", "mutation": {"op": "set", "selector": {"tableId": "table-1"}, "path": "rows.0.cells.0.gridSpan", "value": 1}},
+    {"caseId": "vmerge-follower-promoted", "fixtureId": "docx-issue99-standards-rich", "projection": "tables", "expectedDefectCode": "VMERGE-FOLLOWER-MASTER", "mutation": {"op": "set", "selector": {"tableId": "table-1"}, "path": "rows.2.cells.0.vMerge", "value": "restart"}},
+    {"caseId": "complex-field-range-dropped", "fixtureId": "docx-issue99-standards-rich", "projection": "fields", "expectedDefectCode": "COMPLEX-FIELD-RANGE-LOSS", "mutation": {"op": "delete", "selector": {"fieldId": "field-1"}, "path": "events"}},
+    {"caseId": "section-layout-dropped", "fixtureId": "docx-issue99-standards-rich", "projection": "sections", "expectedDefectCode": "SECTION-PAGE-PROPERTY-LOSS", "mutation": {"op": "delete", "selector": {"sectionId": "section-1"}, "path": "pgSz"}},
+    {"caseId": "unknown-as-preserved", "fixtureId": "docx-issue99-standards-rich", "projection": "unsupported", "expectedDefectCode": "UNKNOWN-FALSE-PRESERVE", "mutation": {"op": "set", "selector": {"token": "unknownBlock"}, "path": "disposition", "value": "preserved"}},
+    {"caseId": "alternatecontent-branch-omitted", "fixtureId": "docx-issue99-standards-rich", "projection": "unsupported", "expectedDefectCode": "ALTERNATECONTENT-BRANCH-LOSS", "mutation": {"op": "delete", "selector": {"token": "AlternateContent:Choice"}, "path": "token"}},
+    {"caseId": "resource-limit-ignored", "fixtureId": "docx-issue99-standards-rich", "projection": "resources", "expectedDefectCode": "RESOURCE-LIMIT-IGNORED", "mutation": {"op": "set", "selector": {"kind": "missing"}, "path": "availability", "value": "available"}},
+    {"caseId": "false-complete-claim", "fixtureId": "docx-issue99-standards-rich", "projection": "completionClaims", "expectedDefectCode": "FALSE-COMPLETE", "mutation": {"op": "set", "selector": {"requiredCompletionStatus": "not-complete"}, "path": "requiredCompletionStatus", "value": "complete"}}
+  ]
+}

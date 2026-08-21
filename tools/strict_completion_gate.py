@@ -170,11 +170,11 @@ def run() -> dict[str, Any]:
 
 
 def run_bundle(manifest: Path, *, allow_dirty: bool = False) -> dict[str, Any]:
-    """Run the commit-bound Evidence validator as a strict completion gate.
+    """Run the commit-bound Evidence validator for every recovery child.
 
-    The legacy phase-2 gate remains available through ``run()``.  A bundle
-    path opts into the newer #88 contract and makes the evidence validator
-    the authoritative result for that invocation.
+    The old phase-2 report is intentionally not a release result.  A bundle
+    invocation is the only strict completion path and its issue scope is the
+    full #88--#105 recovery contract, not just #88.
     """
 
     try:
@@ -183,27 +183,108 @@ def run_bundle(manifest: Path, *, allow_dirty: bool = False) -> dict[str, Any]:
         from tools.validate_qualification_bundle import validate_bundle
 
     validation = validate_bundle(manifest, repo_root=ROOT, allow_dirty=allow_dirty)
-    blockers = validation.get("diagnostics", [])
+    blockers = list(validation.get("diagnostics", []))
+    if validation.get("status") == "passed":
+        try:
+            try:
+                from release_attestation import validate_candidate_bundle
+            except ImportError:  # pragma: no cover
+                from tools.release_attestation import validate_candidate_bundle
+            validate_candidate_bundle(manifest, allow_dirty=allow_dirty)
+        except Exception as exc:
+            blockers.append({"code": getattr(exc, "code", "CANDIDATE_BUNDLE_INVALID"), "detail": str(exc)})
+    issues = list(range(88, 106))
     return {
         "schema": "fdir/strict-completion-gate-report",
-        "version": "1.1.0",
-        "status": "passed" if validation.get("status") == "passed" else "blocked",
-        "issues": [88],
+        "version": "1.2.0",
+        "status": "passed" if validation.get("status") == "passed" and not blockers else "blocked",
+        "mode": "candidate",
+        "releaseReady": False,
+        "issues": issues,
         "blockers": blockers,
-        "reportsChecked": ["qualification-bundle"],
+        "reportsChecked": ["qualification-bundle", *[f"issue-{issue}" for issue in issues]],
         "bundleValidation": validation,
     }
 
 
-def main() -> int:
+def run_attestation(attestation: Path, *, bundle: Path | None = None) -> dict[str, Any]:
+    """Validate a final attestation without re-entering the legacy gate."""
+
+    try:
+        try:
+            from release_attestation import load_and_validate_attestation
+        except ImportError:  # pragma: no cover
+            from tools.release_attestation import load_and_validate_attestation
+        actions = os.environ.get("GITHUB_ACTIONS", "").casefold() == "true"
+        expected_attempt: Any = os.environ.get("GITHUB_RUN_ATTEMPT") if actions else None
+        if isinstance(expected_attempt, str) and expected_attempt.isdigit():
+            expected_attempt = int(expected_attempt)
+        result = load_and_validate_attestation(
+            attestation,
+            bundle_manifest_path=bundle,
+            expected_run_id=os.environ.get("GITHUB_RUN_ID") if actions else None,
+            expected_attempt=expected_attempt,
+        )
+    except Exception as exc:
+        return {
+            "schema": "fdir/strict-completion-gate-report",
+            "version": "1.2.0",
+            "status": "blocked",
+            "mode": "final-attestation",
+            "releaseReady": False,
+            "issues": list(range(88, 106)),
+            "blockers": [{"code": getattr(exc, "code", "ATTESTATION_INVALID"), "detail": str(exc)}],
+            "reportsChecked": ["final-attestation"],
+        }
+    return {
+        "schema": "fdir/strict-completion-gate-report",
+        "version": "1.2.0",
+        "status": "passed",
+        "mode": "final-attestation",
+        "releaseReady": True,
+        "issues": list(range(88, 106)),
+        "blockers": [],
+        "reportsChecked": ["qualification-bundle", "final-attestation", *[f"issue-{issue}" for issue in range(88, 106)]],
+        "attestation": result,
+    }
+
+
+def _legacy_path_report() -> dict[str, Any]:
+    """Return a non-release report instead of allowing the old path to pass."""
+
+    return {
+        "schema": "fdir/strict-completion-gate-report",
+        "version": "1.2.0",
+        "status": "blocked",
+        "mode": "smoke",
+        "releaseReady": False,
+        "issues": list(range(88, 106)),
+        "blockers": [{
+            "code": "LEGACY_COMPLETION_PATH_DISABLED",
+            "detail": "strict completion release qualification requires --bundle or --attestation; the legacy report path is development-only",
+        }],
+        "reportsChecked": [],
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bundle", type=Path, help="validate a commit-bound qualification manifest")
+    parser.add_argument("--attestation", type=Path, help="validate a final release attestation")
+    parser.add_argument("--mode", choices=("smoke", "release"), default=None)
     parser.add_argument("--allow-dirty", action="store_true", help="permit a dirty bundle for local development")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     try:
-        report = run_bundle(args.bundle, allow_dirty=args.allow_dirty) if args.bundle else run()
+        if args.bundle is not None:
+            report = run_bundle(args.bundle, allow_dirty=args.allow_dirty)
+            if args.attestation is not None and report.get("status") == "passed":
+                report = run_attestation(args.attestation, bundle=args.bundle)
+        elif args.attestation is not None:
+            report = run_attestation(args.attestation)
+        else:
+            report = _legacy_path_report()
     except Exception as exc:
-        report = {"schema": "fdir/strict-completion-gate-report", "version": "1.0.0", "status": "blocked", "blockers": [{"code": "GATE_ERROR", "detail": f"{type(exc).__name__}: {exc}"}]}
+        report = {"schema": "fdir/strict-completion-gate-report", "version": "1.2.0", "status": "blocked", "mode": "release" if args.mode == "release" else "smoke", "releaseReady": False, "issues": list(range(88, 106)), "blockers": [{"code": "GATE_ERROR", "detail": f"{type(exc).__name__}: {exc}"}]}
     print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
     return 0 if report.get("status") == "passed" else 1
 

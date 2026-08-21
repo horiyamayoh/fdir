@@ -21,6 +21,7 @@ issue's full independent qualification reports.
 from __future__ import annotations
 
 import argparse
+import base64
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -42,12 +43,14 @@ DEFAULT_QUERY_CONTRACT_PATH = ROOT / "machine" / "query-contract.json"
 DEFAULT_CAPABILITY_PROFILE_PATH = ROOT / "machine" / "capability-profile.json"
 
 INDEX_SCHEMA = "fdir/independent-sqlite-index"
-INDEX_VERSION = "1.0.0"
-SQLITE_USER_VERSION = 1
+INDEX_VERSION = "1.1.0"
+SQLITE_USER_VERSION = 2
 CANONICALIZATION = "FDIR-IIDX-C14N-1"
 BUILDER_NAME = "fdir.independent_index"
-BUILDER_VERSION = "1.0.0"
+BUILDER_VERSION = "1.1.0"
 MANIFEST_SUFFIX = ".manifest.json"
+DOCUMENT_COLLECTION = "__document__"
+_MISSING = object()
 
 TABLES = {"metadata", "entities", "fields", "reverse_references"}
 MANIFEST_CORE_KEYS = {
@@ -56,12 +59,14 @@ MANIFEST_CORE_KEYS = {
     "canonicalization",
     "source",
     "bindings",
+    "contractVersions",
     "capabilityProfileIds",
     "applicableCapabilityProfileIds",
     "indexSchemaVersion",
     "builder",
     "counts",
     "integrity",
+    "querySurface",
     "build",
 }
 MANIFEST_KEYS = MANIFEST_CORE_KEYS | {"databaseSha256", "integrityChecksum"}
@@ -101,6 +106,25 @@ def _canonical_json(value: Any) -> str:
         raise IndependentIndexError(f"value is not canonical JSON: {exc}") from exc
 
 
+def _encode_query_cursor(value: dict[str, Any]) -> str:
+    encoded = _canonical_json(value).encode("utf-8")
+    return base64.urlsafe_b64encode(encoded).decode("ascii").rstrip("=")
+
+
+def _decode_query_cursor(value: str) -> dict[str, Any]:
+    if not isinstance(value, str) or not value:
+        raise IndependentIndexError("query cursor must be a non-empty string")
+    try:
+        padding = "=" * (-len(value) % 4)
+        decoded = base64.urlsafe_b64decode((value + padding).encode("ascii"))
+        result = json.loads(decoded.decode("utf-8"), object_pairs_hook=_unique_object_pairs, parse_constant=_reject_json_constant)
+    except (ValueError, UnicodeError, json.JSONDecodeError) as exc:
+        raise IndependentIndexError("query cursor is malformed") from exc
+    if not isinstance(result, dict):
+        raise IndependentIndexError("query cursor is not an object")
+    return result
+
+
 def _sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
@@ -132,6 +156,187 @@ def _load_json(path: Path, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise IndependentIndexError(f"{label} must be a JSON object: {path}")
     return value
+
+
+def _pointer_segments(pointer: str) -> list[str]:
+    if pointer in {"", "/"}:
+        return []
+    if not isinstance(pointer, str) or not pointer.startswith("/"):
+        raise IndependentIndexError("field pointer must be empty or start with '/'")
+    return pointer[1:].split("/")
+
+
+def _pointer_matches(template: str, pointer: str) -> bool:
+    return _pointer_segments_match(_pointer_segments(template), _pointer_segments(pointer))
+
+
+def _pointer_segments_match(template_segments: tuple[str, ...] | list[str], pointer_segments: tuple[str, ...] | list[str]) -> bool:
+    index = 0
+    for segment in template_segments:
+        if segment == "**":
+            return index <= len(pointer_segments)
+        if index >= len(pointer_segments):
+            return False
+        if segment != "*" and segment != pointer_segments[index]:
+            return False
+        index += 1
+    return index == len(pointer_segments)
+
+
+def _extension_identity_matches(
+    field: dict[str, Any],
+    extension_type: str | None,
+    extension_namespace: str | None,
+    extension_version: str | None,
+) -> bool:
+    metadata = field.get("extension")
+    if not isinstance(metadata, dict):
+        return True
+    return (
+        (extension_type is None or metadata.get("type") == extension_type)
+        and (extension_namespace is None or metadata.get("namespace") == extension_namespace)
+        and (extension_version is None or metadata.get("schemaVersion") == extension_version)
+    )
+
+
+class _IndexedFieldRegistry(dict[str, list[dict[str, Any]]]):
+    """Dictionary-compatible field registry with constant-time path buckets."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.all_candidates: dict[str, list[tuple[int, tuple[str, ...], dict[str, Any]]]] = {}
+        self.by_first: dict[tuple[str, str], list[tuple[int, tuple[str, ...], dict[str, Any]]]] = {}
+        self.exact: dict[tuple[str, str], list[tuple[int, tuple[str, ...], dict[str, Any]]]] = {}
+        self.wildcards: dict[tuple[str, str, int | None], list[tuple[int, tuple[str, ...], dict[str, Any]]]] = {}
+
+
+def _query_contract_sources_valid(query_contract: dict[str, Any], root: Path) -> None:
+    generated = query_contract.get("generated")
+    sources = generated.get("sources") if isinstance(generated, dict) else None
+    if not isinstance(sources, list) or not sources:
+        raise IndependentIndexError("query contract has no generated source bindings")
+    for source in sources:
+        if not isinstance(source, dict) or not isinstance(source.get("path"), str) or not isinstance(source.get("sha256"), str):
+            raise IndependentIndexError("query contract source binding is malformed")
+        path = (root / source["path"]).resolve()
+        try:
+            path.relative_to(root.resolve())
+        except ValueError as exc:
+            raise IndependentIndexError("query contract source escapes repository root") from exc
+        if _file_sha256(path) != source["sha256"]:
+            raise IndependentIndexError(f"query contract source is stale: {source['path']}")
+
+
+def _query_field_registry(query_contract: dict[str, Any]) -> _IndexedFieldRegistry:
+    groups = (
+        query_contract.get("fieldPaths"),
+        query_contract.get("documentFieldPaths"),
+        query_contract.get("extensionFieldPaths"),
+    )
+    if not all(isinstance(group, list) for group in groups):
+        raise IndependentIndexError("query contract field registry is incomplete")
+    total = sum(len(group) for group in groups if isinstance(group, list))
+    if query_contract.get("fieldPathCount") != total:
+        raise IndependentIndexError("query contract field path count is inconsistent")
+    result = _IndexedFieldRegistry()
+    seen: set[str] = set()
+    ordinal = 0
+    for group in groups:
+        assert isinstance(group, list)
+        for field in group:
+            if not isinstance(field, dict) or not isinstance(field.get("fieldId"), str) or not isinstance(field.get("ownerCollection"), str) or not isinstance(field.get("path"), str):
+                raise IndependentIndexError("query contract contains a malformed field")
+            if field["fieldId"] in seen:
+                raise IndependentIndexError(f"query contract contains duplicate field id: {field['fieldId']}")
+            seen.add(field["fieldId"])
+            collection = field["ownerCollection"]
+            path = str(field["path"])
+            result.setdefault(collection, []).append(field)
+            segments = tuple(_pointer_segments(path))
+            candidate = (ordinal, segments, field)
+            result.all_candidates.setdefault(collection, []).append(candidate)
+            first = segments[0] if segments else ""
+            result.by_first.setdefault((collection, first), []).append(candidate)
+            if "*" not in segments and "**" not in segments:
+                result.exact.setdefault((collection, path), []).append(candidate)
+            else:
+                length = None if "**" in segments else len(segments)
+                result.wildcards.setdefault((collection, first, length), []).append(candidate)
+            ordinal += 1
+    return result
+
+
+def _registered_query_field(
+    registry: dict[str, list[dict[str, Any]]],
+    collection: str,
+    pointer: str,
+    extension_type: str | None = None,
+    extension_namespace: str | None = None,
+    extension_version: str | None = None,
+) -> dict[str, Any] | None:
+    if pointer in {"", "/"}:
+        return None
+    if not isinstance(registry, _IndexedFieldRegistry):
+        return next(
+            (
+                field for field in registry.get(collection, [])
+                if _extension_identity_matches(field, extension_type, extension_namespace, extension_version)
+                and _pointer_matches(str(field["path"]), pointer)
+            ),
+            None,
+        )
+    pointer_segments = tuple(_pointer_segments(pointer))
+    first = pointer_segments[0] if pointer_segments else ""
+    candidates = list(registry.exact.get((collection, pointer), ()))
+    for template_first in (first, "*", "**"):
+        for length in (len(pointer_segments), None):
+            candidates.extend(registry.wildcards.get((collection, template_first, length), ()))
+    for _, template_segments, field in sorted(candidates, key=lambda item: item[0]):
+        if _extension_identity_matches(field, extension_type, extension_namespace, extension_version) and _pointer_segments_match(template_segments, pointer_segments):
+            return field
+    return None
+
+
+def _matching_query_fields(
+    registry: dict[str, list[dict[str, Any]]],
+    collection: str,
+    pointer: str,
+    extension_type: str | None = None,
+    extension_namespace: str | None = None,
+    extension_version: str | None = None,
+) -> list[dict[str, Any]]:
+    """Return query-template matches without scanning unrelated fields."""
+
+    if not isinstance(registry, _IndexedFieldRegistry):
+        return [
+            field for field in registry.get(collection, [])
+            if _extension_identity_matches(field, extension_type, extension_namespace, extension_version)
+            and (_pointer_matches(str(field["path"]), pointer) or _pointer_matches(pointer, str(field["path"])))
+        ]
+    pointer_segments = tuple(_pointer_segments(pointer))
+    first = pointer_segments[0] if pointer_segments else ""
+    if "*" in pointer_segments or "**" in pointer_segments:
+        if first in {"*", "**"}:
+            candidates = list(registry.all_candidates.get(collection, ()))
+        else:
+            candidates = []
+            for candidate_first in (first, "*", "**"):
+                candidates.extend(registry.by_first.get((collection, candidate_first), ()))
+    else:
+        candidates = list(registry.exact.get((collection, pointer), ()))
+        for candidate_first in (first, "*", "**"):
+            for length in (len(pointer_segments), None):
+                candidates.extend(registry.wildcards.get((collection, candidate_first, length), ()))
+    result: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for _, template_segments, field in sorted(candidates, key=lambda item: item[0]):
+        field_id = str(field["fieldId"])
+        if field_id in seen or not _extension_identity_matches(field, extension_type, extension_namespace, extension_version):
+            continue
+        if _pointer_segments_match(template_segments, pointer_segments) or _pointer_segments_match(pointer_segments, template_segments):
+            seen.add(field_id)
+            result.append(field)
+    return result
 
 
 def manifest_path_for(index_path: Path) -> Path:
@@ -294,6 +499,21 @@ def _contract_context(
     if not isinstance(extension_registry.get("entries"), list) or not extension_registry["entries"]:
         raise IndependentIndexError("extension registry has no entries")
     query_contract = _load_json(query_contract_path, "query contract")
+    if query_contract.get("schema") != "fdir/document-form-query-contract":
+        raise IndependentIndexError("query contract schema is invalid")
+    _query_contract_sources_valid(query_contract, ROOT)
+    field_registry = _query_field_registry(query_contract)
+    contract_collections = {
+        item.get("name"): item.get("idField")
+        for item in query_contract.get("collections", [])
+        if isinstance(item, dict)
+    }
+    if contract_collections != collection_contract:
+        raise IndependentIndexError("query contract collection mapping is stale or incomplete")
+    if any(collection not in field_registry for collection in collection_contract):
+        raise IndependentIndexError("query contract has no field paths for a model collection")
+    if DOCUMENT_COLLECTION not in field_registry:
+        raise IndependentIndexError("query contract has no document field paths")
     capability_profile = _load_json(capability_profile_path, "capability profile")
     profiles = capability_profile.get("profiles")
     if not isinstance(profiles, list):
@@ -319,6 +539,9 @@ def _contract_context(
         "capabilityProfileSha256": _file_sha256(capability_profile_path),
     }
     contract_metadata = {
+        "profileIds": profile_ids,
+        "applicableProfileIds": [applicable],
+        "bindings": bindings,
         "contractVersions": {
             "irSchema": schema.get("$id", schema.get("version")),
             "model": model_contract.get("version"),
@@ -327,11 +550,15 @@ def _contract_context(
             "queryContract": query_contract.get("version"),
             "capabilityProfile": capability_profile.get("version"),
         },
-        "profileIds": profile_ids,
-        "applicableProfileIds": [applicable],
-        "bindings": bindings,
+        "queryContractVersion": query_contract.get("version"),
+        "registeredFieldPathCount": query_contract.get("fieldPathCount"),
     }
-    return collection_contract, contract_metadata, {"schema": schema, "model": model_contract}
+    return collection_contract, contract_metadata, {
+        "schema": schema,
+        "model": model_contract,
+        "queryContract": query_contract,
+        "fieldRegistry": field_registry,
+    }
 
 
 def _escape_pointer_segment(value: str) -> str:
@@ -365,6 +592,41 @@ def _value_type(value: Any) -> str:
     if isinstance(value, dict):
         return "object"
     raise IndependentIndexError(f"unsupported JSON value type: {type(value).__name__}")
+
+
+def _typed_equal(left: Any, right: Any) -> bool:
+    # Keep bool, integer, and number lanes distinct; Python's ``True == 1``
+    # is not the query contract's typed equality.
+    if _value_type(left) != _value_type(right):
+        return False
+    return left == right
+
+
+def _typed_compare(left: Any, right: Any, operator: str) -> bool:
+    if operator in {"eq", "neq"}:
+        equal = _typed_equal(left, right)
+        return equal if operator == "eq" else not equal
+    if operator in {"lt", "lte", "gt", "gte"}:
+        if _value_type(left) not in {"integer", "number", "string"} or _value_type(right) not in {"integer", "number", "string"}:
+            raise IndependentIndexError(f"{operator} requires comparable scalar values")
+        if _value_type(left) != _value_type(right):
+            raise IndependentIndexError("typed comparison cannot mix scalar lanes")
+        if operator == "lt":
+            return left < right
+        if operator == "lte":
+            return left <= right
+        if operator == "gt":
+            return left > right
+        return left >= right
+    if operator == "prefix":
+        return isinstance(left, str) and isinstance(right, str) and left.startswith(right)
+    if operator == "contains":
+        if isinstance(left, str) and isinstance(right, str):
+            return right in left
+        if isinstance(left, list):
+            return any(_typed_equal(item, right) for item in left)
+        return False
+    raise IndependentIndexError(f"unknown field operator: {operator}")
 
 
 def _known_ids(document: dict[str, Any], collection_contract: dict[str, str]) -> dict[str, str]:
@@ -436,11 +698,13 @@ def _reference_rows_for_entity(
 def _extract_records(
     document: dict[str, Any],
     collection_contract: dict[str, str],
+    field_registry: dict[str, list[dict[str, Any]]],
 ) -> dict[str, list[dict[str, Any]]]:
     entities: list[dict[str, Any]] = []
     fields: list[dict[str, Any]] = []
     references: list[dict[str, Any]] = []
     known_ids = _known_ids(document, collection_contract)
+    known_ids[document["documentId"]] = DOCUMENT_COLLECTION
 
     for collection, identifier_field in collection_contract.items():
         for ordinal, entity in enumerate(document.get(collection, [])):
@@ -456,6 +720,13 @@ def _extract_records(
                 "payloadSha256": _sha256_bytes(payload_json.encode("utf-8")),
             })
             for pointer, value in _walk_fields(entity):
+                extension_type = entity.get("type") if collection == "extensions" and isinstance(entity.get("type"), str) else None
+                extension_namespace = entity.get("namespace") if collection == "extensions" and isinstance(entity.get("namespace"), str) else None
+                extension_version = entity.get("schemaVersion") if collection == "extensions" and isinstance(entity.get("schemaVersion"), str) else None
+                if pointer and _registered_query_field(field_registry, collection, pointer, extension_type, extension_namespace, extension_version) is None:
+                    raise IndependentIndexError(
+                        f"observed field path is absent from query contract: {collection}{pointer}"
+                    )
                 value_json = _canonical_json(value)
                 fields.append({
                     "collection": collection,
@@ -473,6 +744,41 @@ def _extract_records(
                 identifier_field=identifier_field,
                 known_ids=known_ids,
             ))
+
+    document_identifier = str(document["documentId"])
+    document_names = {
+        str(field["path"]).split("/", 2)[1].replace("~1", "/").replace("~0", "~")
+        for field in field_registry.get(DOCUMENT_COLLECTION, [])
+        if isinstance(field, dict) and isinstance(field.get("path"), str) and str(field["path"]).startswith("/")
+    }
+    document_surface = {
+        name: document[name]
+        for name in sorted(document_names)
+        if name in document
+    }
+    document_payload = {"documentId": document_identifier, **document_surface}
+    for pointer, value in _walk_fields(document_payload):
+        if pointer and _registered_query_field(field_registry, DOCUMENT_COLLECTION, pointer) is None:
+            raise IndependentIndexError(
+                f"observed document field path is absent from query contract: {pointer}"
+            )
+        value_json = _canonical_json(value)
+        fields.append({
+            "collection": DOCUMENT_COLLECTION,
+            "entityId": document_identifier,
+            "pointer": pointer,
+            "valueJson": value_json,
+            "valueSha256": _sha256_bytes(value_json.encode("utf-8")),
+            "valueType": _value_type(value),
+            "isNull": 1 if value is None else 0,
+        })
+    references.extend(_reference_rows_for_entity(
+        document_payload,
+        collection=DOCUMENT_COLLECTION,
+        identifier=document_identifier,
+        identifier_field="documentId",
+        known_ids=known_ids,
+    ))
 
     entities.sort(key=lambda row: (row["collection"], row["entityId"]))
     fields.sort(key=lambda row: (row["collection"], row["entityId"], row["pointer"]))
@@ -511,6 +817,8 @@ def _counts(
     return {
         "entities": len(records["entities"]),
         "fields": len(records["fields"]),
+        "documentFields": sum(1 for row in records["fields"] if row["collection"] == DOCUMENT_COLLECTION),
+        "entityFields": sum(1 for row in records["fields"] if row["collection"] != DOCUMENT_COLLECTION),
         "references": len(records["references"]),
         "collections": {
             collection: sum(1 for row in records["entities"] if row["collection"] == collection)
@@ -534,7 +842,7 @@ def _build_context(
     document, source_file_sha256, source_canonical_digest = _load_document(
         source_path, collection_contract
     )
-    _, contract_metadata, _ = _contract_context(
+    _, contract_metadata, contract_artifacts = _contract_context(
         document,
         schema_path=schema_path,
         model_contract_path=model_contract_path,
@@ -543,13 +851,15 @@ def _build_context(
         query_contract_path=query_contract_path,
         capability_profile_path=capability_profile_path,
     )
-    records = _extract_records(document, collection_contract)
+    records = _extract_records(document, collection_contract, contract_artifacts["fieldRegistry"])
     context = {
         "document": document,
         "sourceFileSha256": source_file_sha256,
         "sourceCanonicalDigest": source_canonical_digest,
         "collectionContract": collection_contract,
         "contractMetadata": contract_metadata,
+        "fieldRegistry": contract_artifacts["fieldRegistry"],
+        "queryContract": contract_artifacts["queryContract"],
         "recordsDigest": _records_digest(records),
     }
     return context, collection_contract, contract_metadata, records
@@ -575,12 +885,17 @@ def _manifest_core(
             "canonicalDigest": context["sourceCanonicalDigest"],
         },
         "bindings": contract_metadata["bindings"],
+        "contractVersions": contract_metadata["contractVersions"],
         "capabilityProfileIds": contract_metadata["profileIds"],
         "applicableCapabilityProfileIds": contract_metadata["applicableProfileIds"],
         "indexSchemaVersion": SQLITE_USER_VERSION,
         "builder": {"name": BUILDER_NAME, "version": BUILDER_VERSION},
         "counts": _counts(records, collection_contract),
         "integrity": {"recordsDigest": context["recordsDigest"]},
+        "querySurface": {
+            "contractVersion": contract_metadata["queryContractVersion"],
+            "registeredFieldPathCount": contract_metadata["registeredFieldPathCount"],
+        },
         "build": {
             "timestampUtc": build_timestamp,
             "python": platform.python_version(),
@@ -937,6 +1252,8 @@ def _check_manifest_against_source(
         raise IndependentIndexError("index source binding does not match current IR")
     if core["bindings"] != expected_bindings:
         raise IndependentIndexError("index contract binding does not match current contracts")
+    if core["contractVersions"] != context["contractMetadata"]["contractVersions"]:
+        raise IndependentIndexError("index contract versions are stale")
     if core["capabilityProfileIds"] != context["contractMetadata"]["profileIds"]:
         raise IndependentIndexError("index capability profile registry binding is stale")
     if core["applicableCapabilityProfileIds"] != context["contractMetadata"]["applicableProfileIds"]:
@@ -945,6 +1262,12 @@ def _check_manifest_against_source(
         raise IndependentIndexError("index row counts do not match current IR")
     if core["integrity"] != {"recordsDigest": context["recordsDigest"]}:
         raise IndependentIndexError("index records digest does not match current IR")
+    expected_query_surface = {
+        "contractVersion": context["contractMetadata"]["queryContractVersion"],
+        "registeredFieldPathCount": context["contractMetadata"]["registeredFieldPathCount"],
+    }
+    if core["querySurface"] != expected_query_surface:
+        raise IndependentIndexError("index query surface binding is stale")
     if core["canonicalization"] != CANONICALIZATION:
         raise IndependentIndexError("unsupported index canonicalization")
     if core["builder"] != {"name": BUILDER_NAME, "version": BUILDER_VERSION}:
@@ -962,11 +1285,13 @@ class PersistentIndex:
         index_path: Path,
         manifest: dict[str, Any],
         collection_contract: dict[str, str],
+        field_registry: dict[str, list[dict[str, Any]]],
     ) -> None:
         self._connection = connection
         self.index_path = index_path
         self.manifest = manifest
         self.collection_contract = collection_contract
+        self.field_registry = field_registry
 
     def close(self) -> None:
         self._connection.close()
@@ -984,8 +1309,28 @@ class PersistentIndex:
             )
 
     def _check_collection(self, collection: str) -> None:
-        if collection not in self.collection_contract:
+        if collection != DOCUMENT_COLLECTION and collection not in self.collection_contract:
             raise IndependentIndexError(f"unknown indexed collection: {collection}")
+
+    def _check_field(
+        self,
+        collection: str,
+        pointer: str,
+        extension_type: str | None = None,
+        extension_namespace: str | None = None,
+        extension_version: str | None = None,
+    ) -> None:
+        if pointer in {"", "/"}:
+            raise IndependentIndexError("the entity/document root is not a field path")
+        if _registered_query_field(
+            self.field_registry,
+            collection,
+            pointer,
+            extension_type,
+            extension_namespace,
+            extension_version,
+        ) is None:
+            raise IndependentIndexError(f"field pointer is not registered: {collection}{pointer}")
 
     def list_entities(
         self,
@@ -995,8 +1340,14 @@ class PersistentIndex:
         status: str | None = None,
         offset: int = 0,
         limit: int | None = None,
+        profile: str | None = None,
     ) -> list[dict[str, Any]]:
         self._assert_live()
+        if profile is not None:
+            if profile not in set(self.manifest.get("capabilityProfileIds", [])):
+                raise IndependentIndexError(f"unknown capability profile: {profile}")
+            if profile not in self.manifest.get("applicableCapabilityProfileIds", []):
+                return []
         if collection is not None:
             self._check_collection(collection)
         if offset < 0 or (limit is not None and limit < 0):
@@ -1023,6 +1374,70 @@ class PersistentIndex:
         except sqlite3.Error as exc:
             raise IndependentIndexError(f"entity query failed: {exc}") from exc
 
+    def list_entities_page(
+        self,
+        collection: str,
+        *,
+        kind: str | None = None,
+        status: str | None = None,
+        limit: int = 100,
+        cursor: str | None = None,
+        profile: str | None = None,
+    ) -> dict[str, Any]:
+        """Return a deterministic entity page bound to this index digest."""
+
+        self._check_collection(collection)
+        max_page_size = 1000
+        if limit < 1 or limit > max_page_size:
+            raise IndependentIndexError(f"limit must be between 1 and {max_page_size}")
+        profile_id = profile or (self.manifest.get("applicableCapabilityProfileIds") or [None])[0]
+        if profile_id not in set(self.manifest.get("capabilityProfileIds", [])):
+            raise IndependentIndexError(f"unknown capability profile: {profile_id}")
+        digest = self.manifest["source"]["canonicalDigest"]
+        last_id: str | None = None
+        if cursor is not None:
+            payload = _decode_query_cursor(cursor)
+            expected = {
+                "schema": "fdir/query-cursor",
+                "queryContractVersion": self.manifest["querySurface"]["contractVersion"],
+                "indexDigest": digest,
+                "collection": collection,
+                "kind": kind,
+                "status": status,
+                "profileId": profile_id,
+            }
+            if any(payload.get(key) != value for key, value in expected.items()):
+                raise IndependentIndexError("query cursor is stale or belongs to another query/index")
+            if not isinstance(payload.get("lastId"), str):
+                raise IndependentIndexError("query cursor has no last entity ID")
+            last_id = payload["lastId"]
+        values = self.list_entities(collection, kind=kind, status=status, profile=profile)
+        if last_id is not None:
+            identifier_field = self.collection_contract[collection]
+            values = [item for item in values if str(item[identifier_field]) > last_id]
+        items = values[:limit]
+        next_cursor = None
+        if len(values) > limit and items:
+            identifier_field = self.collection_contract[collection]
+            next_cursor = _encode_query_cursor({
+                "schema": "fdir/query-cursor",
+                "queryContractVersion": self.manifest["querySurface"]["contractVersion"],
+                "indexDigest": digest,
+                "collection": collection,
+                "kind": kind,
+                "status": status,
+                "profileId": profile_id,
+                "lastId": str(items[-1][identifier_field]),
+            })
+        return {
+            "queryContractVersion": self.manifest["querySurface"]["contractVersion"],
+            "profileId": profile_id,
+            "indexDigest": digest,
+            "collection": collection,
+            "items": items,
+            "nextCursor": next_cursor,
+        }
+
     def get_entity(self, collection: str, identifier: str) -> dict[str, Any]:
         self._check_collection(collection)
         self._assert_live()
@@ -1043,6 +1458,22 @@ class PersistentIndex:
             raise IndependentIndexError("field pointer must be empty or start with '/'")
         self._assert_live()
         try:
+            extension_type = None
+            extension_namespace = None
+            extension_version = None
+            if collection != DOCUMENT_COLLECTION:
+                entity_row = self._connection.execute(
+                    "SELECT payload_json FROM entities WHERE collection = ? AND entity_id = ?",
+                    (collection, identifier),
+                ).fetchone()
+                if entity_row is None:
+                    raise IndependentIndexError(f"unknown entity: {collection}/{identifier}")
+                if collection == "extensions":
+                    payload = json.loads(entity_row[0], object_pairs_hook=_unique_object_pairs, parse_constant=_reject_json_constant)
+                    extension_type = payload.get("type") if isinstance(payload, dict) and isinstance(payload.get("type"), str) else None
+                    extension_namespace = payload.get("namespace") if isinstance(payload, dict) and isinstance(payload.get("namespace"), str) else None
+                    extension_version = payload.get("schemaVersion") if isinstance(payload, dict) and isinstance(payload.get("schemaVersion"), str) else None
+            self._check_field(collection, pointer, extension_type, extension_namespace, extension_version)
             row = self._connection.execute(
                 """
                 SELECT value_json FROM fields
@@ -1062,60 +1493,219 @@ class PersistentIndex:
         value: Any,
         *,
         collection: str | None = None,
+        namespace: str | None = None,
+        extension_type: str | None = None,
+        schema_version: str | None = None,
     ) -> list[dict[str, str]]:
         """Return entities whose stored field equals a typed JSON value."""
+        return [
+            {"collection": row["collection"], "id": row["id"]}
+            for row in self.query_fields(
+                pointer,
+                value,
+                operator="eq",
+                collection=collection,
+                namespace=namespace,
+                extension_type=extension_type,
+                schema_version=schema_version,
+            )
+        ]
 
+    def query_fields(
+        self,
+        pointer: str,
+        value: Any = _MISSING,
+        *,
+        operator: str = "eq",
+        collection: str | None = None,
+        kind: str | None = None,
+        status: str | None = None,
+        profile: str | None = None,
+        namespace: str | None = None,
+        extension_type: str | None = None,
+        schema_version: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Run a typed field query over the persistent field rows."""
+
+        if not isinstance(pointer, str) or not pointer.startswith("/"):
+            raise IndependentIndexError("query field pointer must start with '/'")
         if collection is not None:
             self._check_collection(collection)
-        if not isinstance(pointer, str) or (pointer and not pointer.startswith("/")):
-            raise IndependentIndexError("field pointer must be empty or start with '/'")
-        value_json = _canonical_json(value)
-        clauses = ["pointer = ?", "value_sha256 = ?", "value_type = ?"]
-        parameters: list[Any] = [
-            pointer,
-            _sha256_bytes(value_json.encode("utf-8")),
-            _value_type(value),
-        ]
-        if collection is not None:
-            clauses.append("collection = ?")
-            parameters.append(collection)
+            matching_registry = _matching_query_fields(
+                self.field_registry,
+                collection,
+                pointer,
+                extension_type if collection == "extensions" else None,
+                namespace if collection == "extensions" else None,
+                schema_version if collection == "extensions" else None,
+            )
+            if not matching_registry:
+                raise IndependentIndexError(f"field pointer is not registered: {collection}{pointer}")
+            if not any(operator in field.get("filterOperators", []) for field in matching_registry):
+                raise IndependentIndexError(f"operator {operator} is not registered for {collection}{pointer}")
+        else:
+            matching_registry = [
+                field
+                for owner_collection in self.field_registry
+                for field in _matching_query_fields(self.field_registry, owner_collection, pointer)
+            ]
+            if not matching_registry:
+                raise IndependentIndexError(f"field pointer is not registered: {pointer}")
+            if not any(operator in field.get("filterOperators", []) for field in matching_registry):
+                raise IndependentIndexError(f"operator {operator} is not registered for {pointer}")
+        if operator not in {"eq", "neq", "lt", "lte", "gt", "gte", "prefix", "contains", "exists", "is-null", "is-missing"}:
+            raise IndependentIndexError(f"unknown field operator: {operator}")
+        if operator not in {"exists", "is-null", "is-missing"} and value is _MISSING:
+            raise IndependentIndexError(f"operator {operator} requires a value")
+        if profile is not None:
+            profiles = set(self.manifest.get("capabilityProfileIds", []))
+            if profile not in profiles:
+                raise IndependentIndexError(f"unknown capability profile: {profile}")
+            if profile not in self.manifest.get("applicableCapabilityProfileIds", []):
+                return []
+        response_metadata = {
+            "queryContractVersion": self.manifest["querySurface"]["contractVersion"],
+            "profileId": profile or (self.manifest.get("applicableCapabilityProfileIds") or [None])[0],
+        }
         self._assert_live()
+        clauses: list[str] = []
+        parameters: list[Any] = []
+        if collection is not None:
+            clauses.append("f.collection = ?")
+            parameters.append(collection)
+        if "*" not in pointer:
+            clauses.append("f.pointer = ?")
+            parameters.append(pointer)
+        sql = (
+            "SELECT f.collection, f.entity_id, f.pointer, f.value_json, "
+            "f.value_type, e.entity_kind, e.entity_status, e.payload_json "
+            "FROM fields f LEFT JOIN entities e "
+            "ON e.collection = f.collection AND e.entity_id = f.entity_id"
+            + (" WHERE " + " AND ".join(clauses) if clauses else "")
+            + " ORDER BY f.collection, f.entity_id, f.pointer"
+        )
+        try:
+            rows = self._connection.execute(sql, parameters).fetchall()
+        except sqlite3.Error as exc:
+            raise IndependentIndexError(f"typed field query failed: {exc}") from exc
+        results: list[dict[str, Any]] = []
+        for row in rows:
+            row_collection, identifier, actual_pointer = row[0], row[1], row[2]
+            if "*" in pointer and not _pointer_matches(pointer, actual_pointer):
+                continue
+            if kind is not None and row[5] != kind:
+                continue
+            if status is not None and row[6] != status:
+                continue
+            if row_collection == "extensions":
+                try:
+                    payload = json.loads(row[7], object_pairs_hook=_unique_object_pairs, parse_constant=_reject_json_constant)
+                except (json.JSONDecodeError, ValueError, TypeError) as exc:
+                    raise IndependentIndexError("stored extension entity JSON cannot be decoded") from exc
+                row_extension_type = payload.get("type") if isinstance(payload, dict) and isinstance(payload.get("type"), str) else None
+                row_namespace = payload.get("namespace") if isinstance(payload, dict) and isinstance(payload.get("namespace"), str) else None
+                row_schema_version = payload.get("schemaVersion") if isinstance(payload, dict) and isinstance(payload.get("schemaVersion"), str) else None
+                if namespace is not None and row_namespace != namespace:
+                    continue
+                if extension_type is not None and row_extension_type != extension_type:
+                    continue
+                if schema_version is not None and row_schema_version != schema_version:
+                    continue
+                if _registered_query_field(
+                    self.field_registry,
+                    row_collection,
+                    actual_pointer,
+                    row_extension_type,
+                    row_namespace,
+                    row_schema_version,
+                ) is None:
+                    continue
+            try:
+                actual = json.loads(row[3], object_pairs_hook=_unique_object_pairs, parse_constant=_reject_json_constant)
+            except (json.JSONDecodeError, ValueError, TypeError) as exc:
+                raise IndependentIndexError("stored field JSON cannot be decoded") from exc
+            if operator == "exists":
+                matches = True
+            elif operator == "is-null":
+                matches = actual is None
+            elif operator == "is-missing":
+                matches = False
+            else:
+                matches = _typed_compare(actual, value, operator)
+            if matches:
+                results.append({
+                    **response_metadata,
+                    "collection": row_collection,
+                    "id": identifier,
+                    "pointer": actual_pointer,
+                    "presence": "null" if actual is None else "value",
+                    "value": actual,
+                    "status": row[6],
+                })
+
+        if operator == "is-missing" and "*" not in pointer:
+            try:
+                candidate_sql = "SELECT collection, entity_id, entity_kind, entity_status FROM entities"
+                candidate_params: list[Any] = []
+                if collection is not None and collection != DOCUMENT_COLLECTION:
+                    candidate_sql += " WHERE collection = ?"
+                    candidate_params.append(collection)
+                candidate_sql += " ORDER BY collection, entity_id"
+                candidates = self._connection.execute(candidate_sql, candidate_params).fetchall()
+                if collection == DOCUMENT_COLLECTION:
+                    candidates = [(DOCUMENT_COLLECTION, self.manifest["source"]["documentId"], None, None)]
+            except sqlite3.Error as exc:
+                raise IndependentIndexError(f"missing-field candidate query failed: {exc}") from exc
+            present = {(row[0], row[1]) for row in rows}
+            for candidate in candidates:
+                if (candidate[0], candidate[1]) in present:
+                    continue
+                if kind is not None and candidate[2] != kind:
+                    continue
+                if status is not None and candidate[3] != status:
+                    continue
+                results.append({
+                    **response_metadata,
+                    "collection": candidate[0], "id": candidate[1], "pointer": pointer,
+                    "presence": "missing", "value": None, "status": candidate[3],
+                })
+        results.sort(key=lambda item: (item["collection"], item["id"], item["pointer"]))
+        return results
+
+    def find_references(
+        self,
+        target_id: str | None = None,
+        *,
+        source_id: str | None = None,
+        source_collection: str | None = None,
+        pointer: str | None = None,
+    ) -> list[dict[str, Any]]:
+        self._assert_live()
+        clauses: list[str] = []
+        parameters: list[Any] = []
+        for column, value in (("target_id", target_id), ("source_id", source_id), ("source_collection", source_collection), ("source_pointer", pointer)):
+            if value is not None:
+                clauses.append(f"{column} = ?")
+                parameters.append(value)
         try:
             rows = self._connection.execute(
-                """
-                SELECT collection, entity_id FROM fields
-                WHERE """ + " AND ".join(clauses) + """
-                ORDER BY collection, entity_id
-                """,
+                "SELECT source_collection, source_id, source_pointer, target_id, target_collection, reference_kind, ordinal FROM reverse_references"
+                + (" WHERE " + " AND ".join(clauses) if clauses else "")
+                + " ORDER BY target_collection, target_id, source_collection, source_id, source_pointer, reference_kind, COALESCE(ordinal, -1)",
                 parameters,
             ).fetchall()
         except sqlite3.Error as exc:
-            raise IndependentIndexError(f"typed field query failed: {exc}") from exc
-        return [{"collection": row[0], "id": row[1]} for row in rows]
-
-    def reverse_references(self, target_id: str) -> list[dict[str, Any]]:
-        self._assert_live()
-        try:
-            rows = self._connection.execute(
-                """
-                SELECT source_collection, source_id, source_pointer,
-                       target_id, target_collection, reference_kind, ordinal
-                FROM reverse_references WHERE target_id = ?
-                ORDER BY source_collection, source_id, source_pointer,
-                         reference_kind, COALESCE(ordinal, -1)
-                """,
-                (target_id,),
-            ).fetchall()
-        except sqlite3.Error as exc:
-            raise IndependentIndexError(f"reverse-reference query failed: {exc}") from exc
+            raise IndependentIndexError(f"reference query failed: {exc}") from exc
         return [
             {
                 "sourceCollection": row[0], "sourceId": row[1], "sourcePointer": row[2],
-                "targetId": row[3], "targetCollection": row[4],
-                "referenceKind": row[5], "ordinal": row[6],
+                "targetId": row[3], "targetCollection": row[4], "referenceKind": row[5], "ordinal": row[6],
             }
             for row in rows
         ]
+
+    def reverse_references(self, target_id: str) -> list[dict[str, Any]]:
+        return self.find_references(target_id)
 
 
 def open_index(
@@ -1170,6 +1760,8 @@ def open_index(
         actual_counts = {
             "entities": len(actual_records["entities"]),
             "fields": len(actual_records["fields"]),
+            "documentFields": sum(1 for row in actual_records["fields"] if row["collection"] == DOCUMENT_COLLECTION),
+            "entityFields": sum(1 for row in actual_records["fields"] if row["collection"] != DOCUMENT_COLLECTION),
             "references": len(actual_records["references"]),
             "collections": {
                 collection: sum(
@@ -1185,7 +1777,7 @@ def open_index(
         _check_manifest_against_source(
             manifest, context, expected_records, collection_contract
         )
-        return PersistentIndex(connection, index_path, manifest, collection_contract)
+        return PersistentIndex(connection, index_path, manifest, collection_contract, context["fieldRegistry"])
     except Exception:
         try:
             connection.close()

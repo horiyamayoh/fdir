@@ -24,7 +24,7 @@ STATUS_VALUES = {
     "preserved", "normalized", "approximated", "ambiguous", "unsupported", "omitted-by-policy", "unavailable", "failed",
 }
 PARTIAL_STATUSES = {"approximated", "ambiguous", "unsupported", "omitted-by-policy", "failed"}
-NODE_KINDS = {"document", "section", "paragraph", "run", "heading", "list", "table", "row", "column", "cell", "shape", "textBox", "connector", "image", "chart", "glyph", "path", "field", "annotation", "resource"}
+NODE_KINDS = {"document", "section", "story", "footnote", "endnote", "comment", "paragraph", "run", "heading", "thematicBreak", "list", "table", "row", "column", "cell", "shape", "textBox", "connector", "image", "chart", "glyph", "path", "field", "annotation", "resource"}
 VISUAL_NODE_KINDS = {"shape", "textBox", "connector", "image", "chart", "glyph", "path"}
 
 
@@ -155,6 +155,9 @@ def _validate_schema(value: Any, schema: dict[str, Any], root: dict[str, Any], p
         properties = schema.get("properties", {})
         if not isinstance(properties, dict):
             raise IRValidationError(f"{path} has invalid schema properties", "DFIR-SCHEMA-PROPERTIES")
+        pattern_properties = schema.get("patternProperties", {})
+        if not isinstance(pattern_properties, dict):
+            raise IRValidationError(f"{path} has invalid schema patternProperties", "DFIR-SCHEMA-PROPERTIES")
         required = schema.get("required", [])
         if not isinstance(required, list):
             raise IRValidationError(f"{path} has invalid schema required list", "DFIR-SCHEMA-REQUIRED")
@@ -171,7 +174,17 @@ def _validate_schema(value: Any, schema: dict[str, Any], root: dict[str, Any], p
         for key, child in value.items():
             if key in properties:
                 _validate_schema(child, properties[key], root, f"{path}.{key}")
-            elif additional is False:
+                continue
+            matched_patterns = [
+                pattern_schema
+                for pattern, pattern_schema in pattern_properties.items()
+                if isinstance(pattern, str) and isinstance(pattern_schema, dict) and re.search(pattern, key) is not None
+            ]
+            for pattern_schema in matched_patterns:
+                _validate_schema(child, pattern_schema, root, f"{path}.{key}")
+            if matched_patterns:
+                continue
+            if additional is False:
                 raise IRValidationError(f"{path} contains unknown field: {key}", "DFIR-SCHEMA-CLOSED")
             elif isinstance(additional, dict):
                 _validate_schema(child, additional, root, f"{path}.{key}")
@@ -328,9 +341,15 @@ def _validate_capability_contract(document: dict[str, Any], source: dict[str, An
         observed[key] = observed.get(key, 0) + entry["occurrences"]
         disposition = entry.get("disposition")
         if status in PARTIAL_STATUSES and disposition != "non-preserved":
-            raise IRValidationError(f"non-preserved feature has disposition {disposition}: {entry['feature']}", "DFIR-CAPABILITY-DISPOSITION")
+            raise IRValidationError(
+                f"conversion.featureInventory entry {entry['feature']} has non-preserved status but disposition {disposition}",
+                "DFIR-CAPABILITY-DISPOSITION",
+            )
         if status == "unavailable" and disposition != "observation":
-            raise IRValidationError(f"unavailable feature is not observation-only: {entry['feature']}", "DFIR-CAPABILITY-DISPOSITION")
+            raise IRValidationError(
+                f"conversion.featureInventory entry {entry['feature']} is unavailable but disposition is not observation",
+                "DFIR-CAPABILITY-DISPOSITION",
+            )
     if observed != expected:
         raise IRValidationError("featureInventory does not aggregate conversion.features exactly", "DFIR-CAPABILITY-INVENTORY-MISMATCH")
 
@@ -353,10 +372,36 @@ def _walk(value: Any, path: str = "$") -> None:
 def _id_ref(value: Any, ids: dict[str, str], targets: set[str], path: str, *, optional: bool = True, target_kinds: set[str] | None = None, kind_by_id: dict[str, str] | None = None) -> None:
     if value is None and optional:
         return
-    if not isinstance(value, str) or value not in ids or ids[value] not in targets:
+    if not isinstance(value, str) or value not in ids:
         raise IRValidationError(f"{path} references an invalid target: {value}", "DFIR-REF-DANGLING")
+    if ids[value] not in targets:
+        raise IRValidationError(
+            f"{path} references collection {ids[value]}, expected one of {sorted(targets)}",
+            "DFIR-REF-WRONG-COLLECTION",
+        )
     if target_kinds is not None and kind_by_id is not None and value in kind_by_id and kind_by_id[value] not in target_kinds:
         raise IRValidationError(f"{path} references wrong target kind: {kind_by_id[value]}", "DFIR-REF-WRONG-TYPE")
+
+
+def _extension_reference_registry(
+    document: dict[str, Any],
+    ids: dict[str, str],
+    kind_by_id: dict[str, str],
+) -> dict[str, dict[str, Any]]:
+    """Expose the document-wide reference-registry to extension payload checks."""
+
+    reference_registry: dict[str, dict[str, Any]] = {
+        identifier: {"collection": collection, "kind": kind_by_id.get(identifier)}
+        for identifier, collection in ids.items()
+    }
+    for collection, identifier_key in COLLECTION_KEYS.items():
+        for item in document.get(collection, []):
+            if isinstance(item, dict) and isinstance(item.get(identifier_key), str):
+                reference_registry[item[identifier_key]] = {
+                    "collection": collection,
+                    "kind": item.get("kind"),
+                }
+    return reference_registry
 
 
 def _check_cycle(graph: dict[str, str | None], code: str, label: str) -> None:
@@ -645,6 +690,19 @@ def validate_document(document: dict[str, Any]) -> list[str]:
     for relation_id, relation in items_by_collection["relations"].items():
         _id_ref(relation.get("fromId"), ids, set(COLLECTION_KEYS), f"relation {relation_id}.fromId", optional=False)
         _id_ref(relation.get("toId"), ids, set(COLLECTION_KEYS), f"relation {relation_id}.toId", optional=False)
+        if relation.get("kind") == "connectorTarget":
+            from_id = relation.get("fromId")
+            to_id = relation.get("toId")
+            if kind_by_id.get(from_id) != "connector":
+                raise IRValidationError(
+                    f"relation {relation_id}.fromId must identify a connector, got {kind_by_id.get(from_id)}",
+                    "DFIR-RELATION-ENDPOINT-KIND",
+                )
+            if kind_by_id.get(to_id) not in NODE_KINDS:
+                raise IRValidationError(
+                    f"relation {relation_id}.toId must identify a node, got {kind_by_id.get(to_id)}",
+                    "DFIR-RELATION-ENDPOINT-KIND",
+                )
     for order_id, order in items_by_collection["orders"].items():
         _id_ref(order.get("ownerId"), ids, {"parts", "surfaces", "nodes"}, f"order {order_id}.ownerId", optional=False)
         seen_ids: set[str] = set()
@@ -667,8 +725,15 @@ def validate_document(document: dict[str, Any]) -> list[str]:
         from extension_registry import validate_extension
     except ImportError:  # pragma: no cover - package-style import
         from tools.extension_registry import validate_extension
+    reference_registry = _extension_reference_registry(document, ids, kind_by_id)
     for extension in items_by_collection["extensions"].values():
-        extension_result = validate_extension(extension, document, ids, kind_by_id)
+        extension_result = validate_extension(
+            extension,
+            document,
+            ids,
+            kind_by_id,
+            reference_registry=reference_registry,
+        )
         if extension_result == "opaque":
             diagnosed = any(
                 item.get("code") == "DFIR-EXTENSION-UNKNOWN-OPAQUE"
@@ -704,16 +769,37 @@ def validate_document(document: dict[str, Any]) -> list[str]:
         if warning_id not in diagnostic_ids:
             raise IRValidationError(f"conversion references missing warning {warning_id}", "DFIR-DIAGNOSTIC-MISSING")
         if next(item for item in items_by_collection["diagnostics"].values() if item.get("diagnosticId") == warning_id).get("severity") not in {"info", "warning"}:
-            raise IRValidationError(f"conversion warning references an error diagnostic {warning_id}", "DFIR-WARNING-SEVERITY")
+            raise IRValidationError(
+                f"conversion.warnings references error-severity diagnostic {warning_id}",
+                "DFIR-WARNING-SEVERITY",
+            )
     for feature in conversion.get("features", []):
         status = feature.get("status")
         if status not in STATUS_VALUES:
             raise IRValidationError(f"feature has invalid status: {status}", "DFIR-STATUS-INVALID")
         if feature.get("targetId") is not None:
             _id_ref(feature["targetId"], ids, set(COLLECTION_KEYS) - {"diagnostics", "sourceMaps"}, "conversion feature targetId", optional=False)
+            target = next(
+                (
+                    item
+                    for collection, items in items_by_collection.items()
+                    if collection not in {"diagnostics", "sourceMaps"}
+                    for item in items.values()
+                    if item.get(COLLECTION_KEYS[collection]) == feature["targetId"]
+                ),
+                None,
+            )
+            if isinstance(target, dict) and status == "preserved" and _status_of(target) in PARTIAL_STATUSES:
+                raise IRValidationError(
+                    f"conversion.features targetId {feature['targetId']} declares preserved but target status is {_status_of(target)}",
+                    "DFIR-CAPABILITY-ENTITY-AUTHORITY",
+                )
         for diagnostic_id in feature.get("diagnosticIds", []):
             if diagnostic_id not in diagnostic_ids:
-                raise IRValidationError(f"feature references missing diagnostic {diagnostic_id}", "DFIR-DIAGNOSTIC-MISSING")
+                raise IRValidationError(
+                    f"conversion.features references missing diagnostic {diagnostic_id}",
+                    "DFIR-DIAGNOSTIC-MISSING",
+                )
     for inventory in conversion.get("featureInventory", []):
         for diagnostic_id in inventory.get("diagnosticIds", []):
             if diagnostic_id not in diagnostic_ids:
@@ -724,19 +810,19 @@ def validate_document(document: dict[str, Any]) -> list[str]:
     hard_loss = any(status in PARTIAL_STATUSES for status in statuses)
     has_error = any(item.get("severity") in {"error", "fatal"} for item in items_by_collection["diagnostics"].values())
     if conversion["status"] in {"complete", "complete-with-warnings"} and (hard_loss or has_error):
-        raise IRValidationError("complete conversion contains a non-preserved or error outcome", "DFIR-COMPLETE-CLAIM")
+        raise IRValidationError("conversion.status claims completion despite a non-preserved or error outcome", "DFIR-COMPLETE-CLAIM")
     if conversion["status"] == "complete" and conversion.get("warnings"):
-        raise IRValidationError("warning-bearing conversion must use complete-with-warnings", "DFIR-WARNING-STATUS")
+        raise IRValidationError("conversion.status=complete cannot carry conversion.warnings", "DFIR-WARNING-STATUS")
     if conversion["status"] == "complete-with-warnings" and not conversion.get("warnings"):
-        raise IRValidationError("complete-with-warnings conversion has no warning evidence", "DFIR-WARNING-STATUS")
+        raise IRValidationError("conversion.status=complete-with-warnings requires conversion.warnings evidence", "DFIR-WARNING-STATUS")
     if conversion["status"] == "failed":
         if not conversion.get("diagnostics"):
-            raise IRValidationError("failed conversion has no diagnostic", "DFIR-FAILED-NO-DIAGNOSTIC")
+            raise IRValidationError("conversion.status=failed requires conversion.diagnostics", "DFIR-FAILED-NO-DIAGNOSTIC")
         if not has_error:
             raise IRValidationError(
-                "failed conversion has no error or fatal diagnostic",
+                "conversion.status=failed requires an error or fatal diagnostic",
                 "DFIR-FAILED-NO-ERROR-DIAGNOSTIC",
             )
     if conversion["status"] == "partial" and not conversion.get("diagnostics") and not hard_loss:
-        raise IRValidationError("partial conversion has no loss evidence", "DFIR-PARTIAL-NO-EVIDENCE")
+        raise IRValidationError("conversion.status=partial requires conversion.diagnostics or a non-preserved outcome", "DFIR-PARTIAL-NO-EVIDENCE")
     return [f"{item.get('code')}: {item.get('message')}" for item in items_by_collection["diagnostics"].values() if item.get("severity") in {"info", "warning"}]

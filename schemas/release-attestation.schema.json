@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/horiyamayoh/fdir/schemas/release-attestation.schema.json/1.0.0",
+  "title": "FDIR final release attestation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "repository", "sourceSha", "generatedAt", "phase", "bundle", "issueState", "releaseState", "ci", "closure", "attestationDigest"],
+  "properties": {
+    "schema": {"const": "fdir/release-attestation"},
+    "version": {"const": "1.0.0"},
+    "repository": {"const": "horiyamayoh/fdir"},
+    "sourceSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "generatedAt": {"type": "string", "format": "date-time"},
+    "phase": {"const": "final"},
+    "bundle": {"$ref": "#/$defs/bundle"},
+    "issueState": {"$ref": "https://github.com/horiyamayoh/fdir/schemas/github-issue-state.schema.json/1.0.0"},
+    "releaseState": {"$ref": "#/$defs/releaseState"},
+    "ci": {"$ref": "#/$defs/ci"},
+    "closure": {"$ref": "#/$defs/closure"},
+    "attestationDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  },
+  "$defs": {
+    "bundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifestPath", "manifestDigest", "manifestFileDigest", "sourceSha", "dirtyTree", "evidenceIds", "reports"],
+      "properties": {
+        "manifestPath": {"type": "string", "minLength": 1},
+        "manifestDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "manifestFileDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "sourceSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "dirtyTree": {"const": false},
+        "evidenceIds": {"type": "array", "minItems": 18, "maxItems": 18, "uniqueItems": true, "items": {"type": "string"}},
+        "reports": {"type": "array", "minItems": 18, "maxItems": 18, "items": {"$ref": "#/$defs/report"}}
+      }
+    },
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidenceId", "issueNumbers", "sourceSha", "generatedAt", "status", "sha256"],
+      "properties": {
+        "evidenceId": {"type": "string", "minLength": 1},
+        "issueNumbers": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "integer", "minimum": 1}},
+        "sourceSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "status": {"const": "passed"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "releaseState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "releaseBlocked", "blockingIssues", "openIssues", "snapshotDigest", "retrievedAt", "authority"],
+      "properties": {
+        "status": {"const": "release-ready"},
+        "releaseBlocked": {"const": false},
+        "blockingIssues": {"type": "array", "maxItems": 0},
+        "openIssues": {"type": "array", "maxItems": 0},
+        "snapshotDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "retrievedAt": {"type": "string", "format": "date-time"},
+        "authority": {"const": "verified-snapshot"}
+      }
+    },
+    "ci": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "repository", "sourceSha", "runId", "runUrl", "jobId", "attempt", "status", "artifact"],
+      "properties": {
+        "provider": {"enum": ["github-actions", "local"]},
+        "repository": {"const": "horiyamayoh/fdir"},
+        "sourceSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "runId": {"type": "string", "minLength": 1},
+        "runUrl": {"type": "string", "minLength": 1},
+        "jobId": {"type": "string", "minLength": 1},
+        "attempt": {"type": "integer", "minimum": 1},
+        "status": {"const": "completed"},
+        "artifact": {"$ref": "#/$defs/artifact"}
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "id", "digest", "url"],
+      "properties": {
+        "status": {"const": "uploaded"},
+        "id": {"type": "string", "minLength": 1},
+        "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "url": {"type": "string", "minLength": 1}
+      }
+    },
+    "closure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidateIssueNumbers", "finalIssueNumber", "selfReference", "selfQualifyingIssueNumbers", "attestationOutsideCandidateBundle"],
+      "properties": {
+        "candidateIssueNumbers": {"const": [88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104]},
+        "finalIssueNumber": {"const": 105},
+        "selfReference": {"const": false},
+        "selfQualifyingIssueNumbers": {"type": "array", "maxItems": 0},
+        "attestationOutsideCandidateBundle": {"const": true}
+      }
+    }
+  }
+}

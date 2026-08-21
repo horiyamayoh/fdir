@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/horiyamayoh/fdir/schemas/github-issue-state.schema.json/1.0.0",
+  "title": "FDIR verified GitHub issue-state snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "repository", "sourceSha", "retrievedAt", "expiresAt", "maxAgeSeconds", "retrievedBy", "retrieval", "ci", "issues", "responseDigest", "snapshotDigest"],
+  "properties": {
+    "schema": {"const": "fdir/github-issue-state"},
+    "version": {"const": "1.0.0"},
+    "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+    "sourceSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "retrievedAt": {"type": "string", "format": "date-time"},
+    "expiresAt": {"type": "string", "format": "date-time"},
+    "maxAgeSeconds": {"type": "integer", "minimum": 1, "maximum": 3600},
+    "retrievedBy": {"type": "string", "minLength": 1},
+    "retrieval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "apiBaseUrl", "apiVersion", "userAgent"],
+      "properties": {
+        "method": {"const": "GET"},
+        "apiBaseUrl": {"type": "string", "pattern": "^https?://"},
+        "apiVersion": {"const": "2022-11-28"},
+        "userAgent": {"type": "string", "minLength": 1},
+        "actor": {"type": "string", "minLength": 1}
+      }
+    },
+    "ci": {"$ref": "#/$defs/ci"},
+    "issues": {
+      "type": "array",
+      "minItems": 19,
+      "maxItems": 19,
+      "items": {"$ref": "#/$defs/issue"}
+    },
+    "responseDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "snapshotDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  },
+  "$defs": {
+    "ci": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "repository", "sourceSha", "runId", "attempt", "job"],
+      "properties": {
+        "provider": {"enum": ["github-actions", "local"]},
+        "repository": {"type": "string", "minLength": 1},
+        "sourceSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "runId": {"type": "string", "minLength": 1},
+        "attempt": {"type": "integer", "minimum": 1},
+        "job": {"type": "string", "minLength": 1}
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issueNumber", "state", "stateReason", "closedAt", "updatedAt", "url", "etag", "responseDigest"],
+      "properties": {
+        "issueNumber": {"type": "integer", "minimum": 87, "maximum": 105},
+        "state": {"enum": ["open", "closed"]},
+        "stateReason": {"type": ["string", "null"], "enum": ["completed", "not_planned", "duplicate", "reopened", null]},
+        "closedAt": {"type": ["string", "null"], "format": "date-time"},
+        "updatedAt": {"type": "string", "format": "date-time"},
+        "url": {"type": "string", "format": "uri"},
+        "etag": {"type": ["string", "null"]},
+        "responseDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

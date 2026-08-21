@@ -6,9 +6,24 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      attest_run_id:
+        description: "Completed qualification workflow run ID to attest"
+        required: true
+        type: string
+      attest_attempt:
+        description: "Exact attempt number for that run"
+        required: true
+        type: string
+      attest_sha:
+        description: "Exact 40-character source SHA for that run"
+        required: true
+        type: string
 
 permissions:
   contents: read
+  actions: read
   issues: read
 
 concurrency:
@@ -16,60 +31,701 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  design:
+  platform:
+    name: Platform ${{ matrix.profile }}
+    if: ${{ github.event_name != 'workflow_dispatch' }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: ubuntu-py3.12
+            runner: ubuntu-latest
+            osFamily: Linux
+            python: "3.12"
+          - profile: windows-py3.12
+            runner: windows-latest
+            osFamily: Windows
+            python: "3.12"
+          - profile: macos-py3.12
+            runner: macos-latest
+            osFamily: Darwin
+            python: "3.12"
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PLATFORM_PROFILE: ${{ matrix.profile }}
+      PLATFORM_OS_FAMILY: ${{ matrix.osFamily }}
+      PLATFORM_PYTHON: ${{ matrix.python }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install qualification dependencies
+        run: python -m pip install --disable-pip-version-check --requirement requirements-qualification.txt
+      - name: Validate platform identity
+        shell: python
+        run: |
+          import os
+          import platform
+          import re
+          import sys
+
+          if os.environ.get("GITHUB_ACTIONS", "").lower() != "true":
+              raise SystemExit("PLATFORM_NOT_GITHUB_ACTIONS")
+          if os.environ.get("GITHUB_REPOSITORY") != "horiyamayoh/fdir":
+              raise SystemExit("PLATFORM_REPOSITORY_MISMATCH")
+          source_sha = os.environ.get("GITHUB_SHA", "")
+          if re.fullmatch(r"[0-9a-f]{40}", source_sha) is None:
+              raise SystemExit("PLATFORM_SOURCE_SHA_INVALID")
+          if re.fullmatch(r"[1-9][0-9]*", os.environ.get("GITHUB_RUN_ID", "")) is None:
+              raise SystemExit("PLATFORM_RUN_ID_INVALID")
+          if re.fullmatch(r"[1-9][0-9]*", os.environ.get("GITHUB_RUN_ATTEMPT", "")) is None:
+              raise SystemExit("PLATFORM_ATTEMPT_INVALID")
+          if not os.environ.get("GITHUB_JOB"):
+              raise SystemExit("PLATFORM_JOB_ID_MISSING")
+          actual_python = f"{sys.version_info.major}.{sys.version_info.minor}"
+          if actual_python != os.environ["PLATFORM_PYTHON"]:
+              raise SystemExit(f"PLATFORM_PYTHON_MISMATCH:{actual_python}")
+          if platform.system() != os.environ["PLATFORM_OS_FAMILY"]:
+              raise SystemExit(f"PLATFORM_OS_MISMATCH:{platform.system()}")
+      - name: Run platform smoke
+        run: python tools/convert_document.py --help
+      - name: Write platform candidate evidence
+        shell: python
+        env:
+          OUTPUT: ${{ runner.temp }}/platform-evidence.json
+        run: |
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          value = {
+              "schema": "fdir/github-actions-platform-evidence",
+              "version": "1.0.0",
+              "phase": "candidate",
+              "provider": "github-actions",
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "sourceSha": os.environ["GITHUB_SHA"],
+              "runId": os.environ["GITHUB_RUN_ID"],
+              "attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
+              "jobId": os.environ["GITHUB_JOB"],
+              "profile": os.environ["PLATFORM_PROFILE"],
+              "osFamily": os.environ["PLATFORM_OS_FAMILY"],
+              "python": os.environ["PLATFORM_PYTHON"],
+              "status": "passed",
+              "releaseReady": False,
+              "links": {
+                  "source": f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/commit/{os.environ['GITHUB_SHA']}",
+                  "run": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+                  "attempt": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}/attempts/{os.environ['GITHUB_RUN_ATTEMPT']}",
+              },
+          }
+          canonical = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+          value["evidenceDigest"] = hashlib.sha256(canonical).hexdigest()
+          Path(os.environ["OUTPUT"]).write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+      - name: Upload platform candidate evidence
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fdir-platform-evidence-${{ matrix.profile }}-${{ github.sha }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/platform-evidence.json
+          if-no-files-found: error
+          retention-days: 14
+
+  qualification:
+    name: Qualification bundle
+    if: ${{ always() && github.event_name != 'workflow_dispatch' }}
+    needs: [platform]
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install qualification dependencies
+        run: python -m pip install --disable-pip-version-check --requirement requirements-qualification.txt
+      - name: Validate workflow identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_ACTIONS:-}" = "true"
+          test "${GITHUB_REPOSITORY:-}" = "horiyamayoh/fdir"
+          [[ "${GITHUB_SHA:-}" =~ ^[0-9a-f]{40}$ ]]
+          [[ "${GITHUB_RUN_ID:-}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${GITHUB_RUN_ATTEMPT:-}" =~ ^[1-9][0-9]*$ ]]
+          test -n "${GITHUB_JOB:-}"
       - name: Validate design authority
         run: python tools/validate_design.py
       - name: Validate generated model contract
         run: python tools/validate_model_contract.py --check
+      - name: Validate qualification contract
+        run: python tools/validate_qualification_contract.py
       - name: Validate qualification schema
         run: python tools/validate_qualification_bundle.py --schema-only
       - name: Run Evidence integrity matrix
         run: python tools/test_evidence_integrity.py --all
       - name: Run clean-room replay
         run: python tools/clean_room_replay.py --source-sha "${{ github.sha }}"
+      - name: Prepare commit-bound bundle path
+        id: bundle-path
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_sha="$(git rev-parse HEAD)"
+          test "$source_sha" = "$GITHUB_SHA"
+          bundle_root="$RUNNER_TEMP/qualification/$source_sha"
+          mkdir -p "$bundle_root"
+          {
+            echo "source-sha=$source_sha"
+            echo "bundle-root=$bundle_root"
+          } >> "$GITHUB_OUTPUT"
       - name: Build commit-bound qualification bundle
         shell: bash
         run: |
-          SOURCE_SHA="$(git rev-parse HEAD)"
-          BUNDLE_ROOT="$RUNNER_TEMP/qualification/$SOURCE_SHA"
-          python tools/build_qualification_bundle.py --source-sha "$SOURCE_SHA" --out "$BUNDLE_ROOT" --timeout 1800
+          set -euo pipefail
+          python tools/build_qualification_bundle.py \
+            --source-sha "${{ steps.bundle-path.outputs.source-sha }}" \
+            --out "${{ steps.bundle-path.outputs.bundle-root }}" \
+            --timeout 1800
       - name: Validate commit-bound qualification bundle
-        run: python tools/validate_qualification_bundle.py "$RUNNER_TEMP/qualification/${{ github.sha }}/manifest.json"
+        run: python tools/validate_qualification_bundle.py "${{ steps.bundle-path.outputs.bundle-root }}/manifest.json"
       - name: Run final release gate
-        run: python tools/release_gate.py --bundle "$RUNNER_TEMP/qualification/${{ github.sha }}/manifest.json"
+        run: python tools/release_gate.py --bundle "${{ steps.bundle-path.outputs.bundle-root }}/manifest.json"
       - name: Publish qualification digest
         shell: bash
         run: |
-          sha256sum "$RUNNER_TEMP/qualification/${GITHUB_SHA}/manifest.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          set -euo pipefail
+          sha256sum "${{ steps.bundle-path.outputs.bundle-root }}/manifest.json" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Run real-input adapter E2E
         run: python tools/run_e2e.py --all
       - name: Upload qualification bundle
-        if: always()
-        id: upload
+        if: ${{ success() }}
+        id: upload-bundle
         uses: actions/upload-artifact@v4
         with:
-          name: fdir-qualification-bundle-${{ github.sha }}
+          name: fdir-qualification-bundle-${{ github.sha }}-attempt-${{ github.run_attempt }}
           path: ${{ runner.temp }}/qualification
           if-no-files-found: error
           retention-days: 14
-      - name: Publish qualification links
-        if: always()
+      - name: Write qualification upload receipt
+        if: ${{ success() }}
+        shell: python
+        env:
+          OUTPUT: ${{ runner.temp }}/qualification-upload-receipt.json
+          ARTIFACT_ID: ${{ steps.upload-bundle.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ steps.upload-bundle.outputs.artifact-digest }}
+          ARTIFACT_URL: ${{ steps.upload-bundle.outputs.artifact-url }}
+        run: |
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          artifact_id = os.environ.get("ARTIFACT_ID", "")
+          digest = os.environ.get("ARTIFACT_DIGEST", "")
+          artifact_url = os.environ.get("ARTIFACT_URL", "")
+          if not artifact_id or not digest or not artifact_url:
+              raise SystemExit("QUALIFICATION_ARTIFACT_OUTPUT_MISSING")
+          if not digest.startswith("sha256:"):
+              digest = f"sha256:{digest}"
+          attempt = int(os.environ["GITHUB_RUN_ATTEMPT"])
+          name = f"fdir-qualification-bundle-{os.environ['GITHUB_SHA']}-attempt-{attempt}"
+          value = {
+              "schema": "fdir/qualification-upload-receipt",
+              "version": "1.0.0",
+              "provider": "github-actions",
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "sourceSha": os.environ["GITHUB_SHA"],
+              "runId": os.environ["GITHUB_RUN_ID"],
+              "attempt": attempt,
+              "job": {"id": os.environ["GITHUB_JOB"], "name": "Qualification bundle"},
+              "artifact": {"status": "uploaded", "name": name, "id": artifact_id, "digest": digest, "url": artifact_url},
+              "links": {
+                  "source": f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/commit/{os.environ['GITHUB_SHA']}",
+                  "run": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+                  "attempt": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}/attempts/{attempt}",
+              },
+          }
+          canonical = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+          value["receiptDigest"] = hashlib.sha256(canonical).hexdigest()
+          Path(os.environ["OUTPUT"]).write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+      - name: Upload qualification upload receipt
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fdir-qualification-receipt-${{ github.sha }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/qualification-upload-receipt.json
+          if-no-files-found: error
+          retention-days: 14
+
+  evidence:
+    name: Collect GitHub Actions release evidence
+    if: ${{ always() }}
+    needs: [platform, qualification]
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      EVIDENCE_RUN_ID: ${{ inputs.attest_run_id || github.run_id }}
+      EVIDENCE_ATTEMPT: ${{ inputs.attest_attempt || github.run_attempt }}
+      EVIDENCE_SHA: ${{ inputs.attest_sha || github.sha }}
+      EVIDENCE_MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
+      EVIDENCE_PATH: ${{ runner.temp }}/fdir-release-evidence/actions-evidence.json
+    steps:
+      - name: Checkout evidence source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.attest_sha || github.sha }}
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install qualification dependencies
+        run: python -m pip install --disable-pip-version-check --requirement requirements-qualification.txt
+      - name: Inspect completed run, jobs, steps, and artifacts
+        id: inspect
+        uses: actions/github-script@v7
+        env:
+          REQUIRED_PROFILES: '["ubuntu-py3.12", "windows-py3.12", "macos-py3.12"]'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require("fs");
+            const path = require("path");
+            const crypto = require("crypto");
+
+            const repository = process.env.GITHUB_REPOSITORY;
+            const [owner, repo] = repository.split("/");
+            const sourceSha = process.env.EVIDENCE_SHA;
+            const runIdText = process.env.EVIDENCE_RUN_ID;
+            const attemptText = process.env.EVIDENCE_ATTEMPT;
+            const runId = Number(runIdText);
+            const attempt = Number(attemptText);
+            const manual = process.env.EVIDENCE_MANUAL === "true";
+            const profiles = JSON.parse(process.env.REQUIRED_PROFILES);
+            const outputPath = process.env.EVIDENCE_PATH;
+            const diagnostics = [];
+
+            const canonical = (value) => {
+              if (Array.isArray(value)) return value.map(canonical);
+              if (value && typeof value === "object") {
+                return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])]));
+              }
+              return value;
+            };
+            const digest = (value) => crypto.createHash("sha256").update(JSON.stringify(canonical(value))).digest("hex");
+            const addDiagnostic = (code, detail, link = null) => diagnostics.push({ code, detail, link });
+            const runUrl = `https://github.com/${repository}/actions/runs/${runIdText}`;
+            const attemptUrl = `${runUrl}/attempts/${attemptText}`;
+            const sourceUrl = `https://github.com/${repository}/commit/${sourceSha}`;
+            const expectedJobSpecs = [
+              ...profiles.map((profile) => ({
+                name: `Platform ${profile}`,
+                profile,
+                requiredSteps: ["Validate platform identity", "Run platform smoke", "Write platform candidate evidence", "Upload platform candidate evidence"],
+              })),
+              {
+                name: "Qualification bundle",
+                profile: "qualification",
+                requiredSteps: [
+                  "Validate workflow identity",
+                  "Validate design authority",
+                  "Validate generated model contract",
+                  "Validate qualification contract",
+                  "Validate qualification schema",
+                  "Run Evidence integrity matrix",
+                  "Run clean-room replay",
+                  "Prepare commit-bound bundle path",
+                  "Build commit-bound qualification bundle",
+                  "Validate commit-bound qualification bundle",
+                  "Run final release gate",
+                  "Publish qualification digest",
+                  "Run real-input adapter E2E",
+                  "Upload qualification bundle",
+                  "Write qualification upload receipt",
+                  "Upload qualification upload receipt",
+                ],
+              },
+            ];
+            const expectedArtifactNames = [
+              ...profiles.map((profile) => `fdir-platform-evidence-${profile}-${sourceSha}-attempt-${attemptText}`),
+              `fdir-qualification-bundle-${sourceSha}-attempt-${attemptText}`,
+              `fdir-qualification-receipt-${sourceSha}-attempt-${attemptText}`,
+            ];
+            const base = {
+              schema: "fdir/github-actions-release-evidence",
+              version: "1.0.0",
+              phase: manual ? "final-verification" : "candidate-verification",
+              provider: "github-actions",
+              repository,
+              sourceSha,
+              generatedAt: new Date().toISOString(),
+              releaseReady: false,
+              status: "blocked",
+              run: {
+                id: runIdText,
+                attempt,
+                status: null,
+                conclusion: null,
+                headSha: null,
+                name: null,
+                path: null,
+                url: runUrl,
+                apiUrl: `https://api.github.com/repos/${repository}/actions/runs/${runIdText}`,
+                attemptUrl,
+              },
+              jobs: [],
+              artifacts: [],
+              links: { source: sourceUrl, run: runUrl, attempt: attemptUrl },
+              diagnostics,
+            };
+
+            try {
+              if (!/^[0-9a-f]{40}$/.test(sourceSha)) addDiagnostic("SOURCE_SHA_INVALID", "the evidence source SHA is not an exact lowercase 40-character SHA");
+              if (!/^[1-9][0-9]*$/.test(runIdText)) addDiagnostic("RUN_ID_INVALID", "the evidence run ID is not a positive integer", runUrl);
+              if (!/^[1-9][0-9]*$/.test(attemptText)) addDiagnostic("ATTEMPT_INVALID", "the evidence attempt is not a positive integer", attemptUrl);
+              if (!Number.isInteger(runId) || !Number.isInteger(attempt)) throw new Error("invalid run identity");
+
+              const run = (await github.rest.actions.getWorkflowRun({ owner, repo, run_id: runId })).data;
+              base.run = {
+                id: String(run.id),
+                attempt: Number(run.run_attempt),
+                status: run.status,
+                conclusion: run.conclusion,
+                headSha: run.head_sha,
+                name: run.name,
+                path: run.path,
+                event: run.event,
+                createdAt: run.created_at,
+                startedAt: run.run_started_at,
+                completedAt: run.updated_at,
+                url: run.html_url || runUrl,
+                apiUrl: run.url,
+                attemptUrl,
+              };
+              if (run.id !== runId) addDiagnostic("RUN_ID_MISMATCH", `API run ID ${run.id} differs from requested ${runId}`, run.html_url || runUrl);
+              if (run.repository?.full_name !== repository) addDiagnostic("RUN_REPOSITORY_MISMATCH", "workflow run repository is not the inspected repository", run.html_url || runUrl);
+              if (run.head_sha !== sourceSha) addDiagnostic("RUN_SHA_MISMATCH", `workflow run head SHA ${run.head_sha} differs from ${sourceSha}`, run.html_url || runUrl);
+              if (Number(run.run_attempt) !== attempt) addDiagnostic("RUN_ATTEMPT_MISMATCH", `workflow run attempt ${run.run_attempt} differs from ${attempt}`, attemptUrl);
+              if (run.path !== ".github/workflows/design.yml") addDiagnostic("RUN_WORKFLOW_MISMATCH", `workflow path ${run.path} is not .github/workflows/design.yml`, run.html_url || runUrl);
+              if (run.status !== "completed" || run.conclusion !== "success") addDiagnostic("RUN_NOT_SUCCESS", `workflow run is ${run.status}/${run.conclusion || "null"}; only completed/success is release authority`, run.html_url || runUrl);
+
+              try {
+                const workflowFile = await github.rest.repos.getContent({ owner, repo, path: ".github/workflows/design.yml", ref: sourceSha });
+                const workflowText = Buffer.from(workflowFile.data.content, "base64").toString("utf8");
+                const forbiddenContinueOnError = ["continue-", "on-error"].join("");
+                if (workflowText.includes(forbiddenContinueOnError)) addDiagnostic("WORKFLOW_CONTINUE_ON_ERROR", "workflow contains a continue-on-error policy; required evidence cannot use it", sourceUrl);
+              } catch (error) {
+                addDiagnostic("WORKFLOW_SOURCE_UNAVAILABLE", `could not retrieve the workflow at ${sourceSha}: ${error.message}`, sourceUrl);
+              }
+
+              const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRunAttempt, { owner, repo, run_id: runId, attempt, per_page: 100 });
+              const ignoredStep = (name) => /^(Set up job|Complete job|Post )/i.test(name || "");
+              for (const spec of expectedJobSpecs) {
+                const job = jobs.find((candidate) => candidate.name === spec.name);
+                if (!job) {
+                  addDiagnostic("JOB_MISSING", `required job ${spec.name} is missing or was skipped`, `${runUrl}/jobs`);
+                  base.jobs.push({ name: spec.name, profile: spec.profile, status: "missing", conclusion: "skipped", required: true, steps: [] });
+                  continue;
+                }
+                const steps = (job.steps || []).map((step) => ({
+                  number: step.number,
+                  name: step.name,
+                  status: step.status,
+                  conclusion: step.conclusion,
+                  startedAt: step.started_at,
+                  completedAt: step.completed_at,
+                  url: `${job.html_url}#step:${step.number}`,
+                }));
+                const record = {
+                  id: String(job.id),
+                  name: job.name,
+                  profile: spec.profile,
+                  runId: String(job.run_id),
+                  attempt: Number(job.run_attempt),
+                  headSha: job.head_sha,
+                  status: job.status,
+                  conclusion: job.conclusion,
+                  startedAt: job.started_at,
+                  completedAt: job.completed_at,
+                  url: job.html_url,
+                  apiUrl: job.url,
+                  required: true,
+                  steps,
+                };
+                base.jobs.push(record);
+                if (String(job.run_id) !== runIdText) addDiagnostic("JOB_RUN_MISMATCH", `${spec.name} belongs to run ${job.run_id}`, job.html_url);
+                if (job.head_sha !== sourceSha) addDiagnostic("JOB_SHA_MISMATCH", `${spec.name} head SHA ${job.head_sha} differs from ${sourceSha}`, job.html_url);
+                if (Number(job.run_attempt) !== attempt) addDiagnostic("JOB_ATTEMPT_MISMATCH", `${spec.name} attempt ${job.run_attempt} differs from ${attempt}`, job.html_url);
+                if (job.status !== "completed" || job.conclusion !== "success") addDiagnostic("JOB_NOT_SUCCESS", `${spec.name} is ${job.status}/${job.conclusion || "null"}`, job.html_url);
+                for (const step of steps) {
+                  if (!ignoredStep(step.name) && (step.status !== "completed" || step.conclusion !== "success")) addDiagnostic("STEP_NOT_SUCCESS", `${spec.name}/${step.name} is ${step.status}/${step.conclusion || "null"}`, step.url);
+                }
+                for (const requiredStep of spec.requiredSteps) {
+                  const step = steps.find((candidate) => candidate.name === requiredStep);
+                  if (!step) addDiagnostic("STEP_MISSING", `${spec.name}/${requiredStep} is missing or skipped`, job.html_url);
+                  else if (step.status !== "completed" || step.conclusion !== "success") addDiagnostic("REQUIRED_STEP_NOT_SUCCESS", `${spec.name}/${requiredStep} is ${step.status}/${step.conclusion || "null"}`, step.url);
+                }
+              }
+
+              const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, { owner, repo, run_id: runId, per_page: 100 });
+              for (const name of expectedArtifactNames) {
+                const artifact = artifacts.find((candidate) => candidate.name === name);
+                const platformProfile = profiles.find((profile) => name.startsWith(`fdir-platform-evidence-${profile}-`));
+                const producerJob = platformProfile ? `Platform ${platformProfile}` : "Qualification bundle";
+                const producerStep = name.startsWith("fdir-platform-evidence-") ? "Upload platform candidate evidence" : name.startsWith("fdir-qualification-bundle-") ? "Upload qualification bundle" : "Upload qualification upload receipt";
+                if (!artifact) {
+                  addDiagnostic("ARTIFACT_MISSING", `required artifact ${name} is missing; an upload skipped after failure is not evidence`, `${runUrl}/artifacts`);
+                  base.artifacts.push({ name, status: "missing", required: true, producerJob, producerStep });
+                  continue;
+                }
+                const digestValue = artifact.digest || "";
+                const digestHex = digestValue.startsWith("sha256:") ? digestValue.slice(7) : digestValue;
+                const artifactUrl = `https://github.com/${repository}/actions/runs/${runIdText}/artifacts/${artifact.id}`;
+                const record = {
+                  id: String(artifact.id),
+                  name: artifact.name,
+                  status: artifact.expired ? "expired" : "uploaded",
+                  required: true,
+                  sizeInBytes: artifact.size_in_bytes,
+                  digest: digestValue,
+                  sha256: digestHex,
+                  createdAt: artifact.created_at,
+                  updatedAt: artifact.updated_at,
+                  expiresAt: artifact.expires_at,
+                  expired: artifact.expired,
+                  workflowRun: artifact.workflow_run,
+                  producerJob,
+                  producerStep,
+                  url: artifactUrl,
+                  apiUrl: artifact.url,
+                  archiveDownloadUrl: artifact.archive_download_url,
+                };
+                base.artifacts.push(record);
+                if (!/^sha256:[0-9a-f]{64}$/.test(digestValue)) addDiagnostic("ARTIFACT_DIGEST_INVALID", `${name} has no verifiable SHA-256 digest`, artifactUrl);
+                if (artifact.expired) addDiagnostic("ARTIFACT_EXPIRED", `${name} is expired`, artifactUrl);
+                if (artifact.size_in_bytes <= 0) addDiagnostic("ARTIFACT_EMPTY", `${name} is empty`, artifactUrl);
+                if (!artifact.workflow_run || String(artifact.workflow_run.id) !== runIdText || artifact.workflow_run.head_sha !== sourceSha) addDiagnostic("ARTIFACT_RUN_BINDING", `${name} is not bound to the exact source run/SHA`, artifactUrl);
+                if (artifact.expires_at && Date.parse(artifact.expires_at) <= Date.now()) addDiagnostic("ARTIFACT_RETENTION_EXPIRED", `${name} retention has expired`, artifactUrl);
+              }
+            } catch (error) {
+              addDiagnostic("GITHUB_API_VERIFICATION_ERROR", `${error.name || "Error"}: ${error.message}`, runUrl);
+            }
+
+            const runSuccess = base.run.status === "completed" && base.run.conclusion === "success";
+            base.releaseReady = runSuccess && diagnostics.length === 0;
+            base.status = base.releaseReady ? "passed" : "blocked";
+            base.attestationDigest = digest(base);
+            fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+            fs.writeFileSync(outputPath, `${JSON.stringify(base, null, 2)}\n`, "utf8");
+            const bundleName = `fdir-qualification-bundle-${sourceSha}-attempt-${attemptText}`;
+            const bundle = base.artifacts.find((artifact) => artifact.name === bundleName);
+            core.setOutput("release-ready", base.releaseReady ? "true" : "false");
+            core.setOutput("evidence-path", outputPath);
+            core.setOutput("workflow-conclusion", base.run.conclusion || "");
+            core.setOutput("bundle-artifact-id", bundle?.id || "");
+            core.setOutput("bundle-artifact-digest", bundle?.digest || "");
+            core.setOutput("bundle-artifact-url", bundle?.url || "");
+
+      - name: Upload GitHub Actions evidence
+        if: ${{ success() }}
+        id: upload-evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: fdir-ci-evidence-${{ env.EVIDENCE_SHA }}-attempt-${{ env.EVIDENCE_ATTEMPT }}
+          path: ${{ env.EVIDENCE_PATH }}
+          if-no-files-found: error
+          retention-days: 14
+      - name: Publish evidence links
+        if: ${{ success() }}
         shell: bash
         run: |
           {
-            echo "## Qualification evidence"
-            echo "- Source commit: https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
-            echo "- Workflow run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-            echo "- Artifact: ${{ steps.upload.outputs.artifact-url }}"
-            echo "- Artifact ID: ${{ steps.upload.outputs.artifact-id }}"
-            echo "- Artifact SHA-256: ${{ steps.upload.outputs.artifact-digest }}"
-            echo "- Retention: 14 days (expires 14 days after upload)"
+            echo "## GitHub Actions evidence"
+            echo "- Release-ready: ${{ steps.inspect.outputs.release-ready }}"
+            echo "- Source commit: https://github.com/${GITHUB_REPOSITORY}/commit/${EVIDENCE_SHA}"
+            echo "- Verified run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${EVIDENCE_RUN_ID}"
+            echo "- Verified attempt: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${EVIDENCE_RUN_ID}/attempts/${EVIDENCE_ATTEMPT}"
+            echo "- Evidence artifact: ${{ steps.upload-evidence.outputs.artifact-url }}"
+            echo "- Qualification artifact: ${{ steps.inspect.outputs.bundle-artifact-url }}"
+            echo "- Qualification artifact digest: ${{ steps.inspect.outputs.bundle-artifact-digest }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Require completed successful target run for final attestation
+        if: ${{ env.EVIDENCE_MANUAL == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ steps.inspect.outputs.release-ready }}" != "true" ]]; then
+            echo "FINAL_ATTESTATION_BLOCKED: target run/job/step/artifact evidence was not completed and successful" >&2
+            exit 1
+          fi
+      - name: Download qualification bundle for attestation
+        if: ${{ env.EVIDENCE_MANUAL == 'true' && steps.inspect.outputs.release-ready == 'true' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: fdir-qualification-bundle-${{ env.EVIDENCE_SHA }}-attempt-${{ env.EVIDENCE_ATTEMPT }}
+          path: ${{ runner.temp }}/candidate-bundle
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ env.EVIDENCE_RUN_ID }}
+      - name: Download qualification upload receipt
+        if: ${{ env.EVIDENCE_MANUAL == 'true' && steps.inspect.outputs.release-ready == 'true' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: fdir-qualification-receipt-${{ env.EVIDENCE_SHA }}-attempt-${{ env.EVIDENCE_ATTEMPT }}
+          path: ${{ runner.temp }}/candidate-receipt
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ env.EVIDENCE_RUN_ID }}
+      - name: Validate downloaded candidate bundle
+        if: ${{ env.EVIDENCE_MANUAL == 'true' && steps.inspect.outputs.release-ready == 'true' }}
+        id: candidate
+        shell: python
+        env:
+          CANDIDATE_ROOT: ${{ runner.temp }}/candidate-bundle
+          RECEIPT_ROOT: ${{ runner.temp }}/candidate-receipt
+          EVIDENCE_PATH: ${{ env.EVIDENCE_PATH }}
+        run: |
+          import json
+          import os
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          evidence = json.loads(Path(os.environ["EVIDENCE_PATH"]).read_text(encoding="utf-8"))
+          bundle_name = f"fdir-qualification-bundle-{os.environ['EVIDENCE_SHA']}-attempt-{os.environ['EVIDENCE_ATTEMPT']}"
+          bundle_record = next(item for item in evidence["artifacts"] if item.get("name") == bundle_name and item.get("status") == "uploaded")
+          manifests = sorted(Path(os.environ["CANDIDATE_ROOT"]).rglob("manifest.json"))
+          if len(manifests) != 1:
+              raise SystemExit(f"CANDIDATE_MANIFEST_COUNT:{len(manifests)}")
+          manifest = manifests[0]
+          value = json.loads(manifest.read_text(encoding="utf-8"))
+          if value.get("sourceSha") != os.environ["EVIDENCE_SHA"] or value.get("dirtyTree") is not False:
+              raise SystemExit("CANDIDATE_BUNDLE_BINDING_INVALID")
+          subprocess.run([sys.executable, "tools/validate_qualification_bundle.py", str(manifest)], check=True)
+          receipts = sorted(Path(os.environ["RECEIPT_ROOT"]).rglob("qualification-upload-receipt.json"))
+          if len(receipts) != 1:
+              raise SystemExit(f"QUALIFICATION_RECEIPT_COUNT:{len(receipts)}")
+          receipt = json.loads(receipts[0].read_text(encoding="utf-8"))
+          artifact = receipt.get("artifact", {})
+          if artifact.get("id") != bundle_record.get("id") or artifact.get("digest") != bundle_record.get("digest") or artifact.get("url") != bundle_record.get("url"):
+              raise SystemExit("QUALIFICATION_RECEIPT_ARTIFACT_MISMATCH")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              print(f"manifest={manifest}", file=output)
+              print(f"artifact-id={bundle_record['id']}", file=output)
+              print(f"artifact-digest={bundle_record['digest']}", file=output)
+              print(f"artifact-url={bundle_record['url']}", file=output)
+      - name: Build final release attestation
+        if: ${{ env.EVIDENCE_MANUAL == 'true' && steps.inspect.outputs.release-ready == 'true' }}
+        id: build-attestation
+        shell: python
+        env:
+          BUNDLE_MANIFEST: ${{ steps.candidate.outputs.manifest }}
+          BUNDLE_ARTIFACT_ID: ${{ steps.candidate.outputs.artifact-id }}
+          BUNDLE_ARTIFACT_DIGEST: ${{ steps.candidate.outputs.artifact-digest }}
+          BUNDLE_ARTIFACT_URL: ${{ steps.candidate.outputs.artifact-url }}
+          OUTPUT: ${{ runner.temp }}/fdir-release-evidence/release-attestation.json
+        run: |
+          import os
+          from pathlib import Path
+
+          from tools import release_attestation
+
+          external_environment = dict(os.environ)
+          external_environment.update({
+              "GITHUB_ACTIONS": "true",
+              "GITHUB_REPOSITORY": "horiyamayoh/fdir",
+              "GITHUB_SHA": os.environ["EVIDENCE_SHA"],
+              "GITHUB_RUN_ID": os.environ["EVIDENCE_RUN_ID"],
+              "GITHUB_RUN_ATTEMPT": os.environ["EVIDENCE_ATTEMPT"],
+              "GITHUB_JOB": "qualification",
+          })
+          artifact_digest = os.environ["BUNDLE_ARTIFACT_DIGEST"]
+          if artifact_digest.startswith("sha256:"):
+              artifact_digest = artifact_digest[7:]
+          release_attestation.build_attestation(
+              Path(os.environ["BUNDLE_MANIFEST"]),
+              output=Path(os.environ["OUTPUT"]),
+              source_sha=os.environ["EVIDENCE_SHA"],
+              artifact_id=os.environ["BUNDLE_ARTIFACT_ID"],
+              artifact_digest=artifact_digest,
+              artifact_url=os.environ["BUNDLE_ARTIFACT_URL"],
+              environment=external_environment,
+          )
+      - name: Upload release attestation
+        if: ${{ success() && env.EVIDENCE_MANUAL == 'true' && steps.inspect.outputs.release-ready == 'true' }}
+        id: upload-attestation
+        uses: actions/upload-artifact@v4
+        with:
+          name: fdir-release-attestation-${{ env.EVIDENCE_SHA }}-attempt-${{ env.EVIDENCE_ATTEMPT }}
+          path: |
+            ${{ env.EVIDENCE_PATH }}
+            ${{ runner.temp }}/fdir-release-evidence/release-attestation.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Write release attestation publication receipt
+        if: ${{ success() && steps.upload-attestation.outcome == 'success' }}
+        shell: python
+        env:
+          OUTPUT: ${{ runner.temp }}/fdir-release-evidence/release-attestation-publication.json
+          ARTIFACT_ID: ${{ steps.upload-attestation.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ steps.upload-attestation.outputs.artifact-digest }}
+          ARTIFACT_URL: ${{ steps.upload-attestation.outputs.artifact-url }}
+          ATTESTATION_PATH: ${{ runner.temp }}/fdir-release-evidence/release-attestation.json
+        run: |
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          attestation = json.loads(Path(os.environ["ATTESTATION_PATH"]).read_text(encoding="utf-8"))
+          digest = os.environ.get("ARTIFACT_DIGEST", "")
+          if digest and not digest.startswith("sha256:"):
+              digest = f"sha256:{digest}"
+          value = {
+              "schema": "fdir/release-attestation-publication",
+              "version": "1.0.0",
+              "provider": "github-actions",
+              "sourceSha": os.environ["EVIDENCE_SHA"],
+              "sourceRunId": os.environ["EVIDENCE_RUN_ID"],
+              "sourceAttempt": int(os.environ["EVIDENCE_ATTEMPT"]),
+              "attestationDigest": attestation.get("attestationDigest"),
+              "evidenceDigest": json.loads(Path(os.environ["EVIDENCE_PATH"]).read_text(encoding="utf-8")).get("attestationDigest"),
+              "artifact": {"status": "uploaded", "id": os.environ["ARTIFACT_ID"], "digest": digest, "url": os.environ["ARTIFACT_URL"]},
+              "links": {
+                  "source": f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/commit/{os.environ['EVIDENCE_SHA']}",
+                  "sourceRun": f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['EVIDENCE_RUN_ID']}",
+                  "publicationRun": f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+              },
+          }
+          canonical = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+          value["publicationDigest"] = hashlib.sha256(canonical).hexdigest()
+          Path(os.environ["OUTPUT"]).write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+      - name: Upload release attestation publication receipt
+        if: ${{ success() && steps.upload-attestation.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fdir-release-attestation-receipt-${{ env.EVIDENCE_SHA }}-attempt-${{ env.EVIDENCE_ATTEMPT }}
+          path: ${{ runner.temp }}/fdir-release-evidence/release-attestation-publication.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Publish final release attestation links
+        if: ${{ success() && steps.upload-attestation.outcome == 'success' }}
+        shell: bash
+        run: |
+          {
+            echo "## Final release attestation"
+            echo "- Source commit: https://github.com/${GITHUB_REPOSITORY}/commit/${EVIDENCE_SHA}"
+            echo "- Verified source run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${EVIDENCE_RUN_ID}"
+            echo "- Verified source attempt: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${EVIDENCE_RUN_ID}/attempts/${EVIDENCE_ATTEMPT}"
+            echo "- Release attestation artifact: ${{ steps.upload-attestation.outputs.artifact-url }}"
+            echo "- Release attestation artifact digest: ${{ steps.upload-attestation.outputs.artifact-digest }}"
+            echo "- Publication run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           } >> "$GITHUB_STEP_SUMMARY"

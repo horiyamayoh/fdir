@@ -18,13 +18,307 @@ from typing import Any
 import xml.etree.ElementTree as ET
 import zipfile
 
+
+# The bundle format deliberately keeps packaging provenance and requirement
+# evidence in different trust domains.  These definitions are shared by the
+# producer-side checks in the bundle builder and the independent checks in the
+# bundle validator.  Do not add command-exit/file-existence assertions here:
+# those are packaging facts, not qualification claims.
+PRODUCER_REPORT_SCHEMA = "fdir/qualification-producer-report"
+PRODUCER_REPORT_VERSION = "1.0.0"
+PRODUCER_REPORT_OUTPUT_ROLE = "producer-report"
+
+PRODUCER_REPORT_REQUIRED_FIELDS = frozenset({
+    "schema",
+    "version",
+    "evidenceId",
+    "requirementIds",
+    "sourceSha",
+    "inputDigests",
+    "producerId",
+    "authorityId",
+    "independence",
+    "assertions",
+    "testCases",
+    "uncoveredItems",
+    "unsupportedItems",
+    "waivedItems",
+    "status",
+    "failureCount",
+})
+PRODUCER_REPORT_ALLOWED_FIELDS = PRODUCER_REPORT_REQUIRED_FIELDS
+PRODUCER_ASSERTION_REQUIRED_FIELDS = frozenset({
+    "assertionId",
+    "requirementId",
+    "assertionType",
+    "testCaseId",
+    "classification",
+    "authorityArtifact",
+    "actualArtifact",
+    "expected",
+    "actual",
+    "comparison",
+    "status",
+    "target",
+    "diagnostic",
+    "supportingArtifact",
+})
+PRODUCER_ASSERTION_ALLOWED_FIELDS = PRODUCER_ASSERTION_REQUIRED_FIELDS
+PRODUCER_CASE_REQUIRED_FIELDS = frozenset({
+    "caseId",
+    "requirementId",
+    "classification",
+    "inputArtifact",
+    "authorityArtifact",
+    "actualArtifact",
+    "expected",
+    "actual",
+    "comparison",
+    "result",
+    "target",
+    "diagnostic",
+    "supportingArtifact",
+})
+PRODUCER_CASE_ALLOWED_FIELDS = PRODUCER_CASE_REQUIRED_FIELDS
+ARTIFACT_REFERENCE_REQUIRED_FIELDS = frozenset({"path", "sha256", "selector", "selectedSha256"})
+ARTIFACT_REFERENCE_ALLOWED_FIELDS = ARTIFACT_REFERENCE_REQUIRED_FIELDS
+SELECTOR_REQUIRED_FIELDS = frozenset({"kind"})
+SELECTOR_ALLOWED_FIELDS = frozenset({"kind", "pointer", "lineStart", "lineEnd"})
+CLASSIFICATIONS = frozenset({"positive", "negative", "mutation", "metamorphic", "differential", "hostile"})
+
+
+def is_producer_report_output(value: Any) -> bool:
+    """Return whether a contract output explicitly declares the producer envelope.
+
+    ``producerReport`` is the contract-facing spelling; the copied Evidence
+    output is normalized to the stable ``producer-report`` role.  A semantic
+    report must never be inferred as the envelope merely because it is JSON or
+    because a command exited successfully.
+    """
+
+    if not isinstance(value, dict):
+        return False
+    return value.get("producerReport") is True or (
+        isinstance(value.get("role"), str)
+        and value["role"].casefold() == PRODUCER_REPORT_OUTPUT_ROLE
+    )
+
+
+def canonical_json_bytes(value: Any) -> bytes:
+    """Return the canonical bytes used for selected JSON value digests."""
+
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def _selector_tokens(pointer: str) -> list[str]:
+    if pointer == "":
+        return []
+    if not isinstance(pointer, str) or not pointer.startswith("/"):
+        raise ValueError("JSON Pointer must be empty or start with '/'")
+    return [token.replace("~1", "/").replace("~0", "~") for token in pointer[1:].split("/")]
+
+
+def resolve_json_pointer(value: Any, pointer: str) -> Any:
+    """Resolve a bounded RFC 6901 JSON Pointer without accepting heuristics."""
+
+    current = value
+    for token in _selector_tokens(pointer):
+        if isinstance(current, dict) and token in current:
+            current = current[token]
+        elif isinstance(current, list) and token.isdigit() and int(token) < len(current):
+            current = current[int(token)]
+        else:
+            raise KeyError(pointer)
+    return current
+
+
+def selected_artifact_value(path: Path, selector: dict[str, Any]) -> Any:
+    """Read exactly the selected content from a supporting artifact."""
+
+    if not isinstance(selector, dict) or selector.get("kind") not in {"json-pointer", "whole-file"}:
+        raise ValueError("artifact selector must be json-pointer or whole-file")
+    if selector["kind"] == "whole-file":
+        return Path(path).read_bytes()
+    document = json.loads(Path(path).read_text(encoding="utf-8-sig"))
+    return resolve_json_pointer(document, selector.get("pointer", ""))
+
+
+def selected_artifact_digest(value: Any, selector: dict[str, Any]) -> str:
+    """Digest a selected value with a selector-specific canonicalization."""
+
+    if selector.get("kind") == "whole-file":
+        if not isinstance(value, (bytes, bytearray)):
+            raise TypeError("whole-file selector did not return bytes")
+        return sha256(bytes(value)).hexdigest()
+    return sha256(canonical_json_bytes(value)).hexdigest()
+
+
+def _comparison_equal(expected: Any, actual: Any, comparison: dict[str, Any]) -> bool:
+    return comparison.get("operator") == "equal" and canonical_json_bytes(expected) == canonical_json_bytes(actual)
+
+
+def _comparison_not_equal(expected: Any, actual: Any, comparison: dict[str, Any]) -> bool:
+    return comparison.get("operator") == "not-equal" and canonical_json_bytes(expected) != canonical_json_bytes(actual)
+
+
+def _comparison_contains(expected: Any, actual: Any, comparison: dict[str, Any]) -> bool:
+    if comparison.get("operator") != "contains":
+        return False
+    if isinstance(expected, list):
+        return isinstance(actual, list) and all(item in actual for item in expected)
+    if isinstance(expected, dict):
+        return isinstance(actual, dict) and all(key in actual and canonical_json_bytes(actual[key]) == canonical_json_bytes(value) for key, value in expected.items())
+    if isinstance(expected, str):
+        return isinstance(actual, str) and expected in actual
+    return False
+
+
+# This is intentionally a registry, not a fallback to ``expected == actual``.
+# Every producer assertion type has a named evaluator and a fixed comparison
+# rule.  Generic command/file assertions are intentionally absent.
+ASSERTION_EVALUATOR_REGISTRY = {
+    "json-value-equals": _comparison_equal,
+    "json-value-not-equals": _comparison_not_equal,
+    "negative-rejection": _comparison_not_equal,
+    "mutation-killed": _comparison_not_equal,
+    "metamorphic-equality": _comparison_equal,
+    "differential-equality": _comparison_equal,
+    "source-occurrence-accounting": _comparison_equal,
+    "capability-coverage": _comparison_equal,
+    "status-aggregation": _comparison_equal,
+    "schema-differential": _comparison_equal,
+    "graph-invariant": _comparison_equal,
+    "status-contract": _comparison_equal,
+    "defect-injection": _comparison_equal,
+    "style-provenance": _comparison_equal,
+    "geometry-order": _comparison_equal,
+    "topology": _comparison_equal,
+    "relationship-closure": _comparison_equal,
+    "extension-closure": _comparison_equal,
+    "canonical-identity": _comparison_equal,
+    "format-profile": _comparison_equal,
+    "query-index-parity": _comparison_equal,
+    "corpus-independence": _comparison_equal,
+    "release-claim-conformance": _comparison_equal,
+    "artifact-digest-equals": _comparison_equal,
+    "artifact-contains": _comparison_contains,
+}
+
+
+# The issue-to-type map is deliberately kept in code because the current
+# qualification contract predates producer reports and cannot be weakened by
+# merely adding an evidence ID or reusing a generic suite command.
+ISSUE_PRODUCER_ASSERTION_TYPES = {
+    88: frozenset({"json-value-equals", "negative-rejection", "mutation-killed"}),
+    89: frozenset({"defect-injection", "mutation-killed"}),
+    90: frozenset({"schema-differential", "graph-invariant", "status-contract"}),
+    91: frozenset({"source-occurrence-accounting", "capability-coverage", "status-aggregation"}),
+    92: frozenset({"json-value-equals", "differential-equality", "mutation-killed"}),
+    93: frozenset({"style-provenance", "json-value-equals", "mutation-killed"}),
+    94: frozenset({"geometry-order", "json-value-equals", "mutation-killed"}),
+    95: frozenset({"topology", "json-value-equals", "mutation-killed"}),
+    96: frozenset({"relationship-closure", "json-value-equals", "mutation-killed"}),
+    97: frozenset({"extension-closure", "json-value-equals", "mutation-killed"}),
+    98: frozenset({"canonical-identity", "differential-equality", "mutation-killed"}),
+    99: frozenset({"format-profile", "differential-equality", "mutation-killed"}),
+    100: frozenset({"format-profile", "differential-equality", "mutation-killed"}),
+    101: frozenset({"format-profile", "differential-equality", "mutation-killed"}),
+    102: frozenset({"format-profile", "differential-equality", "mutation-killed"}),
+    103: frozenset({"query-index-parity", "differential-equality", "mutation-killed"}),
+    104: frozenset({"corpus-independence", "differential-equality", "metamorphic-equality", "mutation-killed"}),
+    105: frozenset({"release-claim-conformance", "differential-equality", "mutation-killed"}),
+}
+
+
+def allowed_producer_assertion_types(issue_numbers: list[int]) -> frozenset[str]:
+    """Return the non-generic evaluator types allowed for an evidence lane."""
+
+    allowed: set[str] = set()
+    for issue_number in issue_numbers:
+        allowed.update(ISSUE_PRODUCER_ASSERTION_TYPES.get(int(issue_number), ASSERTION_EVALUATOR_REGISTRY))
+    return frozenset(allowed)
+
+
+def validate_producer_report_shape(report: Any) -> list[str]:
+    """Validate the closed, issue-specific producer report envelope."""
+
+    errors: list[str] = []
+    if not isinstance(report, dict):
+        return ["producer report root must be an object"]
+    missing = sorted(PRODUCER_REPORT_REQUIRED_FIELDS - set(report))
+    extra = sorted(set(report) - PRODUCER_REPORT_ALLOWED_FIELDS)
+    if missing:
+        errors.append("producer report is missing: " + ", ".join(missing))
+    if extra:
+        errors.append("producer report has unknown fields: " + ", ".join(extra))
+    if report.get("schema") != PRODUCER_REPORT_SCHEMA or report.get("version") != PRODUCER_REPORT_VERSION:
+        errors.append("producer report schema/version is invalid")
+    if not isinstance(report.get("producerId"), str) or not report["producerId"]:
+        errors.append("producer report producerId is required")
+    if not isinstance(report.get("authorityId"), str) or not report["authorityId"]:
+        errors.append("producer report authorityId is required")
+    independence = report.get("independence")
+    if not isinstance(independence, dict):
+        errors.append("producer report independence must be an object")
+    else:
+        required = {"producerComponentDigest", "authorityComponentDigest", "evaluatorComponentDigest", "expectedDerivedFromActual", "sharedComponentDigests"}
+        if required - set(independence):
+            errors.append("producer report independence fields are incomplete")
+        if independence.get("expectedDerivedFromActual") is not False:
+            errors.append("producer report must prove expected output was not derived from actual output")
+        if not isinstance(independence.get("sharedComponentDigests"), list):
+            errors.append("producer report sharedComponentDigests must be an array")
+    for field in ("evidenceId", "sourceSha"):
+        if not isinstance(report.get(field), str) or not report[field]:
+            errors.append(f"producer report {field} is required")
+    if not isinstance(report.get("requirementIds"), list) or not report["requirementIds"]:
+        errors.append("producer report requirementIds must be a non-empty array")
+    input_digests = report.get("inputDigests")
+    if not isinstance(input_digests, list) or not input_digests or any(not isinstance(item, str) for item in input_digests):
+        errors.append("producer report inputDigests must be a non-empty array")
+    for field in ("assertions", "testCases"):
+        if not isinstance(report.get(field), list) or not report[field]:
+            errors.append(f"producer report {field} must be a non-empty array")
+    for field in ("uncoveredItems", "unsupportedItems", "waivedItems"):
+        if not isinstance(report.get(field), list):
+            errors.append(f"producer report {field} must be an array")
+    if report.get("status") not in {"passed", "failed", "blocked"}:
+        errors.append("producer report status is invalid")
+    if not isinstance(report.get("failureCount"), int) or report.get("failureCount") < 0:
+        errors.append("producer report failureCount is invalid")
+    return errors
+
 try:
     from ir_validation import COLLECTION_KEYS
-    from query_ir import get_entity, list_entities, rebuild_index
+    from query_ir import (
+        _build_index,
+        _find_references_validated,
+        _get_entity_validated,
+        _list_entities_validated,
+        _query_field_coverage_validated,
+        _validated_document,
+        find_references,
+        get_entity,
+        list_entities,
+        query_field_coverage,
+        rebuild_index,
+    )
     from adapter_pdf import _decode_stream, _pdf_font_mappings, _pdf_objects, _pdf_references, _pdf_operations
 except ImportError:  # pragma: no cover
     from tools.ir_validation import COLLECTION_KEYS
-    from tools.query_ir import get_entity, list_entities, rebuild_index
+    from tools.query_ir import (
+        _build_index,
+        _find_references_validated,
+        _get_entity_validated,
+        _list_entities_validated,
+        _query_field_coverage_validated,
+        _validated_document,
+        find_references,
+        get_entity,
+        list_entities,
+        query_field_coverage,
+        rebuild_index,
+    )
     from tools.adapter_pdf import _decode_stream, _pdf_font_mappings, _pdf_objects, _pdf_references, _pdf_operations
 
 
@@ -837,8 +1131,12 @@ def _pdf_page_streams(objects: dict[tuple[int, int], bytes]) -> list[tuple[int, 
         if streams:
             for reference, stream in streams:
                 result.append((page, reference, stream))
-        else:
-            result.append((page, page_key, page_data))
+        # A page dictionary is not a content stream.  Falling back to the
+        # dictionary bytes makes keys such as /Type and /Parent look like PDF
+        # operators and creates fabricated unsupported occurrences when the
+        # referenced stream is unavailable or fails its bounded /Length check.
+        # The object-level bounded-work diagnostic is the authoritative
+        # accounting for that situation.
     return result
 
 
@@ -1702,20 +2000,23 @@ def validate_source_feature_closure(document: dict[str, Any], evidence: dict[str
 def query_parity(document: dict[str, Any]) -> dict[str, Any]:
     """Compare every typed direct entity lookup with the rebuilt index."""
 
+    validated = _validated_document(document)
+    document = validated.document
     direct_ids: list[tuple[str, str]] = []
     direct_counts: dict[str, int] = {}
     operations: set[str] = set()
     for collection, identifier_key in COLLECTION_KEYS.items():
-        values = list_entities(document, collection)
+        values = _list_entities_validated(document, collection)
         operations.add(f"list_entities:{collection}")
         direct_counts[collection] = len(values)
         for item in values:
             identifier = item[identifier_key]
-            if get_entity(document, collection, identifier)[identifier_key] != identifier:
+            if _get_entity_validated(document, collection, identifier)[identifier_key] != identifier:
                 raise ValueError(f"typed lookup mismatch: {collection}/{identifier}")
             direct_ids.append((collection, identifier))
             operations.add(f"get_entity:{collection}")
-    index = rebuild_index(document)
+    field_coverage = _query_field_coverage_validated(document)
+    index = _build_index(document)
     index_ids = [(item["collection"], item["id"]) for item in index["entities"]]
     direct_ids.sort()
     index_ids.sort()
@@ -1723,8 +2024,34 @@ def query_parity(document: dict[str, Any]) -> dict[str, Any]:
         missing = sorted(set(direct_ids) - set(index_ids))
         extra = sorted(set(index_ids) - set(direct_ids))
         raise ValueError(f"direct/index entity mismatch: missing={missing}, extra={extra}")
+    mismatches: list[dict[str, Any]] = []
+    if field_coverage["status"] != "passed":
+        mismatches.extend(field_coverage["unqueryableFacts"])
+    if len(index.get("fieldFacts", [])) != field_coverage["checkedFactCount"]:
+        mismatches.append({
+            "code": "QUERY_FIELD_FACT_COUNT_MISMATCH",
+            "direct": field_coverage["checkedFactCount"],
+            "index": len(index.get("fieldFacts", [])),
+        })
+    direct_references = {
+        (
+            row["fromCollection"], row["fromId"], row["field"],
+            row["toCollection"], row["toId"], row["ordinal"],
+        )
+        for row in _find_references_validated(document, index=index)
+    }
+    indexed_references = {
+        (
+            row["fromCollection"], row["fromId"], row["field"],
+            row["toCollection"], row["toId"], row["ordinal"],
+        )
+        for row in index.get("reverseReferences", [])
+    }
+    if direct_references != indexed_references:  # retained as an explicit parity assertion
+        mismatches.append({"code": "REVERSE_REFERENCE_PARITY_MISMATCH"})
+    validated.assert_current()
     return {
-        "status": "passed",
+        "status": "passed" if not mismatches else "failed",
         "operations": sorted(operations),
         "directEntityCount": len(direct_ids),
         "indexEntityCount": len(index_ids),
@@ -1732,7 +2059,12 @@ def query_parity(document: dict[str, Any]) -> dict[str, Any]:
         "indexEntityIds": [f"{collection}/{identifier}" for collection, identifier in index_ids],
         "directCounts": direct_counts,
         "reverseReferenceCount": len(index["reverseReferences"]),
-        "unqueryableFacts": [],
+        "directReferenceCount": len(direct_references),
+        "indexReferenceCount": len(indexed_references),
+        "fieldFactCount": len(index.get("fieldFacts", [])),
+        "registeredFieldPathCount": field_coverage["registeredFieldPathCount"],
+        "unqueryableFacts": field_coverage["unqueryableFacts"],
+        "mismatches": mismatches,
     }
 
 
@@ -1774,6 +2106,7 @@ def _legacy_query_parity(document: dict[str, Any]) -> dict[str, Any]:
                 raise ValueError(f"typed lookup mismatch: {collection}/{identifier}")
             direct_ids.append((collection, identifier))
             operations.add(f"get_entity:{collection}")
+    field_coverage = query_field_coverage(document)
     index = rebuild_index(document)
     index_ids = [(item["collection"], item["id"]) for item in index["entities"]]
     direct_ids.sort()
@@ -1783,7 +2116,7 @@ def _legacy_query_parity(document: dict[str, Any]) -> dict[str, Any]:
         extra = sorted(set(index_ids) - set(direct_ids))
         raise ValueError(f"direct/index entity mismatch: missing={missing}, extra={extra}")
     return {
-        "status": "passed",
+        "status": "passed" if field_coverage["status"] == "passed" else "failed",
         "operations": sorted(operations),
         "directEntityCount": len(direct_ids),
         "indexEntityCount": len(index_ids),
@@ -1791,7 +2124,10 @@ def _legacy_query_parity(document: dict[str, Any]) -> dict[str, Any]:
         "indexEntityIds": [f"{collection}/{identifier}" for collection, identifier in index_ids],
         "directCounts": direct_counts,
         "reverseReferenceCount": len(index["reverseReferences"]),
-        "unqueryableFacts": [],
+        "fieldFactCount": len(index.get("fieldFacts", [])),
+        "registeredFieldPathCount": field_coverage["registeredFieldPathCount"],
+        "unqueryableFacts": field_coverage["unqueryableFacts"],
+        "mismatches": field_coverage["unqueryableFacts"],
     }
 
 

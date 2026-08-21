@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/horiyamayoh/fdir/schemas/qualification-evidence.schema.json/1.0.0",
   "title": "FDIR qualification Evidence object",
-  "description": "Commit-bound, digest-bound execution evidence for a qualification bundle.",
+  "description": "Commit-bound packaging provenance containing an independently produced, issue-specific qualification report.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -20,6 +20,7 @@
     "environment",
     "inputs",
     "outputs",
+    "producerReport",
     "assertions",
     "testCases",
     "status",
@@ -28,113 +29,60 @@
     "ci"
   ],
   "properties": {
-    "schema": {
-      "const": "fdir/qualification-evidence"
-    },
-    "version": {
-      "const": "1.0.0"
-    },
-    "evidenceId": {
-      "type": "string",
-      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-    },
+    "schema": { "const": "fdir/qualification-evidence" },
+    "version": { "const": "1.0.0" },
+    "evidenceId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
     "issueNumbers": {
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "items": {
-        "type": "integer",
-        "minimum": 1
-      }
+      "items": { "type": "integer", "minimum": 1 }
     },
     "requirementIds": {
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-      }
+      "items": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" }
     },
-    "sourceSha": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{40}$"
-    },
-    "dirtyTree": {
-      "type": "boolean"
-    },
-    "generatedAt": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "generator": {
-      "type": "string",
-      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^/\\\\]+(?:/[^/\\\\]+)*$"
-    },
+    "sourceSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "dirtyTree": { "type": "boolean" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "generator": { "$ref": "#/$defs/repositoryPath" },
     "command": {
       "type": "array",
       "minItems": 1,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
+      "items": { "type": "string", "minLength": 1 }
     },
-    "workingDirectory": {
-      "type": "string",
-      "pattern": "^(?:\\.|(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^/\\\\]+(?:/[^/\\\\]+)*)$"
-    },
-    "environment": {
-      "$ref": "#/$defs/environment"
-    },
+    "workingDirectory": { "type": "string", "pattern": "^(?:\\.|(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^/\\\\]+(?:/[^/\\\\]+)*)$" },
+    "environment": { "$ref": "#/$defs/environment" },
     "inputs": {
       "type": "array",
       "minItems": 1,
-      "items": {
-        "$ref": "#/$defs/input"
-      }
+      "items": { "$ref": "#/$defs/input" }
     },
     "outputs": {
       "type": "array",
       "minItems": 1,
-      "items": {
-        "$ref": "#/$defs/output"
-      }
+      "items": { "$ref": "#/$defs/output" }
     },
+    "producerReport": { "$ref": "#/$defs/producerReportBinding" },
     "assertions": {
       "type": "array",
       "minItems": 1,
-      "items": {
-        "$ref": "#/$defs/assertion"
-      }
+      "items": { "$ref": "#/$defs/packagingAssertion" }
     },
     "testCases": {
       "type": "array",
       "minItems": 1,
-      "items": {
-        "$ref": "#/$defs/testCase"
-      }
+      "items": { "$ref": "#/$defs/packagingCase" }
     },
-    "status": {
-      "type": "string",
-      "enum": [
-        "passed",
-        "failed",
-        "blocked"
-      ]
-    },
-    "failureCount": {
-      "type": "integer",
-      "minimum": 0
-    },
+    "status": { "type": "string", "enum": ["passed", "failed", "blocked"] },
+    "failureCount": { "type": "integer", "minimum": 0 },
     "waivers": {
       "type": "array",
-      "items": {
-        "$ref": "#/$defs/waiver"
-      }
+      "items": { "$ref": "#/$defs/waiver" }
     },
-    "ci": {
-      "$ref": "#/$defs/ci"
-    }
+    "ci": { "$ref": "#/$defs/ci" }
   },
   "$defs": {
     "sha256": {
@@ -145,244 +93,235 @@
       "type": "string",
       "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^/\\\\]+(?:/[^/\\\\]+)*$"
     },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
     "environment": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "os",
-        "architecture",
-        "python",
-        "runtime",
-        "dependencyLockDigest"
-      ],
+      "required": ["os", "architecture", "python", "runtime", "dependencyLockDigest"],
       "properties": {
-        "os": {
-          "type": "string",
-          "minLength": 1
-        },
-        "architecture": {
-          "type": "string",
-          "minLength": 1
-        },
-        "python": {
-          "type": "string",
-          "minLength": 1
-        },
-        "runtime": {
-          "type": "string",
-          "minLength": 1
-        },
-        "dependencyLockDigest": {
-          "$ref": "#/$defs/sha256"
-        }
+        "os": { "type": "string", "minLength": 1 },
+        "architecture": { "type": "string", "minLength": 1 },
+        "python": { "type": "string", "minLength": 1 },
+        "runtime": { "type": "string", "minLength": 1 },
+        "dependencyLockDigest": { "$ref": "#/$defs/sha256" }
       }
     },
     "input": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "path",
-        "sha256",
-        "role"
-      ],
+      "required": ["path", "sha256", "role"],
       "properties": {
-        "path": {
-          "$ref": "#/$defs/repositoryPath"
-        },
-        "sha256": {
-          "$ref": "#/$defs/sha256"
-        },
-        "role": {
-          "type": "string",
-          "minLength": 1
-        }
+        "path": { "$ref": "#/$defs/repositoryPath" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "role": { "type": "string", "minLength": 1 }
       }
     },
     "output": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "path",
-        "mediaType",
-        "sha256",
-        "role"
-      ],
+      "required": ["path", "mediaType", "sha256", "role"],
       "properties": {
-        "path": {
-          "$ref": "#/$defs/repositoryPath"
-        },
-        "mediaType": {
-          "type": "string",
-          "minLength": 1
-        },
-        "sha256": {
-          "$ref": "#/$defs/sha256"
-        },
-        "role": {
-          "type": "string",
-          "minLength": 1
-        }
+        "path": { "$ref": "#/$defs/repositoryPath" },
+        "mediaType": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "role": { "type": "string", "minLength": 1 }
       }
     },
-    "supportingOutput": {
+    "selector": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "path",
-        "lineStart",
-        "lineEnd"
-      ],
+      "required": ["kind"],
       "properties": {
-        "path": {
-          "$ref": "#/$defs/repositoryPath"
+        "kind": { "type": "string", "enum": ["json-pointer", "whole-file"] },
+        "pointer": { "type": "string", "pattern": "^(?:|/.*)$" },
+        "lineStart": { "type": "integer", "minimum": 1 },
+        "lineEnd": { "type": "integer", "minimum": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "json-pointer" } } },
+          "then": { "required": ["pointer"] }
         },
-        "lineStart": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "lineEnd": {
-          "type": "integer",
-          "minimum": 1
+        {
+          "if": { "properties": { "kind": { "const": "whole-file" } } },
+          "then": { "not": { "required": ["pointer"] } }
         }
+      ]
+    },
+    "artifactReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "selector", "selectedSha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/repositoryPath" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "selector": { "$ref": "#/$defs/selector" },
+        "selectedSha256": { "$ref": "#/$defs/sha256" }
       }
     },
-    "assertion": {
+    "producerReportBinding": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "assertionId",
-        "expected",
-        "actual",
-        "status",
-        "supportingOutput"
-      ],
+      "required": ["path", "sha256", "schema", "version", "evidenceId", "requirementIds"],
       "properties": {
-        "assertionId": {
+        "path": { "$ref": "#/$defs/repositoryPath" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "schema": { "const": "fdir/qualification-producer-report" },
+        "version": { "const": "1.0.0" },
+        "evidenceId": { "$ref": "#/$defs/id" },
+        "requirementIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
+      }
+    },
+    "packagingAssertion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assertionId", "assertionType", "expected", "actual", "status", "supportingOutput"],
+      "properties": {
+        "assertionId": { "$ref": "#/$defs/id" },
+        "assertionType": {
           "type": "string",
-          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          "enum": ["producer-report-digest", "producer-report-source-binding", "output-digest-binding", "manifest-completeness", "command-metadata"]
         },
         "expected": {},
         "actual": {},
-        "status": {
-          "type": "string",
-          "enum": [
-            "passed",
-            "failed"
-          ]
-        },
-        "supportingOutput": {
-          "$ref": "#/$defs/supportingOutput"
-        }
+        "status": { "type": "string", "enum": ["passed", "failed"] },
+        "supportingOutput": { "$ref": "#/$defs/artifactReference" }
       }
     },
-    "testCase": {
+    "packagingCase": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "caseId",
-        "oracle",
-        "inputDigest",
-        "result"
-      ],
+      "required": ["caseId", "caseType", "inputDigest", "actualArtifact", "expected", "actual", "comparison", "result"],
       "properties": {
-        "caseId": {
-          "type": "string",
-          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-        },
-        "oracle": {
-          "type": "string",
-          "minLength": 1
-        },
-        "inputDigest": {
-          "$ref": "#/$defs/sha256"
-        },
-        "result": {
-          "type": "string",
-          "enum": [
-            "passed",
-            "failed",
-            "skipped"
-          ]
-        }
+        "caseId": { "$ref": "#/$defs/id" },
+        "caseType": { "const": "packaging" },
+        "inputDigest": { "$ref": "#/$defs/sha256" },
+        "actualArtifact": { "$ref": "#/$defs/artifactReference" },
+        "expected": {},
+        "actual": {},
+        "comparison": { "$ref": "#/$defs/comparison" },
+        "result": { "type": "string", "enum": ["passed", "failed"] }
+      }
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operator"],
+      "properties": {
+        "operator": { "type": "string", "enum": ["equal", "not-equal", "contains"] }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 }
+      }
+    },
+    "producerAssertion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assertionId", "requirementId", "assertionType", "testCaseId", "classification", "authorityArtifact", "actualArtifact", "expected", "actual", "comparison", "status", "target", "diagnostic", "supportingArtifact"],
+      "properties": {
+        "assertionId": { "$ref": "#/$defs/id" },
+        "requirementId": { "$ref": "#/$defs/id" },
+        "assertionType": { "type": "string", "minLength": 1 },
+        "testCaseId": { "$ref": "#/$defs/id" },
+        "classification": { "type": "string", "enum": ["positive", "negative", "mutation", "metamorphic", "differential", "hostile"] },
+        "authorityArtifact": { "$ref": "#/$defs/artifactReference" },
+        "actualArtifact": { "$ref": "#/$defs/artifactReference" },
+        "expected": {},
+        "actual": {},
+        "comparison": { "$ref": "#/$defs/comparison" },
+        "status": { "type": "string", "enum": ["passed", "failed"] },
+        "target": { "type": "object", "minProperties": 1 },
+        "diagnostic": { "$ref": "#/$defs/diagnostic" },
+        "supportingArtifact": { "$ref": "#/$defs/artifactReference" }
+      }
+    },
+    "producerCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["caseId", "requirementId", "classification", "inputArtifact", "authorityArtifact", "actualArtifact", "expected", "actual", "comparison", "result", "target", "diagnostic", "supportingArtifact"],
+      "properties": {
+        "caseId": { "$ref": "#/$defs/id" },
+        "requirementId": { "$ref": "#/$defs/id" },
+        "classification": { "type": "string", "enum": ["positive", "negative", "mutation", "metamorphic", "differential", "hostile"] },
+        "inputArtifact": { "$ref": "#/$defs/artifactReference" },
+        "authorityArtifact": { "$ref": "#/$defs/artifactReference" },
+        "actualArtifact": { "$ref": "#/$defs/artifactReference" },
+        "expected": {},
+        "actual": {},
+        "comparison": { "$ref": "#/$defs/comparison" },
+        "result": { "type": "string", "enum": ["passed", "failed", "skipped"] },
+        "target": { "type": "object", "minProperties": 1 },
+        "diagnostic": { "$ref": "#/$defs/diagnostic" },
+        "supportingArtifact": { "$ref": "#/$defs/artifactReference" }
+      }
+    },
+    "independence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["producerComponentDigest", "authorityComponentDigest", "evaluatorComponentDigest", "expectedDerivedFromActual", "sharedComponentDigests"],
+      "properties": {
+        "producerComponentDigest": { "$ref": "#/$defs/sha256" },
+        "authorityComponentDigest": { "$ref": "#/$defs/sha256" },
+        "evaluatorComponentDigest": { "$ref": "#/$defs/sha256" },
+        "expectedDerivedFromActual": { "const": false },
+        "sharedComponentDigests": { "type": "array", "items": { "$ref": "#/$defs/sha256" } }
+      }
+    },
+    "producerReportDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "version", "evidenceId", "requirementIds", "sourceSha", "inputDigests", "producerId", "authorityId", "independence", "assertions", "testCases", "uncoveredItems", "unsupportedItems", "waivedItems", "status", "failureCount"],
+      "properties": {
+        "schema": { "const": "fdir/qualification-producer-report" },
+        "version": { "const": "1.0.0" },
+        "evidenceId": { "$ref": "#/$defs/id" },
+        "requirementIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+        "sourceSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "inputDigests": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/sha256" } },
+        "producerId": { "type": "string", "minLength": 1 },
+        "authorityId": { "type": "string", "minLength": 1 },
+        "independence": { "$ref": "#/$defs/independence" },
+        "assertions": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/producerAssertion" } },
+        "testCases": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/producerCase" } },
+        "uncoveredItems": { "type": "array" },
+        "unsupportedItems": { "type": "array" },
+        "waivedItems": { "type": "array" },
+        "status": { "type": "string", "enum": ["passed", "failed", "blocked"] },
+        "failureCount": { "type": "integer", "minimum": 0 }
       }
     },
     "waiver": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "waiverId",
-        "reason",
-        "approvedBy"
-      ],
+      "required": ["waiverId", "reason", "approvedBy"],
       "properties": {
-        "waiverId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "reason": {
-          "type": "string",
-          "minLength": 1
-        },
-        "approvedBy": {
-          "type": "string",
-          "minLength": 1
-        }
+        "waiverId": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 },
+        "approvedBy": { "type": "string", "minLength": 1 }
       }
     },
     "ci": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "provider",
-        "repository",
-        "sourceSha",
-        "runId",
-        "runUrl",
-        "jobId",
-        "attempt",
-        "status"
-      ],
+      "required": ["provider", "repository", "sourceSha", "runId", "runUrl", "jobId", "attempt", "status"],
       "properties": {
-        "provider": {
-          "type": "string",
-          "enum": [
-            "github-actions",
-            "local"
-          ]
-        },
-        "repository": {
-          "type": "string",
-          "minLength": 1
-        },
-        "sourceSha": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{40}$"
-        },
-        "runId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "runUrl": {
-          "type": "string",
-          "minLength": 1
-        },
-        "jobId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "attempt": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "status": {
-          "type": "string",
-          "enum": [
-            "completed",
-            "in_progress",
-            "cancelled",
-            "skipped"
-          ]
-        }
+        "provider": { "type": "string", "enum": ["github-actions", "local"] },
+        "repository": { "type": "string", "minLength": 1 },
+        "sourceSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "runId": { "type": "string", "minLength": 1 },
+        "runUrl": { "type": "string", "minLength": 1 },
+        "jobId": { "type": "string", "minLength": 1 },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "status": { "type": "string", "enum": ["completed", "in_progress", "cancelled", "skipped"] }
       }
     }
   }

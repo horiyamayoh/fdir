@@ -1,0 +1,472 @@
+{
+  "schema": "fdir/qualification-issue-93-corpus",
+  "version": "1.0.0",
+  "issueNumber": 93,
+  "qualificationScope": "bounded-independent-style-slice",
+  "oracle": {
+    "identity": "literal expected values authored in this corpus",
+    "expectedValuesAreRuntimeIndependent": true,
+    "forbiddenDerivations": [
+      "tools/adapter_docx.py::_style_properties",
+      "tools/adapter_docx.py::_resolve_styles",
+      "tools/adapter_xlsx.py::_style_table"
+    ],
+    "sourceKind": "authored OOXML package parts; no pre-authored IR is used as input"
+  },
+  "fixtures": [
+    {
+      "fixtureId": "docx-three-level-theme-cascade",
+      "format": "docx",
+      "sourceKind": "authored-ooxml",
+      "parts": {
+        "[Content_Types].xml": [
+          "<?xml version='1.0' encoding='UTF-8'?>",
+          "<Types xmlns='http://schemas.openxmlformats.org/package/2006/content-types'>",
+          "  <Default Extension='rels' ContentType='application/vnd.openxmlformats-package.relationships+xml'/>",
+          "  <Default Extension='xml' ContentType='application/xml'/>",
+          "  <Override PartName='/word/document.xml' ContentType='application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'/>",
+          "  <Override PartName='/word/styles.xml' ContentType='application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml'/>",
+          "  <Override PartName='/word/theme/theme1.xml' ContentType='application/vnd.openxmlformats-officedocument.theme+xml'/>",
+          "</Types>"
+        ],
+        "_rels/.rels": [
+          "<?xml version='1.0' encoding='UTF-8'?>",
+          "<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>",
+          "  <Relationship Id='rId1' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument' Target='word/document.xml'/>",
+          "</Relationships>"
+        ],
+        "word/_rels/document.xml.rels": [
+          "<?xml version='1.0' encoding='UTF-8'?>",
+          "<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>",
+          "  <Relationship Id='rIdStyles' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles' Target='styles.xml'/>",
+          "  <Relationship Id='rIdTheme' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme' Target='theme/theme1.xml'/>",
+          "</Relationships>"
+        ],
+        "word/document.xml": [
+          "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>",
+          "<w:document xmlns:w='http://schemas.openxmlformats.org/wordprocessingml/2006/main'>",
+          "  <w:body>",
+          "    <w:p>",
+          "      <w:pPr><w:pStyle w:val='Leaf'/></w:pPr>",
+          "      <w:r><w:rPr><w:color w:themeColor='accent2'/><w:i/></w:rPr><w:t>independent style vector</w:t></w:r>",
+          "    </w:p>",
+          "    <w:sectPr><w:pgSz w:w='11906' w:h='16838'/></w:sectPr>",
+          "  </w:body>",
+          "</w:document>"
+        ],
+        "word/styles.xml": [
+          "<?xml version='1.0' encoding='UTF-8'?>",
+          "<w:styles xmlns:w='http://schemas.openxmlformats.org/wordprocessingml/2006/main'>",
+          "  <w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii='Aptos'/></w:rPr></w:rPrDefault></w:docDefaults>",
+          "  <w:style w:type='paragraph' w:styleId='Base'><w:name w:val='Base'/><w:rPr><w:sz w:val='22'/></w:rPr></w:style>",
+          "  <w:style w:type='paragraph' w:styleId='Mid'><w:name w:val='Mid'/><w:basedOn w:val='Base'/><w:rPr><w:b/></w:rPr></w:style>",
+          "  <w:style w:type='paragraph' w:styleId='Leaf'><w:name w:val='Leaf'/><w:basedOn w:val='Mid'/><w:rPr><w:color w:themeColor='accent1'/></w:rPr></w:style>",
+          "</w:styles>"
+        ],
+        "word/theme/theme1.xml": [
+          "<?xml version='1.0' encoding='UTF-8'?>",
+          "<a:theme xmlns:a='http://schemas.openxmlformats.org/drawingml/2006/main' name='FDIR Theme'>",
+          "  <a:themeElements><a:clrScheme name='FDIR'>",
+          "    <a:dk1><a:sysClr val='windowText' lastClr='000000'/></a:dk1>",
+          "    <a:lt1><a:sysClr val='window' lastClr='FFFFFF'/></a:lt1>",
+          "    <a:accent1><a:srgbClr val='1F4E79'/></a:accent1>",
+          "    <a:accent2><a:srgbClr val='ED7D31'/></a:accent2>",
+          "  </a:clrScheme></a:themeElements>",
+          "</a:theme>"
+        ]
+      },
+      "cases": [
+        {
+          "caseId": "docx-leaf-resolved-properties",
+          "construct": "docx.paragraph-style.resolved",
+          "target": {
+            "collection": "styles",
+            "styleId": "style-docx-resolved-Leaf",
+            "layer": "resolved"
+          },
+          "coverage": [
+            "style-cascade",
+            "resolved-property",
+            "provenance"
+          ],
+          "expected": {
+            "properties": {
+              "fontFamily": "Aptos",
+              "fontSize": {
+                "value": "11",
+                "unit": "pt"
+              },
+              "weight": 700,
+              "foreground": {
+                "kind": "rgb",
+                "r": 31,
+                "g": 78,
+                "b": 121,
+                "a": 1
+              }
+            },
+            "provenance": {
+              "fontFamily": "docx-docDefaults",
+              "fontSize": "style-docx-Base",
+              "weight": "style-docx-Mid",
+              "foreground": "theme-accent1"
+            },
+            "trace": [
+              {
+                "property": "fontFamily",
+                "source": "docx-docDefaults",
+                "action": "default"
+              },
+              {
+                "property": "fontSize",
+                "source": "style-docx-Base",
+                "action": "inherit"
+              },
+              {
+                "property": "weight",
+                "source": "style-docx-Mid",
+                "action": "inherit"
+              },
+              {
+                "property": "foreground",
+                "source": "theme-accent1",
+                "action": "theme"
+              }
+            ]
+          },
+          "sourceOccurrences": [
+            "docx-leaf-font-default",
+            "docx-leaf-font-size",
+            "docx-leaf-weight",
+            "docx-leaf-theme-color"
+          ]
+        },
+        {
+          "caseId": "docx-direct-theme-paint",
+          "construct": "docx.run.direct-formatting",
+          "target": {
+            "collection": "styles",
+            "where": {
+              "origin": "direct",
+              "layer": "direct",
+              "property": "italic"
+            },
+            "layer": "direct"
+          },
+          "coverage": [
+            "resolved-property",
+            "provenance",
+            "color-paint"
+          ],
+          "expected": {
+            "properties": {
+              "italic": true,
+              "foreground": {
+                "kind": "rgb",
+                "r": 237,
+                "g": 125,
+                "b": 49,
+                "a": 1
+              }
+            },
+            "provenance": {
+              "italic": "direct-formatting",
+              "foreground": "theme-accent2"
+            },
+            "trace": [
+              {
+                "property": "italic",
+                "source": "direct-formatting",
+                "action": "direct"
+              },
+              {
+                "property": "foreground",
+                "source": "theme-accent2",
+                "action": "theme"
+              }
+            ]
+          },
+          "sourceOccurrences": [
+            "docx-direct-italic",
+            "docx-direct-theme-color"
+          ]
+        }
+      ]
+    },
+    {
+      "fixtureId": "xlsx-cell-style-and-paint",
+      "format": "xlsx",
+      "sourceKind": "authored-ooxml",
+      "parts": {
+        "[Content_Types].xml": [
+          "<?xml version='1.0' encoding='UTF-8'?>",
+          "<Types xmlns='http://schemas.openxmlformats.org/package/2006/content-types'>",
+          "  <Default Extension='rels' ContentType='application/vnd.openxmlformats-package.relationships+xml'/>",
+          "  <Default Extension='xml' ContentType='application/xml'/>",
+          "  <Override PartName='/xl/workbook.xml' ContentType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml'/>",
+          "  <Override PartName='/xl/worksheets/sheet1.xml' ContentType='application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml'/>",
+          "  <Override PartName='/xl/styles.xml' ContentType='application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml'/>",
+          "  <Override PartName='/xl/theme/theme1.xml' ContentType='application/vnd.openxmlformats-officedocument.theme+xml'/>",
+          "</Types>"
+        ],
+        "_rels/.rels": [
+          "<?xml version='1.0' encoding='UTF-8'?>",
+          "<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>",
+          "  <Relationship Id='rId1' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument' Target='xl/workbook.xml'/>",
+          "</Relationships>"
+        ],
+        "xl/_rels/workbook.xml.rels": [
+          "<?xml version='1.0' encoding='UTF-8'?>",
+          "<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>",
+          "  <Relationship Id='rIdSheet' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet' Target='worksheets/sheet1.xml'/>",
+          "  <Relationship Id='rIdTheme' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme' Target='theme/theme1.xml'/>",
+          "</Relationships>"
+        ],
+        "xl/workbook.xml": [
+          "<?xml version='1.0' encoding='UTF-8'?>",
+          "<workbook xmlns='http://schemas.openxmlformats.org/spreadsheetml/2006/main' xmlns:r='http://schemas.openxmlformats.org/officeDocument/2006/relationships'>",
+          "  <workbookPr date1904='0'/><sheets><sheet name='Data' sheetId='1' r:id='rIdSheet'/></sheets>",
+          "</workbook>"
+        ],
+        "xl/worksheets/sheet1.xml": [
+          "<?xml version='1.0' encoding='UTF-8'?>",
+          "<worksheet xmlns='http://schemas.openxmlformats.org/spreadsheetml/2006/main' xmlns:r='http://schemas.openxmlformats.org/officeDocument/2006/relationships'>",
+          "  <dimension ref='A1:B2'/><sheetData>",
+          "    <row r='1'><c r='A1' s='1' t='n'><v>42</v></c><c r='B1' s='1' t='n'><v>1</v></c></row>",
+          "    <row r='2'><c r='A2' t='n'><v>7</v></c><c r='B2' s='1' t='n'><v>9</v></c></row>",
+          "  </sheetData>",
+          "  <conditionalFormatting sqref='B1:B2'><cfRule type='cellIs' dxfId='0' priority='1' stopIfTrue='1' operator='greaterThan'><formula>8</formula></cfRule></conditionalFormatting>",
+          "</worksheet>"
+        ],
+        "xl/styles.xml": [
+          "<?xml version='1.0' encoding='UTF-8'?>",
+          "<styleSheet xmlns='http://schemas.openxmlformats.org/spreadsheetml/2006/main'>",
+          "  <numFmts count='1'><numFmt numFmtId='164' formatCode='0.00'/></numFmts>",
+          "  <fonts count='2'>",
+          "    <font><sz val='11'/><name val='Aptos'/><color theme='1'/></font>",
+          "    <font><b/><sz val='12'/><name val='Aptos Display'/><color rgb='FF0000'/></font>",
+          "  </fonts>",
+          "  <fills count='2'>",
+          "    <fill><patternFill patternType='none'/></fill>",
+          "    <fill><patternFill patternType='solid'><fgColor theme='4' tint='0.4'/></patternFill></fill>",
+          "  </fills>",
+          "  <borders count='2'><border/><border><bottom style='thin'><color rgb='000000'/></bottom></border></borders>",
+          "  <cellStyleXfs count='2'><xf numFmtId='0' fontId='0' fillId='0' borderId='0'/><xf numFmtId='164' fontId='1' fillId='1' borderId='1' applyNumberFormat='1' applyFont='1' applyFill='1'/></cellStyleXfs>",
+          "  <cellXfs count='2'><xf numFmtId='0' fontId='0' fillId='0' borderId='0'/><xf numFmtId='164' fontId='1' fillId='1' borderId='1' xfId='1' applyNumberFormat='1' applyFont='1' applyFill='1' applyAlignment='1'><alignment horizontal='right'/></xf></cellXfs>",
+          "  <cellStyles count='1'><cellStyle name='AccentValue' xfId='1' builtinId='5'/></cellStyles>",
+          "  <dxfs count='1'><dxf><fill><patternFill patternType='solid'><fgColor rgb='FFFF00'/></patternFill></fill></dxf></dxfs>",
+          "</styleSheet>"
+        ],
+        "xl/theme/theme1.xml": [
+          "<?xml version='1.0' encoding='UTF-8'?>",
+          "<a:theme xmlns:a='http://schemas.openxmlformats.org/drawingml/2006/main' name='FDIR Theme'>",
+          "  <a:themeElements><a:clrScheme name='FDIR'>",
+          "    <a:dk1><a:sysClr val='windowText' lastClr='000000'/></a:dk1>",
+          "    <a:lt1><a:sysClr val='window' lastClr='FFFFFF'/></a:lt1>",
+          "    <a:accent4><a:srgbClr val='70AD47'/></a:accent4>",
+          "  </a:clrScheme></a:themeElements>",
+          "</a:theme>"
+        ]
+      },
+      "cases": [
+        {
+          "caseId": "xlsx-cell-style-resolved",
+          "construct": "xlsx.cell.cellXfs-and-cellStyleXfs",
+          "target": {
+            "collection": "styles",
+            "styleId": "style-xlsx-cell-1",
+            "layer": "resolved"
+          },
+          "coverage": [
+            "style-cascade",
+            "resolved-property",
+            "provenance",
+            "color-paint"
+          ],
+          "expected": {
+            "properties": {
+              "numberFormat": {
+                "code": "0.00",
+                "locale": "unknown"
+              },
+              "fontFamily": "Aptos Display",
+              "fontSize": {
+                "value": "12",
+                "unit": "pt"
+              },
+              "weight": 700,
+              "foreground": {
+                "kind": "rgb",
+                "r": 255,
+                "g": 0,
+                "b": 0,
+                "a": 1
+              },
+              "fill": {
+                "kind": "solid",
+                "color": {
+                  "kind": "rgb",
+                  "r": 169,
+                  "g": 209,
+                  "b": 142,
+                  "a": 1
+                }
+              },
+              "paragraphAlignment": "right"
+            },
+            "provenance": {
+              "numberFormat": "xlsx-cellStyleXfs-AccentValue",
+              "fontFamily": "xlsx-cellXfs-1-font",
+              "fontSize": "xlsx-cellXfs-1-font",
+              "weight": "xlsx-cellXfs-1-font",
+              "foreground": "xlsx-cellXfs-1-font",
+              "fill": "xlsx-cellXfs-1-fill",
+              "paragraphAlignment": "xlsx-cellXfs-1-alignment"
+            },
+            "trace": [
+              {
+                "property": "numberFormat",
+                "source": "xlsx-cellStyleXfs-AccentValue",
+                "action": "inherit"
+              },
+              {
+                "property": "fontFamily",
+                "source": "xlsx-cellXfs-1-font",
+                "action": "direct"
+              },
+              {
+                "property": "fontSize",
+                "source": "xlsx-cellXfs-1-font",
+                "action": "direct"
+              },
+              {
+                "property": "weight",
+                "source": "xlsx-cellXfs-1-font",
+                "action": "direct"
+              },
+              {
+                "property": "foreground",
+                "source": "xlsx-cellXfs-1-font",
+                "action": "direct"
+              },
+              {
+                "property": "fill",
+                "source": "xlsx-cellXfs-1-fill",
+                "action": "direct"
+              },
+              {
+                "property": "borders",
+                "source": "xlsx-cellXfs-1-border",
+                "action": "direct"
+              },
+              {
+                "property": "paragraphAlignment",
+                "source": "xlsx-cellXfs-1-alignment",
+                "action": "direct"
+              }
+            ]
+          },
+          "sourceOccurrences": [
+            "xlsx-cell-number-format",
+            "xlsx-cell-font",
+            "xlsx-cell-font-weight",
+            "xlsx-cell-font-color",
+            "xlsx-cell-tinted-fill",
+            "xlsx-cell-alignment",
+            "xlsx-cell-style-provenance"
+          ]
+        },
+        {
+          "caseId": "xlsx-conditional-paint-priority",
+          "construct": "xlsx.conditional-formatting.dxf",
+          "target": {
+            "collection": "styles",
+            "styleId": "style-xlsx-conditional-node-xlsx-cell-0-B2",
+            "layer": "resolved"
+          },
+          "coverage": [
+            "resolved-property",
+            "color-paint",
+            "provenance"
+          ],
+          "expected": {
+            "properties": {
+              "fill": {
+                "kind": "solid",
+                "color": {
+                  "kind": "rgb",
+                  "r": 255,
+                  "g": 255,
+                  "b": 0,
+                  "a": 1
+                }
+              }
+            },
+            "provenance": {
+              "fill": "xlsx-dxf-0-priority-1"
+            },
+            "trace": [
+              {
+                "property": "numberFormat",
+                "source": "xlsx-cellStyleXfs-AccentValue",
+                "action": "inherit"
+              },
+              {
+                "property": "fontFamily",
+                "source": "xlsx-cellXfs-1-font",
+                "action": "direct"
+              },
+              {
+                "property": "fontSize",
+                "source": "xlsx-cellXfs-1-font",
+                "action": "direct"
+              },
+              {
+                "property": "weight",
+                "source": "xlsx-cellXfs-1-font",
+                "action": "direct"
+              },
+              {
+                "property": "foreground",
+                "source": "xlsx-cellXfs-1-font",
+                "action": "direct"
+              },
+              {
+                "property": "borders",
+                "source": "xlsx-cellXfs-1-border",
+                "action": "direct"
+              },
+              {
+                "property": "paragraphAlignment",
+                "source": "xlsx-cellXfs-1-alignment",
+                "action": "direct"
+              },
+              {
+                "property": "fill",
+                "source": "xlsx-dxf-0-priority-1",
+                "action": "conditional"
+              }
+            ]
+          },
+          "sourceOccurrences": [
+            "xlsx-conditional-dxf-fill"
+          ]
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "This slice qualifies only authored DOCX/XLSX OOXML fixtures; PDF and Markdown style projection are out of scope.",
+    "It does not prove full producer/API differential coverage, all DOCX latent/linked/table/list/section rules, or all XLSX row/column/merged/table/pivot precedence.",
+    "It does not integrate source-occurrence accounting from issue #91 or the exact-SHA bundle from issue #88.",
+    "The expected theme/tint values are literal corpus facts; this slice does not claim a complete color-management implementation.",
+    "A passing bounded report is not an issue #93 completion claim."
+  ],
+  "unmetRequirements": [
+    "Complete DOCX/XLSX style property and construct matrix",
+    "All #89 style defect cases",
+    "Independent producer/API or renderer differential",
+    "Issue #91 unsupported occurrence accounting integration",
+    "Issue #88 qualification bundle integration"
+  ]
+}

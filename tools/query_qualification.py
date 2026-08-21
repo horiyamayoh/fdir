@@ -12,6 +12,7 @@ import copy
 import json
 import os
 from pathlib import Path
+import re
 import sys
 import zipfile
 from typing import Any
@@ -25,41 +26,75 @@ try:
     from ir_validation import COLLECTION_KEYS
     from query_ir import (
         QueryError,
+        _build_index,
+        _ancestors_validated,
+        _descendants_validated,
+        _get_entity_validated,
+        _get_document_field_validated,
+        _get_field_validated,
+        _get_text_validated,
+        _find_extensions_validated,
+        _find_observations_validated,
+        _find_relations_validated,
+        _list_nodes_validated,
+        _list_entities_validated,
+        _query_field_coverage_validated,
+        _validated_document,
         ancestors,
         descendants,
         find_extensions,
         find_observations,
         find_relations,
         get_entity,
+        get_document_field,
         get_field,
         get_text,
         index_parity,
         list_entities,
         list_nodes,
         query_field_coverage,
+        query_fields,
         rebuild_index,
         validate_index,
     )
+    from independent_index import IndependentIndexError, build_index as build_persistent_index, open_index
 except ImportError:  # pragma: no cover
     from tools.convert_document import convert_path
     from tools.ir_validation import COLLECTION_KEYS
     from tools.query_ir import (
         QueryError,
+        _build_index,
+        _ancestors_validated,
+        _descendants_validated,
+        _get_entity_validated,
+        _get_document_field_validated,
+        _get_field_validated,
+        _get_text_validated,
+        _find_extensions_validated,
+        _find_observations_validated,
+        _find_relations_validated,
+        _list_nodes_validated,
+        _list_entities_validated,
+        _query_field_coverage_validated,
+        _validated_document,
         ancestors,
         descendants,
         find_extensions,
         find_observations,
         find_relations,
         get_entity,
+        get_document_field,
         get_field,
         get_text,
         index_parity,
         list_entities,
         list_nodes,
         query_field_coverage,
+        query_fields,
         rebuild_index,
         validate_index,
     )
+    from tools.independent_index import IndependentIndexError, build_index as build_persistent_index, open_index
 
 
 CORPUS = ROOT / "e2e" / "corpus"
@@ -89,12 +124,92 @@ def _package_case(case: dict[str, Any], workspace: Path) -> Path:
     return destination
 
 
-def _direct_query_check(document: dict[str, Any], label: str) -> dict[str, Any]:
+def _json_equal(left: Any, right: Any) -> bool:
+    return json.dumps(left, ensure_ascii=False, sort_keys=True, separators=(",", ":")) == json.dumps(right, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _persistent_query_check(
+    document: dict[str, Any],
+    label: str,
+    workspace: Path,
+    *,
+    validated: Any | None = None,
+) -> dict[str, Any]:
+    """Compare the independent SQLite backend with every observed direct fact."""
+
+    validated = validated or _validated_document(document)
+    document = validated.document
+    safe_label = re.sub(r"[^A-Za-z0-9_.-]+", "_", label)[:80]
+    persistent_workspace = workspace / "persistent-index"
+    persistent_workspace.mkdir(parents=True, exist_ok=True)
+    source = persistent_workspace / f"{safe_label}.json"
+    index_path = persistent_workspace / f"{safe_label}.sqlite"
+    source.write_text(
+        json.dumps(document, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    manifest = build_persistent_index(source, index_path)
+    mismatches: list[dict[str, Any]] = []
+    coverage = _query_field_coverage_validated(document)
+    with open_index(source, index_path) as persistent:
+        for fact in coverage["checked"]:
+            try:
+                if fact["collection"] == "__document__":
+                    direct = _get_document_field_validated(document, fact["pointer"])
+                else:
+                    direct = _get_field_validated(document, fact["collection"], fact["id"], fact["pointer"])
+                indexed = persistent.get_field(fact["collection"], fact["id"], fact["pointer"])
+            except (QueryError, IndependentIndexError, KeyError, TypeError, ValueError) as exc:
+                mismatches.append({"fact": fact, "error": str(exc)})
+                continue
+            if not _json_equal(direct, indexed):
+                mismatches.append({"fact": fact, "direct": direct, "index": indexed})
+        direct_refs = {
+            (
+                row["fromCollection"], row["fromId"], row["field"],
+                row["toCollection"], row["toId"], row["ordinal"],
+            )
+            for row in _build_index(document)["reverseReferences"]
+        }
+        persistent_refs = {
+            (
+                row["sourceCollection"], row["sourceId"], row["sourcePointer"],
+                row["targetCollection"], row["targetId"], row["ordinal"],
+            )
+            for row in persistent.find_references()
+        }
+        if direct_refs != persistent_refs:
+            mismatches.append({
+                "code": "DIRECT_PERSISTENT_REFERENCE_MISMATCH",
+                "directOnly": sorted(direct_refs - persistent_refs),
+                "persistentOnly": sorted(persistent_refs - direct_refs),
+            })
+        if manifest["counts"]["entityFields"] + manifest["counts"]["documentFields"] != manifest["counts"]["fields"]:
+            mismatches.append({"code": "PERSISTENT_FIELD_COUNT_INCONSISTENT"})
+    return {
+        "status": "passed" if not mismatches else "failed",
+        "backend": "sqlite-independent-module",
+        "manifest": {
+            "indexVersion": manifest["indexVersion"],
+            "sourceFileSha256": manifest["source"]["sourceFileSha256"],
+            "queryContractVersion": manifest["contractVersions"]["queryContract"],
+            "fieldPathCount": manifest["querySurface"]["registeredFieldPathCount"],
+            "counts": manifest["counts"],
+        },
+        "checkedFacts": coverage["checkedFactCount"],
+        "mismatches": mismatches,
+    }
+
+
+def _direct_query_check(document: dict[str, Any], label: str, workspace: Path) -> dict[str, Any]:
     """Exercise all typed collection and relationship queries on one document."""
 
-    index = rebuild_index(document)
+    validated = _validated_document(document)
+    document = validated.document
+    index = _build_index(document)
     parity = index_parity(document, index)
-    field_coverage = query_field_coverage(document)
+    field_coverage = _query_field_coverage_validated(document)
     if field_coverage["status"] != "passed":
         raise AssertionError(f"field coverage mismatch: {label}: {field_coverage['unqueryableFacts']}")
     direct_counts: dict[str, int] = {}
@@ -104,7 +219,7 @@ def _direct_query_check(document: dict[str, Any], label: str) -> dict[str, Any]:
             for pointer in field_coverage["checked"]:
                 if pointer["collection"] != collection or pointer["id"] != item[identifier_key]:
                     continue
-                found = get_field(document, collection, item[identifier_key], pointer["pointer"])
+                found = _get_field_validated(document, collection, item[identifier_key], pointer["pointer"])
                 operations.add("get-field")
                 if found is None and pointer["pointer"] not in {"/", ""}:
                     # None is an authoritative value.  The call itself is the
@@ -112,26 +227,26 @@ def _direct_query_check(document: dict[str, Any], label: str) -> dict[str, Any]:
                     continue
     for collection, identifier_key in COLLECTION_KEYS.items():
         expected = sorted(document.get(collection, []), key=lambda item: item[identifier_key])
-        values = list_entities(document, collection)
+        values = _list_entities_validated(document, collection)
         operations.add(f"list-entities:{collection}")
         if values != expected:
             raise AssertionError(f"direct list mismatch: {label}/{collection}")
         direct_counts[collection] = len(values)
         for item in values:
-            found = get_entity(document, collection, item[identifier_key])
+            found = _get_entity_validated(document, collection, item[identifier_key])
             operations.add(f"get-entity:{collection}")
             if found != item:
                 raise AssertionError(f"direct get mismatch: {label}/{collection}/{item[identifier_key]}")
 
     nodes = document.get("nodes", [])
-    if sorted(list_nodes(document), key=lambda item: item["nodeId"]) != sorted(nodes, key=lambda item: item["nodeId"]):
+    if sorted(_list_nodes_validated(document), key=lambda item: item["nodeId"]) != sorted(nodes, key=lambda item: item["nodeId"]):
         raise AssertionError(f"direct node list mismatch: {label}")
     operations.add("list-nodes")
     by_id = {item["nodeId"]: item for item in nodes}
     for node in nodes:
         node_id = node["nodeId"]
         direct_children = list(node.get("childIds", []))
-        found_descendants = descendants(document, node_id)
+        found_descendants = _descendants_validated(document, node_id)
         operations.add("descendants")
         if [item["nodeId"] for item in found_descendants if item["nodeId"] in direct_children] != direct_children:
             raise AssertionError(f"descendant traversal mismatch: {label}/{node_id}")
@@ -140,29 +255,34 @@ def _direct_query_check(document: dict[str, Any], label: str) -> dict[str, Any]:
         while parent is not None:
             expected_ancestors.append(parent)
             parent = by_id[parent].get("parentId")
-        if [item["nodeId"] for item in ancestors(document, node_id)] != expected_ancestors:
+        if [item["nodeId"] for item in _ancestors_validated(document, node_id)] != expected_ancestors:
             raise AssertionError(f"ancestor traversal mismatch: {label}/{node_id}")
         operations.add("ancestors")
 
     text_by_id = {item["textId"]: item for item in document.get("texts", [])}
     for node in nodes:
         reachable = set(node.get("textIds", []))
-        reachable.update(item_id for item in descendants(document, node["nodeId"]) for item_id in item.get("textIds", []))
+        reachable.update(item_id for item in _descendants_validated(document, node["nodeId"]) for item_id in item.get("textIds", []))
         representations = {text_by_id[text_id]["representation"] for text_id in reachable if text_id in text_by_id}
         for representation in representations:
-            actual = get_text(document, node["nodeId"], representation)
+            actual = _get_text_validated(document, node["nodeId"], representation)
             expected = [item for item in document.get("texts", []) if item["textId"] in reachable and item["representation"] == representation]
             if actual != expected:
                 raise AssertionError(f"text query mismatch: {label}/{node['nodeId']}/{representation}")
             operations.add(f"get-text:{representation}")
 
-    if find_relations(document) != document.get("relations", []):
+    if _find_relations_validated(document) != document.get("relations", []):
         raise AssertionError(f"relation query mismatch: {label}")
-    if find_extensions(document) != document.get("extensions", []):
+    if _find_extensions_validated(document) != document.get("extensions", []):
         raise AssertionError(f"extension query mismatch: {label}")
-    if find_observations(document) != document.get("observations", []):
+    if _find_observations_validated(document) != document.get("observations", []):
         raise AssertionError(f"observation query mismatch: {label}")
     operations.update({"find-relations", "find-extensions", "find-observations"})
+    persistent = _persistent_query_check(document, label, workspace, validated=validated)
+    if persistent["status"] != "passed":
+        raise AssertionError(f"persistent query/index mismatch: {label}: {persistent['mismatches'][:3]}")
+
+    validated.assert_current()
 
     return {
         "fixture": label,
@@ -174,10 +294,11 @@ def _direct_query_check(document: dict[str, Any], label: str) -> dict[str, Any]:
         "operations": sorted(operations),
         "queryParity": parity,
         "fieldCoverage": field_coverage,
+        "persistentIndex": persistent,
     }
 
 
-def qualify(path: Path) -> dict[str, Any]:
+def qualify(path: Path, workspace: Path) -> dict[str, Any]:
     """Qualify a checked-in example through the public query API."""
 
     try:
@@ -186,7 +307,7 @@ def qualify(path: Path) -> dict[str, Any]:
         raise AssertionError(f"cannot load example {path}: {exc}") from exc
     if not isinstance(value, dict):
         raise AssertionError(f"example is not an object: {path.name}")
-    return _direct_query_check(value, f"example:{path.name}")
+    return _direct_query_check(value, f"example:{path.name}", workspace)
 
 
 def _expect_rejection(label: str, callback: Any) -> dict[str, str]:
@@ -247,16 +368,16 @@ def _convert_corpus_case(case: dict[str, Any], workspace: Path) -> tuple[dict[st
 
 
 def main() -> int:
-    examples = [qualify(path) for path in sorted((ROOT / "examples").glob("*.json"))]
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     cases: list[dict[str, Any]] = []
     negative_cases: list[dict[str, str]] = []
     workspace = ROOT / "e2e" / ".run" / f"query-qualification-{os.getpid()}"
     workspace.mkdir(parents=True, exist_ok=True)
+    examples = [qualify(path, workspace) for path in sorted((ROOT / "examples").glob("*.json"))]
     corpus_cases = list(manifest.get("cases", [])) + list(manifest.get("negativeCases", []))
     for case in corpus_cases:
         document, evidence = _convert_corpus_case(case, workspace)
-        report = _direct_query_check(document, f"corpus:{case['id']}")
+        report = _direct_query_check(document, f"corpus:{case['id']}", workspace)
         report.update({"id": case["id"], "format": case["format"], "caseClass": case.get("caseClass", "positive"), "conversionStatus": document["conversion"]["status"], "conversionOutcome": evidence.get("outcome")})
         cases.append(report)
         negative_cases.extend(_negative_index_cases(document, str(case["id"])))
@@ -273,7 +394,7 @@ def main() -> int:
     )
     output = {
         "schema": "fdir/query-qualification-report",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "status": "passed",
         "sources": ["examples", "real-input-e2e", "independent-corpus"],
         "sourceExecution": {
@@ -308,5 +429,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except Exception as exc:
-        print(json.dumps({"schema": "fdir/query-qualification-report", "version": "1.2.0", "status": "failed", "error": f"{type(exc).__name__}: {exc}", "unqueryableFacts": []}, ensure_ascii=False, sort_keys=True), file=sys.stdout)
+        print(json.dumps({"schema": "fdir/query-qualification-report", "version": "1.3.0", "status": "failed", "error": f"{type(exc).__name__}: {exc}", "unqueryableFacts": [{"code": "QUALIFICATION_EXECUTION_ERROR", "error": f"{type(exc).__name__}: {exc}"}]}, ensure_ascii=False, sort_keys=True), file=sys.stdout)
         raise SystemExit(1)

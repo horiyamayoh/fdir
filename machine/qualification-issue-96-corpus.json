@@ -1,0 +1,307 @@
+{
+  "schema": "fdir/qualification-issue-96-corpus",
+  "version": "1.0.0",
+  "issueNumber": 96,
+  "qualificationScope": "bounded-independent-relationship-resource-annotation-field-revision-closure",
+  "oracle": {
+    "identity": "literal source facts and expected projections authored in this corpus",
+    "expectedValuesAreRuntimeIndependent": true,
+    "adapterHelpersUsedForExpected": false,
+    "sourceKind": "authored DOCX/XLSX/PDF/Markdown bytes; expected values are not adapter output",
+    "forbiddenDerivations": [
+      "tools/adapter_common.py::DocumentBuilder",
+      "tools/adapter_docx.py::_rels",
+      "tools/adapter_xlsx.py::_relationships",
+      "tools/adapter_pdf.py::_add_pdf_annotations",
+      "tools/adapter_markdown.py::_linked_resource"
+    ],
+    "networkAvailabilityPolicy": "source fact only; no external URL is fetched or declared available"
+  },
+  "reportNames": [
+    "relationship-closure.json",
+    "resource-availability.json",
+    "annotation-link-field-report.json",
+    "revision-range-report.json"
+  ],
+  "formats": ["docx", "xlsx", "pdf", "markdown"],
+  "fixtures": [
+    {
+      "fixtureId": "docx-closure",
+      "format": "docx",
+      "sourceKind": "authored-opc-package",
+      "payloadKind": "zip",
+      "parts": {
+        "[Content_Types].xml": "<?xml version='1.0' encoding='UTF-8'?><Types xmlns='http://schemas.openxmlformats.org/package/2006/content-types'><Default Extension='rels' ContentType='application/vnd.openxmlformats-package.relationships+xml'/><Default Extension='xml' ContentType='application/xml'/><Default Extension='png' ContentType='image/png'/><Default Extension='bin' ContentType='application/octet-stream'/><Override PartName='/word/document.xml' ContentType='application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'/><Override PartName='/word/comments.xml' ContentType='application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml'/><Override PartName='/word/charts/chart1.xml' ContentType='application/vnd.openxmlformats-officedocument.drawingml.chart+xml'/></Types>",
+        "_rels/.rels": "<?xml version='1.0' encoding='UTF-8'?><Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'><Relationship Id='rIdDocument' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument' Target='word/document.xml'/></Relationships>",
+        "word/_rels/document.xml.rels": "<?xml version='1.0' encoding='UTF-8'?><Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'><Relationship Id='rIdHyper' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink' Target='https://example.invalid/docx' TargetMode='External'/><Relationship Id='rIdImage' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/image' Target='media/image1.png'/><Relationship Id='rIdChart' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart' Target='charts/chart1.xml'/><Relationship Id='rIdOle' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject' Target='embeddings/oleObject1.bin'/><Relationship Id='rIdMissing' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/image' Target='media/missing.png'/><Relationship Id='rIdComments' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments' Target='comments.xml'/></Relationships>",
+        "word/charts/_rels/chart1.xml.rels": "<?xml version='1.0' encoding='UTF-8'?><Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'><Relationship Id='rIdChartImage' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/image' Target='../media/image1.png'/></Relationships>",
+        "word/document.xml": "<?xml version='1.0' encoding='UTF-8'?><w:document xmlns:w='http://schemas.openxmlformats.org/wordprocessingml/2006/main' xmlns:r='http://schemas.openxmlformats.org/officeDocument/2006/relationships' xmlns:wp='http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing' xmlns:a='http://schemas.openxmlformats.org/drawingml/2006/main' xmlns:pic='http://schemas.openxmlformats.org/drawingml/2006/picture'><w:body><w:p><w:hyperlink r:id='rIdHyper'><w:r><w:t>Outer </w:t></w:r><w:r><w:t>nested </w:t></w:r><w:r><w:t>tail</w:t></w:r></w:hyperlink><w:commentRangeStart w:id='7'/><w:r><w:t>Commented</w:t></w:r><w:commentRangeEnd w:id='7'/><w:r><w:commentReference w:id='7'/></w:r><w:fldChar w:fldCharType='begin' w:dirty='true'/><w:instrText xml:space='preserve'> PAGE </w:instrText><w:fldChar w:fldCharType='separate'/><w:r><w:t>2</w:t></w:r><w:fldChar w:fldCharType='end'/><w:fldSimple w:instr=' DATE '><w:r><w:t>2026-08-21</w:t></w:r></w:fldSimple><w:ins w:id='1' w:author='Alice' w:date='2026-08-20T10:00:00Z'><w:r><w:t>inserted</w:t></w:r></w:ins><w:del w:id='2' w:author='Bob' w:date='2026-08-20T11:00:00Z'><w:r><w:delText>deleted</w:delText></w:r></w:del><w:drawing><wp:inline><wp:extent cx='914400' cy='914400'/><a:graphic><a:graphicData uri='http://schemas.openxmlformats.org/drawingml/2006/picture'><pic:pic><pic:blipFill><a:blip r:embed='rIdImage'/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:p><w:sectPr/></w:body></w:document>",
+        "word/comments.xml": "<?xml version='1.0' encoding='UTF-8'?><w:comments xmlns:w='http://schemas.openxmlformats.org/wordprocessingml/2006/main'><w:comment w:id='7' w:author='Reviewer' w:date='2026-08-20T12:00:00Z'><w:p><w:r><w:t>Review body</w:t></w:r></w:p></w:comment></w:comments>",
+        "word/charts/chart1.xml": "<?xml version='1.0' encoding='UTF-8'?><chart xmlns='urn:example:chart'><title>Chart</title></chart>",
+        "word/embeddings/oleObject1.bin": {"encoding": "base64", "value": "T0xFLURBVEE="},
+        "word/media/image1.png": {"encoding": "base64", "value": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="}
+      },
+      "expected": {
+        "edges": [
+          {"sourceOccurrenceId": "docx-package-document", "expectedRelationId": "relation-docx-_rels/.rels-rIdDocument", "owner": "[package]", "target": "word/document.xml", "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"relationshipFile": "_rels/.rels", "relationshipId": "rIdDocument"}},
+          {"sourceOccurrenceId": "docx-hyperlink", "expectedRelationId": "relation-docx-word/_rels/document.xml.rels-rIdHyper", "owner": "word/document.xml", "target": "https://example.invalid/docx", "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink", "targetMode": "external", "kind": "links", "status": "unavailable", "reciprocity": true, "sourceLocator": {"relationshipFile": "word/_rels/document.xml.rels", "relationshipId": "rIdHyper"}},
+          {"sourceOccurrenceId": "docx-image", "expectedRelationId": "relation-docx-word/_rels/document.xml.rels-rIdImage", "owner": "word/document.xml", "target": "word/media/image1.png", "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"relationshipFile": "word/_rels/document.xml.rels", "relationshipId": "rIdImage"}},
+          {"sourceOccurrenceId": "docx-chart", "expectedRelationId": "relation-docx-word/_rels/document.xml.rels-rIdChart", "owner": "word/document.xml", "target": "word/charts/chart1.xml", "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"relationshipFile": "word/_rels/document.xml.rels", "relationshipId": "rIdChart"}},
+          {"sourceOccurrenceId": "docx-ole", "expectedRelationId": "relation-docx-word/_rels/document.xml.rels-rIdOle", "owner": "word/document.xml", "target": "word/embeddings/oleObject1.bin", "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"relationshipFile": "word/_rels/document.xml.rels", "relationshipId": "rIdOle"}},
+          {"sourceOccurrenceId": "docx-missing", "expectedRelationId": "relation-docx-word/_rels/document.xml.rels-rIdMissing", "owner": "word/document.xml", "target": "word/media/missing.png", "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image", "targetMode": "internal", "kind": "references", "status": "unavailable", "reciprocity": true, "sourceLocator": {"relationshipFile": "word/_rels/document.xml.rels", "relationshipId": "rIdMissing"}},
+          {"sourceOccurrenceId": "docx-comments", "expectedRelationId": "relation-docx-word/_rels/document.xml.rels-rIdComments", "owner": "word/document.xml", "target": "word/comments.xml", "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"relationshipFile": "word/_rels/document.xml.rels", "relationshipId": "rIdComments"}},
+          {"sourceOccurrenceId": "docx-chart-image", "expectedRelationId": "relation-docx-word/charts/_rels/chart1.xml.rels-rIdChartImage", "owner": "word/charts/chart1.xml", "target": "word/media/image1.png", "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"relationshipFile": "word/charts/_rels/chart1.xml.rels", "relationshipId": "rIdChartImage"}}
+        ],
+        "resources": [
+          {"resourceKey": "docx-image", "match": {"handle": "word/media/image1.png"}, "required": {"packagePresence": true, "rawPayloadAvailable": true, "mediaType": "image/png", "decodability": "decodable", "embeddedOrExternal": "embedded", "availability": "available", "networkAvailability": "not-applicable", "consumerCount": 2}},
+          {"resourceKey": "docx-missing", "match": {"handle": "word/media/missing.png"}, "required": {"packagePresence": false, "rawPayloadAvailable": false, "mediaType": "image/png", "decodability": "not-decodable", "embeddedOrExternal": "embedded", "availability": "unavailable", "networkAvailability": "not-applicable", "consumerCount": 1}},
+          {"resourceKey": "docx-external", "match": {"handle": "https://example.invalid/docx"}, "required": {"packagePresence": false, "rawPayloadAvailable": false, "mediaType": "application/octet-stream", "decodability": "not-decodable", "embeddedOrExternal": "external", "availability": "unavailable", "networkAvailability": "unknown", "consumerCount": 1}}
+        ],
+        "annotations": [
+          {"annotationKey": "docx-hyperlink", "match": {"kind": "hyperlink", "ordinal": 1}, "required": {"sourceSubtype": "w:hyperlink", "action": {"kind": "relationship", "relationshipId": "rIdHyper"}, "body": "https://example.invalid/docx", "displayText": "Outer nested tail", "anchor": {"kind": "content", "resolved": true}, "status": "preserved"}},
+          {"annotationKey": "docx-comment", "match": {"kind": "comment", "ordinal": 1}, "required": {"sourceSubtype": "w:commentRange", "body": "Review body", "anchor": {"kind": "range", "start": "commentRangeStart:7", "end": "commentRangeEnd:7", "balanced": true}, "status": "preserved"}}
+        ],
+        "links": [
+          {"linkKey": "docx-hyperlink", "match": {"annotationKey": "docx-hyperlink"}, "required": {"displayText": "Outer nested tail", "destination": "https://example.invalid/docx", "displayTextIndependent": true}}
+        ],
+        "fields": [
+          {"fieldKey": "docx-complex-field", "match": {"kind": "complex", "instruction": "PAGE"}, "required": {"kind": "complex", "instruction": "PAGE", "displayedResult": "2", "range": {"begin": 1, "separate": 2, "end": 3, "balanced": true}, "flags": ["dirty"], "owner": "docx-paragraph-1", "status": "preserved"}},
+          {"fieldKey": "docx-simple-field", "match": {"kind": "simple", "instruction": "DATE"}, "required": {"kind": "simple", "instruction": "DATE", "displayedResult": "2026-08-21", "range": {"balanced": true}, "owner": "docx-paragraph-1", "status": "preserved"}}
+        ],
+        "revisions": [
+          {"revisionKey": "docx-insert-1", "match": {"type": "insert", "id": "1"}, "required": {"type": "insert", "id": "1", "author": "Alice", "date": "2026-08-20T10:00:00Z", "range": {"start": "ins:1", "end": "ins:1", "balanced": true}, "before": "", "after": "inserted", "status": "preserved"}},
+          {"revisionKey": "docx-delete-2", "match": {"type": "delete", "id": "2"}, "required": {"type": "delete", "id": "2", "author": "Bob", "date": "2026-08-20T11:00:00Z", "range": {"start": "del:2", "end": "del:2", "balanced": true}, "before": "deleted", "after": "", "status": "preserved"}}
+        ]
+      },
+      "cases": [
+        {"caseId": "docx-exact-relationship-edges", "category": "relationship", "projection": "edges"},
+        {"caseId": "docx-resource-payload-and-consumer", "category": "resource", "projection": "resources"},
+        {"caseId": "docx-hyperlink-nested-display", "category": "link", "projection": "links"},
+        {"caseId": "docx-comment-anchor-body", "category": "annotation", "projection": "annotations"},
+        {"caseId": "docx-complex-and-simple-fields", "category": "field", "projection": "fields"},
+        {"caseId": "docx-revision-range-balance", "category": "revision", "projection": "revisions"}
+      ]
+    },
+    {
+      "fixtureId": "xlsx-closure",
+      "format": "xlsx",
+      "sourceKind": "authored-opc-package",
+      "payloadKind": "zip",
+      "parts": {
+        "[Content_Types].xml": "<?xml version='1.0' encoding='UTF-8'?><Types xmlns='http://schemas.openxmlformats.org/package/2006/content-types'><Default Extension='rels' ContentType='application/vnd.openxmlformats-package.relationships+xml'/><Default Extension='xml' ContentType='application/xml'/><Default Extension='png' ContentType='image/png'/><Override PartName='/xl/workbook.xml' ContentType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml'/><Override PartName='/xl/worksheets/sheet1.xml' ContentType='application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml'/><Override PartName='/xl/styles.xml' ContentType='application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml'/><Override PartName='/xl/comments1.xml' ContentType='application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml'/><Override PartName='/xl/threadedComments/threadedComment1.xml' ContentType='application/vnd.ms-excel.threadedcomment+xml'/></Types>",
+        "_rels/.rels": "<?xml version='1.0' encoding='UTF-8'?><Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'><Relationship Id='rIdWorkbook' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument' Target='xl/workbook.xml'/></Relationships>",
+        "xl/_rels/workbook.xml.rels": "<?xml version='1.0' encoding='UTF-8'?><Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'><Relationship Id='rIdSheet' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet' Target='worksheets/sheet1.xml'/><Relationship Id='rIdStyles' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles' Target='styles.xml'/><Relationship Id='rIdExt' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLink' Target='externalLinks/externalLink1.xml'/><Relationship Id='rIdRemote' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLink' Target='https://example.invalid/book.xlsx' TargetMode='External'/><Relationship Id='rIdMissing' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLink' Target='externalLinks/missing.xml'/></Relationships>",
+        "xl/workbook.xml": "<?xml version='1.0' encoding='UTF-8'?><workbook xmlns='http://schemas.openxmlformats.org/spreadsheetml/2006/main' xmlns:r='http://schemas.openxmlformats.org/officeDocument/2006/relationships'><sheets><sheet name='Data' sheetId='1' r:id='rIdSheet'/></sheets><externalReferences><externalReference r:id='rIdExt'/></externalReferences><definedNames><definedName name='DataTotal'>Data!$B$2</definedName></definedNames></workbook>",
+        "xl/worksheets/sheet1.xml": "<?xml version='1.0' encoding='UTF-8'?><worksheet xmlns='http://schemas.openxmlformats.org/spreadsheetml/2006/main' xmlns:r='http://schemas.openxmlformats.org/officeDocument/2006/relationships'><dimension ref='A1:B2'/><sheetData><row r='1'><c r='A1' t='n'><v>1</v></c><c r='B1' t='n'><v>2</v></c></row><row r='2'><c r='A2' t='n'><f>SUM(A1:B1)</f><v>3</v></c></row></sheetData><hyperlinks><hyperlink ref='A1' r:id='rIdHyper' display='External sheet link'/><hyperlink ref='B1' location='Data!A1' display='Internal location'/></hyperlinks></worksheet>",
+        "xl/worksheets/_rels/sheet1.xml.rels": "<?xml version='1.0' encoding='UTF-8'?><Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'><Relationship Id='rIdHyper' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink' Target='https://example.invalid/sheet' TargetMode='External'/><Relationship Id='rIdDrawing' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing' Target='../drawings/drawing1.xml'/><Relationship Id='rIdComments' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments' Target='../comments1.xml'/><Relationship Id='rIdThreaded' Type='http://schemas.microsoft.com/office/2017/10/relationships/threadedComment' Target='../threadedComments/threadedComment1.xml'/><Relationship Id='rIdTable' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/table' Target='../tables/table1.xml'/><Relationship Id='rIdMissingDrawing' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing' Target='../drawings/missing.xml'/></Relationships>",
+        "xl/drawings/_rels/drawing1.xml.rels": "<?xml version='1.0' encoding='UTF-8'?><Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'><Relationship Id='rIdImage' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/image' Target='../media/image1.png'/><Relationship Id='rIdChart' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart' Target='../charts/chart1.xml'/></Relationships>",
+        "xl/styles.xml": "<?xml version='1.0' encoding='UTF-8'?><styleSheet xmlns='http://schemas.openxmlformats.org/spreadsheetml/2006/main'><fonts count='1'><font><sz val='11'/><name val='Aptos'/></font></fonts><fills count='1'><fill><patternFill patternType='none'/></fill></fills><borders count='1'><border/></borders><cellXfs count='1'><xf numFmtId='0' fontId='0' fillId='0' borderId='0'/></cellXfs></styleSheet>",
+        "xl/tables/table1.xml": "<?xml version='1.0' encoding='UTF-8'?><table xmlns='http://schemas.openxmlformats.org/spreadsheetml/2006/main' id='1' name='DataTable' ref='A1:B2'><autoFilter ref='A1:B2'/><tableColumns count='2'><tableColumn id='1' name='Value'/><tableColumn id='2' name='Total'/></tableColumns></table>",
+        "xl/drawings/drawing1.xml": "<?xml version='1.0' encoding='UTF-8'?><xdr:wsDr xmlns:xdr='http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing' xmlns:a='http://schemas.openxmlformats.org/drawingml/2006/main' xmlns:r='http://schemas.openxmlformats.org/officeDocument/2006/relationships'><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:row>0</xdr:row></xdr:from><xdr:ext cx='100' cy='100'/><xdr:pic><xdr:blipFill><a:blip r:embed='rIdImage'/></xdr:blipFill></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>",
+        "xl/charts/chart1.xml": "<?xml version='1.0' encoding='UTF-8'?><chart xmlns='urn:example:chart'><title>Chart</title></chart>",
+        "xl/media/image1.png": {"encoding": "base64", "value": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="},
+        "xl/comments1.xml": "<?xml version='1.0' encoding='UTF-8'?><comments xmlns='http://schemas.openxmlformats.org/spreadsheetml/2006/main'><authors><author>Reviewer</author></authors><commentList><comment ref='A1' authorId='0'><text><t>Cell comment</t></text></comment></commentList></comments>",
+        "xl/threadedComments/threadedComment1.xml": "<?xml version='1.0' encoding='UTF-8'?><threadedComment xmlns='http://schemas.microsoft.com/office/spreadsheetml/2018/threadedcomment' ref='A1' personId='person-1'><text>Threaded body</text></threadedComment>",
+        "xl/persons/person1.xml": "<?xml version='1.0' encoding='UTF-8'?><person xmlns='http://schemas.microsoft.com/office/spreadsheetml/2017/person' displayName='Reviewer' id='person-1'/>",
+        "xl/externalLinks/externalLink1.xml": "<?xml version='1.0' encoding='UTF-8'?><externalLink xmlns='http://schemas.openxmlformats.org/spreadsheetml/2006/main'><externalBook><sheetNames><sheetName val='Remote'/></sheetNames></externalBook></externalLink>",
+        "xl/pivotTables/pivotTable1.xml": "<?xml version='1.0' encoding='UTF-8'?><pivotTableDefinition xmlns='http://schemas.openxmlformats.org/spreadsheetml/2006/main' name='Pivot' cacheId='1'/>",
+        "xl/pivotCache/pivotCacheDefinition1.xml": "<?xml version='1.0' encoding='UTF-8'?><pivotCacheDefinition xmlns='http://schemas.openxmlformats.org/spreadsheetml/2006/main' cacheId='1'/>",
+        "xl/threadedComments/persons.xml": "<?xml version='1.0' encoding='UTF-8'?><persons xmlns='urn:example:persons'/>",
+        "xl/worksheets/_rels/unrelated.xml.rels": "<?xml version='1.0' encoding='UTF-8'?><Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'/>"
+      },
+      "cases": [
+        {"caseId": "xlsx-exact-relationship-edges", "category": "relationship", "projection": "edges"},
+        {"caseId": "xlsx-sheet-hyperlink-and-location", "category": "link", "projection": "links"},
+        {"caseId": "xlsx-image-chart-and-external-resource", "category": "resource", "projection": "resources"},
+        {"caseId": "xlsx-comment-thread-and-anchor", "category": "annotation", "projection": "annotations"},
+        {"caseId": "xlsx-formula-field-range", "category": "field", "projection": "fields"}
+      ],
+      "expected": {
+        "edges": [
+          {"sourceOccurrenceId": "xlsx-package-workbook", "owner": "[package]", "target": "xl/workbook.xml", "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"relationshipFile": "_rels/.rels", "relationshipId": "rIdWorkbook"}},
+          {"sourceOccurrenceId": "xlsx-workbook-sheet", "owner": "xl/workbook.xml", "target": "xl/worksheets/sheet1.xml", "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"relationshipFile": "xl/_rels/workbook.xml.rels", "relationshipId": "rIdSheet"}},
+          {"sourceOccurrenceId": "xlsx-workbook-styles", "owner": "xl/workbook.xml", "target": "xl/styles.xml", "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"relationshipFile": "xl/_rels/workbook.xml.rels", "relationshipId": "rIdStyles"}},
+          {"sourceOccurrenceId": "xlsx-workbook-external-package", "owner": "xl/workbook.xml", "target": "xl/externalLinks/externalLink1.xml", "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLink", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"relationshipFile": "xl/_rels/workbook.xml.rels", "relationshipId": "rIdExt"}},
+          {"sourceOccurrenceId": "xlsx-workbook-external-remote", "owner": "xl/workbook.xml", "target": "https://example.invalid/book.xlsx", "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLink", "targetMode": "external", "kind": "links", "status": "unavailable", "reciprocity": true, "sourceLocator": {"relationshipFile": "xl/_rels/workbook.xml.rels", "relationshipId": "rIdRemote"}},
+          {"sourceOccurrenceId": "xlsx-workbook-missing", "owner": "xl/workbook.xml", "target": "xl/externalLinks/missing.xml", "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLink", "targetMode": "internal", "kind": "references", "status": "unavailable", "reciprocity": true, "sourceLocator": {"relationshipFile": "xl/_rels/workbook.xml.rels", "relationshipId": "rIdMissing"}},
+          {"sourceOccurrenceId": "xlsx-sheet-hyperlink", "owner": "xl/worksheets/sheet1.xml", "target": "https://example.invalid/sheet", "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink", "targetMode": "external", "kind": "links", "status": "unavailable", "reciprocity": true, "sourceLocator": {"relationshipFile": "xl/worksheets/_rels/sheet1.xml.rels", "relationshipId": "rIdHyper"}},
+          {"sourceOccurrenceId": "xlsx-sheet-drawing", "owner": "xl/worksheets/sheet1.xml", "target": "xl/drawings/drawing1.xml", "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"relationshipFile": "xl/worksheets/_rels/sheet1.xml.rels", "relationshipId": "rIdDrawing"}},
+          {"sourceOccurrenceId": "xlsx-sheet-comments", "owner": "xl/worksheets/sheet1.xml", "target": "xl/comments1.xml", "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"relationshipFile": "xl/worksheets/_rels/sheet1.xml.rels", "relationshipId": "rIdComments"}},
+          {"sourceOccurrenceId": "xlsx-sheet-threaded-comments", "owner": "xl/worksheets/sheet1.xml", "target": "xl/threadedComments/threadedComment1.xml", "type": "http://schemas.microsoft.com/office/2017/10/relationships/threadedComment", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"relationshipFile": "xl/worksheets/_rels/sheet1.xml.rels", "relationshipId": "rIdThreaded"}},
+          {"sourceOccurrenceId": "xlsx-sheet-table", "owner": "xl/worksheets/sheet1.xml", "target": "xl/tables/table1.xml", "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/table", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"relationshipFile": "xl/worksheets/_rels/sheet1.xml.rels", "relationshipId": "rIdTable"}},
+          {"sourceOccurrenceId": "xlsx-sheet-missing-drawing", "owner": "xl/worksheets/sheet1.xml", "target": "xl/drawings/missing.xml", "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing", "targetMode": "internal", "kind": "references", "status": "unavailable", "reciprocity": true, "sourceLocator": {"relationshipFile": "xl/worksheets/_rels/sheet1.xml.rels", "relationshipId": "rIdMissingDrawing"}},
+          {"sourceOccurrenceId": "xlsx-drawing-image", "owner": "xl/drawings/drawing1.xml", "target": "xl/media/image1.png", "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"relationshipFile": "xl/drawings/_rels/drawing1.xml.rels", "relationshipId": "rIdImage"}},
+          {"sourceOccurrenceId": "xlsx-drawing-chart", "owner": "xl/drawings/drawing1.xml", "target": "xl/charts/chart1.xml", "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"relationshipFile": "xl/drawings/_rels/drawing1.xml.rels", "relationshipId": "rIdChart"}}
+        ],
+        "resources": [
+          {"resourceKey": "xlsx-image", "match": {"handle": "xl/media/image1.png"}, "required": {"packagePresence": true, "rawPayloadAvailable": true, "mediaType": "image/png", "decodability": "decodable", "embeddedOrExternal": "embedded", "availability": "available", "networkAvailability": "not-applicable", "consumerCount": 1}},
+          {"resourceKey": "xlsx-chart", "match": {"handle": "xl/charts/chart1.xml"}, "required": {"packagePresence": true, "rawPayloadAvailable": true, "mediaType": "application/xml", "decodability": "parseable", "embeddedOrExternal": "embedded", "availability": "available", "networkAvailability": "not-applicable", "consumerCount": 1}},
+          {"resourceKey": "xlsx-external-package", "match": {"handle": "xl/externalLinks/externalLink1.xml"}, "required": {"packagePresence": true, "rawPayloadAvailable": true, "mediaType": "application/xml", "decodability": "parseable", "embeddedOrExternal": "external", "availability": "unavailable", "networkAvailability": "unknown", "consumerCount": 1}},
+          {"resourceKey": "xlsx-external-remote", "match": {"handle": "https://example.invalid/book.xlsx"}, "required": {"packagePresence": false, "rawPayloadAvailable": false, "mediaType": "application/octet-stream", "decodability": "not-decodable", "embeddedOrExternal": "external", "availability": "unavailable", "networkAvailability": "unknown", "consumerCount": 1}},
+          {"resourceKey": "xlsx-missing-drawing", "match": {"handle": "xl/drawings/missing.xml"}, "required": {"packagePresence": false, "rawPayloadAvailable": false, "mediaType": "application/xml", "decodability": "not-decodable", "embeddedOrExternal": "embedded", "availability": "unavailable", "networkAvailability": "not-applicable", "consumerCount": 1}}
+        ],
+        "annotations": [
+          {"annotationKey": "xlsx-external-hyperlink", "match": {"kind": "hyperlink", "ordinal": 1}, "required": {"sourceSubtype": "xlsx:hyperlink", "action": {"kind": "external", "target": "https://example.invalid/sheet"}, "geometry": {"cellRange": "A1"}, "body": "External sheet link", "anchor": {"kind": "cell", "address": "A1", "resolved": true}, "status": "preserved"}},
+          {"annotationKey": "xlsx-location-hyperlink", "match": {"kind": "hyperlink", "ordinal": 2}, "required": {"sourceSubtype": "xlsx:hyperlink", "action": {"kind": "location", "target": "Data!A1"}, "geometry": {"cellRange": "B1"}, "body": "Internal location", "anchor": {"kind": "cell", "address": "B1", "resolved": true}, "status": "preserved"}},
+          {"annotationKey": "xlsx-comment", "match": {"kind": "comment", "ordinal": 1}, "required": {"sourceSubtype": "xlsx:comment", "body": "Cell comment", "anchor": {"kind": "cell", "address": "A1", "resolved": true}, "status": "preserved"}},
+          {"annotationKey": "xlsx-threaded-comment", "match": {"kind": "comment", "ordinal": 2}, "required": {"sourceSubtype": "xlsx:threadedComment", "body": "Threaded body", "anchor": {"kind": "cell", "address": "A1", "resolved": true}, "status": "preserved"}}
+        ],
+        "links": [
+          {"linkKey": "xlsx-external-hyperlink", "match": {"annotationKey": "xlsx-external-hyperlink"}, "required": {"displayText": "External sheet link", "destination": "https://example.invalid/sheet", "displayTextIndependent": true}},
+          {"linkKey": "xlsx-location-hyperlink", "match": {"annotationKey": "xlsx-location-hyperlink"}, "required": {"displayText": "Internal location", "destination": "Data!A1", "displayTextIndependent": true}}
+        ],
+        "fields": [
+          {"fieldKey": "xlsx-formula-A2", "match": {"kind": "spreadsheetFormula", "instruction": "SUM(A1:B1)"}, "required": {"kind": "spreadsheetFormula", "instruction": "SUM(A1:B1)", "storedResult": "3", "computedResult": {"status": "unavailable"}, "range": {"start": "A2", "end": "A2", "balanced": true}, "owner": "A2", "status": "preserved"}}
+        ],
+        "revisions": []
+      }
+    },
+    {
+      "fixtureId": "pdf-rich-annotations",
+      "format": "pdf",
+      "sourceKind": "authored-pdf-object-graph",
+      "payloadKind": "text",
+      "value": "%PDF-1.7\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> /XObject << /Im1 99 0 R >> >> /Contents 6 0 R /Annots [7 0 R 8 0 R 9 0 R 10 0 R 11 0 R 13 0 R] >>\nendobj\n5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n6 0 obj\n<< /Length 39 >>\nstream\nBT /F1 12 Tf 72 720 Td (PDF closure) Tj ET\nendstream\nendobj\n7 0 obj\n<< /Type /Annot /Subtype /Link /Rect [10 20 100 40] /A 12 0 R >>\nendobj\n8 0 obj\n<< /Type /Annot /Subtype /Text /Rect [110 20 150 50] /Contents (A comment) >>\nendobj\n9 0 obj\n<< /Type /Annot /Subtype /Widget /Rect [160 20 240 50] /T (CustomerName) /FT /Tx >>\nendobj\n10 0 obj\n<< /Type /Annot /Subtype /FreeText /Rect [250 20 350 50] /Contents (Free text) >>\nendobj\n11 0 obj\n<< /Type /Annot /Subtype /Highlight /Rect [20 60 120 80] /QuadPoints [20 80 120 80 20 60 120 60] >>\nendobj\n12 0 obj\n<< /Type /Action /S /URI /URI (https://example.invalid/pdf) >>\nendobj\n13 0 obj\n<< /Type /Annot /Subtype /Link /Rect [360 20 500 50] /A 14 0 R >>\nendobj\n14 0 obj\n<< /Type /Action /S /JavaScript /JS (app.alert) >>\nendobj\n%%EOF\n",
+      "expected": {
+        "edges": [
+          {"sourceOccurrenceId": "pdf-catalog-pages", "expectedRelationId": "relation-pdf-object-1-0-2-0", "owner": "1 0 obj", "target": "2 0 obj", "type": "indirect-reference", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"object": "1 0", "reference": "2 0 R"}},
+          {"sourceOccurrenceId": "pdf-pages-kids", "expectedRelationId": "relation-pdf-object-2-0-3-0", "owner": "2 0 obj", "target": "3 0 obj", "type": "indirect-reference", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"object": "2 0", "reference": "3 0 R"}},
+          {"sourceOccurrenceId": "pdf-page-parent", "expectedRelationId": "relation-pdf-object-3-0-2-0", "owner": "3 0 obj", "target": "2 0 obj", "type": "indirect-reference", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"object": "3 0", "reference": "2 0 R"}},
+          {"sourceOccurrenceId": "pdf-page-font", "expectedRelationId": "relation-pdf-object-3-0-5-0", "owner": "3 0 obj", "target": "5 0 obj", "type": "indirect-reference", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"object": "3 0", "reference": "5 0 R"}},
+          {"sourceOccurrenceId": "pdf-page-content", "expectedRelationId": "relation-pdf-object-3-0-6-0", "owner": "3 0 obj", "target": "6 0 obj", "type": "indirect-reference", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"object": "3 0", "reference": "6 0 R"}},
+          {"sourceOccurrenceId": "pdf-page-missing-xobject", "expectedRelationId": "relation-pdf-object-3-0-99-0", "owner": "3 0 obj", "target": "99 0 R", "type": "indirect-reference", "targetMode": "internal", "kind": "references", "status": "unavailable", "reciprocity": true, "sourceLocator": {"object": "3 0", "reference": "99 0 R"}},
+          {"sourceOccurrenceId": "pdf-page-link", "expectedRelationId": "relation-pdf-object-3-0-7-0", "owner": "3 0 obj", "target": "7 0 obj", "type": "indirect-reference", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"object": "3 0", "reference": "7 0 R"}},
+          {"sourceOccurrenceId": "pdf-page-text", "expectedRelationId": "relation-pdf-object-3-0-8-0", "owner": "3 0 obj", "target": "8 0 obj", "type": "indirect-reference", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"object": "3 0", "reference": "8 0 R"}},
+          {"sourceOccurrenceId": "pdf-page-widget", "expectedRelationId": "relation-pdf-object-3-0-9-0", "owner": "3 0 obj", "target": "9 0 obj", "type": "indirect-reference", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"object": "3 0", "reference": "9 0 R"}},
+          {"sourceOccurrenceId": "pdf-page-freetext", "expectedRelationId": "relation-pdf-object-3-0-10-0", "owner": "3 0 obj", "target": "10 0 obj", "type": "indirect-reference", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"object": "3 0", "reference": "10 0 R"}},
+          {"sourceOccurrenceId": "pdf-page-highlight", "expectedRelationId": "relation-pdf-object-3-0-11-0", "owner": "3 0 obj", "target": "11 0 obj", "type": "indirect-reference", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"object": "3 0", "reference": "11 0 R"}},
+          {"sourceOccurrenceId": "pdf-page-script-link", "expectedRelationId": "relation-pdf-object-3-0-13-0", "owner": "3 0 obj", "target": "13 0 obj", "type": "indirect-reference", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"object": "3 0", "reference": "13 0 R"}},
+          {"sourceOccurrenceId": "pdf-link-action", "expectedRelationId": "relation-pdf-object-7-0-12-0", "owner": "7 0 obj", "target": "12 0 obj", "type": "indirect-reference", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"object": "7 0", "reference": "12 0 R"}},
+          {"sourceOccurrenceId": "pdf-script-action", "expectedRelationId": "relation-pdf-object-13-0-14-0", "owner": "13 0 obj", "target": "14 0 obj", "type": "indirect-reference", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"object": "13 0", "reference": "14 0 R"}}
+        ],
+        "resources": [
+          {"resourceKey": "pdf-font-no-payload", "match": {"handle": "object:5 0"}, "required": {"packagePresence": true, "rawPayloadAvailable": false, "mediaType": "application/x-font", "decodability": "not-decodable", "embeddedOrExternal": "embedded", "availability": "unavailable", "networkAvailability": "not-applicable", "consumerCount": 1}},
+          {"resourceKey": "pdf-missing-object", "match": {"handle": "99 0 R"}, "required": {"packagePresence": false, "rawPayloadAvailable": false, "mediaType": "application/pdf-object", "decodability": "not-decodable", "embeddedOrExternal": "embedded", "availability": "unavailable", "networkAvailability": "not-applicable", "consumerCount": 1}}
+        ],
+        "annotations": [
+          {"annotationKey": "pdf-link-uri", "match": {"referenceId": "7 0 R"}, "required": {"sourceSubtype": "Link", "action": {"kind": "URI", "target": "https://example.invalid/pdf"}, "geometry": {"rect": ["10", "20", "100", "40"]}, "anchor": {"kind": "page", "surfaceId": "surface-pdf-page-1"}, "status": "preserved"}},
+          {"annotationKey": "pdf-text", "match": {"referenceId": "8 0 R"}, "required": {"sourceSubtype": "Text", "body": "A comment", "geometry": {"rect": ["110", "20", "150", "50"]}, "anchor": {"kind": "page", "surfaceId": "surface-pdf-page-1"}, "status": "preserved"}},
+          {"annotationKey": "pdf-widget", "match": {"referenceId": "9 0 R"}, "required": {"sourceSubtype": "Widget", "action": {"kind": "field", "name": "CustomerName"}, "geometry": {"rect": ["160", "20", "240", "50"]}, "anchor": {"kind": "page", "surfaceId": "surface-pdf-page-1"}, "status": "unsupported"}},
+          {"annotationKey": "pdf-freetext", "match": {"referenceId": "10 0 R"}, "required": {"sourceSubtype": "FreeText", "body": "Free text", "geometry": {"rect": ["250", "20", "350", "50"]}, "anchor": {"kind": "page", "surfaceId": "surface-pdf-page-1"}, "status": "preserved"}},
+          {"annotationKey": "pdf-highlight", "match": {"referenceId": "11 0 R"}, "required": {"sourceSubtype": "Highlight", "geometry": {"rect": ["20", "60", "120", "80"], "quadPoints": ["20", "80", "120", "80", "20", "60", "120", "60"]}, "anchor": {"kind": "page", "surfaceId": "surface-pdf-page-1"}, "status": "unsupported"}},
+          {"annotationKey": "pdf-javascript-link", "match": {"referenceId": "13 0 R"}, "required": {"sourceSubtype": "Link", "action": {"kind": "JavaScript", "target": "app.alert"}, "geometry": {"rect": ["360", "20", "500", "50"]}, "anchor": {"kind": "page", "surfaceId": "surface-pdf-page-1"}, "status": "unsupported"}}
+        ],
+        "links": [
+          {"linkKey": "pdf-link-uri", "match": {"annotationKey": "pdf-link-uri"}, "required": {"displayText": null, "destination": "https://example.invalid/pdf", "displayTextIndependent": false}},
+          {"linkKey": "pdf-javascript-link", "match": {"annotationKey": "pdf-javascript-link"}, "required": {"displayText": null, "destination": "app.alert", "displayTextIndependent": false}}
+        ],
+        "fields": [
+          {"fieldKey": "pdf-widget-field", "match": {"kind": "form", "referenceId": "9 0 R"}, "required": {"kind": "form", "instruction": "CustomerName", "range": {"begin": "9 0 R", "end": "9 0 R", "balanced": true}, "owner": "9 0 obj", "status": "unsupported"}}
+        ],
+        "revisions": []
+      },
+      "cases": [
+        {"caseId": "pdf-object-edge-closure", "category": "relationship", "projection": "edges"},
+        {"caseId": "pdf-resource-payload-decoding", "category": "resource", "projection": "resources"},
+        {"caseId": "pdf-qualified-subtype-action-geometry", "category": "annotation", "projection": "annotations"},
+        {"caseId": "pdf-link-action-separation", "category": "link", "projection": "links"},
+        {"caseId": "pdf-widget-field-range", "category": "field", "projection": "fields"}
+      ]
+    },
+    {
+      "fixtureId": "pdf-marker-only",
+      "format": "pdf",
+      "sourceKind": "authored-pdf-marker-negative",
+      "payloadKind": "text",
+      "value": "%PDF-1.7\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Annots marker >>\nendobj\n%%EOF\n",
+      "expected": {
+        "edges": [
+          {"sourceOccurrenceId": "pdf-marker-catalog-pages", "expectedRelationId": "relation-pdf-object-1-0-2-0", "owner": "1 0 obj", "target": "2 0 obj", "type": "indirect-reference", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"object": "1 0", "reference": "2 0 R"}},
+          {"sourceOccurrenceId": "pdf-marker-pages-kids", "expectedRelationId": "relation-pdf-object-2-0-3-0", "owner": "2 0 obj", "target": "3 0 obj", "type": "indirect-reference", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"object": "2 0", "reference": "3 0 R"}},
+          {"sourceOccurrenceId": "pdf-marker-page-parent", "expectedRelationId": "relation-pdf-object-3-0-2-0", "owner": "3 0 obj", "target": "2 0 obj", "type": "indirect-reference", "targetMode": "internal", "kind": "references", "status": "preserved", "reciprocity": true, "sourceLocator": {"object": "3 0", "reference": "2 0 R"}}
+        ],
+        "resources": [],
+        "annotations": [],
+        "links": [],
+        "fields": [],
+        "revisions": [],
+        "markerOnlyAnnotationCount": 0
+      },
+      "cases": [
+        {"caseId": "pdf-annots-marker-is-not-an-annotation", "category": "annotation", "projection": "annotations"},
+        {"caseId": "pdf-marker-edge-closure", "category": "relationship", "projection": "edges"}
+      ]
+    },
+    {
+      "fixtureId": "markdown-closure",
+      "format": "markdown",
+      "sourceKind": "authored-markdown-source",
+      "payloadKind": "text",
+      "value": "# Link closure\n\nExternal [outer **link**](https://example.invalid/doc) and [reference][ref].\n![local image](missing.png)\n![external image](https://example.invalid/image.png)\nAutolink <https://example.invalid/auto>\n[^note]\n\n[ref]: local.md \"Local\"\n[^note]: Footnote body\n",
+      "expected": {
+        "edges": [
+          {"sourceOccurrenceId": "md-inline-external", "owner": "markdown-run", "target": "https://example.invalid/doc", "type": "inline-link", "targetMode": "external", "kind": "links", "status": "unavailable", "reciprocity": true, "sourceLocator": {"line": 3, "token": "[outer **link**](https://example.invalid/doc)"}},
+          {"sourceOccurrenceId": "md-reference-link", "owner": "markdown-run", "target": "local.md", "type": "reference-link", "targetMode": "internal", "kind": "links", "status": "unavailable", "reciprocity": true, "sourceLocator": {"line": 3, "token": "[reference][ref]"}},
+          {"owner": "markdown-run-3-1-59-7", "target": "annotation-markdown-reference-9-ref", "kind": "references", "status": "preserved", "reciprocity": false},
+          {"sourceOccurrenceId": "md-local-image", "owner": "markdown-run", "target": "missing.png", "type": "image", "targetMode": "internal", "kind": "links", "status": "unavailable", "reciprocity": true, "sourceLocator": {"line": 4, "token": "![local image](missing.png)"}},
+          {"sourceOccurrenceId": "md-external-image", "owner": "markdown-run", "target": "https://example.invalid/image.png", "type": "image", "targetMode": "external", "kind": "links", "status": "unavailable", "reciprocity": true, "sourceLocator": {"line": 5, "token": "![external image](https://example.invalid/image.png)"}},
+          {"sourceOccurrenceId": "md-autolink", "owner": "markdown-run", "target": "https://example.invalid/auto", "type": "autolink", "targetMode": "external", "kind": "links", "status": "unavailable", "reciprocity": true, "sourceLocator": {"line": 6, "token": "<https://example.invalid/auto>"}}
+        ],
+        "resources": [
+          {"resourceKey": "md-external-doc", "match": {"handle": "https://example.invalid/doc"}, "required": {"packagePresence": false, "rawPayloadAvailable": false, "mediaType": "application/octet-stream", "decodability": "not-attempted", "embeddedOrExternal": "external", "availability": "unavailable", "networkAvailability": "unknown", "consumerCount": 1}},
+          {"resourceKey": "md-local-reference", "match": {"handle": "local.md"}, "required": {"packagePresence": false, "rawPayloadAvailable": false, "mediaType": "application/octet-stream", "decodability": "not-attempted", "embeddedOrExternal": "linked", "availability": "unavailable", "networkAvailability": "not-applicable", "consumerCount": 1}},
+          {"resourceKey": "md-local-image", "match": {"handle": "missing.png"}, "required": {"packagePresence": false, "rawPayloadAvailable": false, "mediaType": "image/png", "decodability": "not-attempted", "embeddedOrExternal": "linked", "availability": "unavailable", "networkAvailability": "not-applicable", "consumerCount": 1}},
+          {"resourceKey": "md-external-image", "match": {"handle": "https://example.invalid/image.png"}, "required": {"packagePresence": false, "rawPayloadAvailable": false, "mediaType": "image/png", "decodability": "not-attempted", "embeddedOrExternal": "external", "availability": "unavailable", "networkAvailability": "unknown", "consumerCount": 1}},
+          {"resourceKey": "md-autolink", "match": {"handle": "https://example.invalid/auto"}, "required": {"packagePresence": false, "rawPayloadAvailable": false, "mediaType": "application/octet-stream", "decodability": "not-attempted", "embeddedOrExternal": "external", "availability": "unavailable", "networkAvailability": "unknown", "consumerCount": 1}}
+        ],
+        "annotations": [
+          {"annotationKey": "md-inline-link", "match": {"kind": "hyperlink", "ordinal": 1}, "required": {"destination": "https://example.invalid/doc", "displayText": "outer **link**", "status": "preserved"}},
+          {"annotationKey": "md-reference-link", "match": {"kind": "hyperlink", "ordinal": 2}, "required": {"destination": "local.md", "displayText": "reference", "status": "preserved"}},
+          {"annotationKey": "md-local-image", "match": {"kind": "hyperlink", "ordinal": 3}, "required": {"destination": "missing.png", "displayText": "local image", "status": "preserved"}},
+          {"annotationKey": "md-external-image", "match": {"kind": "hyperlink", "ordinal": 4}, "required": {"destination": "https://example.invalid/image.png", "displayText": "external image", "status": "preserved"}},
+          {"annotationKey": "md-autolink", "match": {"kind": "hyperlink", "ordinal": 5}, "required": {"destination": "https://example.invalid/auto", "displayText": "https://example.invalid/auto", "status": "preserved"}},
+          {"annotationKey": "md-footnote-reference", "match": {"kind": "footnote", "ordinal": 1}, "required": {"sourceSubtype": "markdown:footnote", "body": "Footnote body", "anchor": {"kind": "reference", "label": "note", "resolved": true}, "status": "preserved"}},
+          {"annotationKey": "md-reference-definition", "match": {"kind": "bookmark", "ordinal": 1}, "required": {"body": "local.md", "referenceId": "ref", "status": "preserved"}},
+          {"annotationKey": "md-footnote-definition", "match": {"kind": "footnote", "ordinal": 2}, "required": {"sourceSubtype": "markdown:footnote", "body": "Footnote body", "anchor": {"kind": "definition", "label": "note", "resolved": true}, "status": "preserved"}}
+        ],
+        "links": [
+          {"linkKey": "md-inline-external", "match": {"target": "https://example.invalid/doc"}, "required": {"displayText": "outer **link**", "destination": "https://example.invalid/doc", "displayTextIndependent": true}},
+          {"linkKey": "md-reference-link", "match": {"target": "local.md"}, "required": {"displayText": "reference", "destination": "local.md", "displayTextIndependent": true}},
+          {"linkKey": "md-local-image", "match": {"target": "missing.png"}, "required": {"displayText": "local image", "destination": "missing.png", "displayTextIndependent": true}},
+          {"linkKey": "md-external-image", "match": {"target": "https://example.invalid/image.png"}, "required": {"displayText": "external image", "destination": "https://example.invalid/image.png", "displayTextIndependent": true}},
+          {"linkKey": "md-autolink", "match": {"target": "https://example.invalid/auto"}, "required": {"displayText": "https://example.invalid/auto", "destination": "https://example.invalid/auto", "displayTextIndependent": true}}
+        ],
+        "fields": [],
+        "revisions": []
+      },
+      "cases": [
+        {"caseId": "markdown-reference-autolink-image-edges", "category": "relationship", "projection": "edges"},
+        {"caseId": "markdown-resource-observation-separation", "category": "resource", "projection": "resources"},
+        {"caseId": "markdown-footnote-anchor-body", "category": "annotation", "projection": "annotations"},
+        {"caseId": "markdown-display-text-independent-of-destination", "category": "link", "projection": "links"}
+      ]
+    }
+  ],
+  "negativeCases": [
+    {"caseId": "relation-target-reassigned", "defect": "relation target reassigned to another part", "fixtureId": "docx-closure", "projection": "edges", "target": {"sourceOccurrenceId": "docx-image"}, "mutation": {"op": "set", "path": "target", "value": "word/comments.xml"}},
+    {"caseId": "missing-target-preserved-available", "defect": "missing target changed to preserved/available", "fixtureId": "docx-closure", "projection": "edges", "target": {"sourceOccurrenceId": "docx-missing"}, "mutation": {"op": "set", "path": "status", "value": "preserved"}},
+    {"caseId": "external-target-available", "defect": "external source fact confused with available internal target", "fixtureId": "docx-closure", "projection": "edges", "target": {"sourceOccurrenceId": "docx-hyperlink"}, "mutation": {"op": "set", "path": "status", "value": "preserved"}},
+    {"caseId": "hyperlink-content-traversal-disabled", "defect": "nested hyperlink display content dropped", "fixtureId": "docx-closure", "projection": "links", "target": {"linkKey": "docx-hyperlink"}, "mutation": {"op": "set", "path": "required.displayText", "value": "Outer tail"}},
+    {"caseId": "anchor-deleted", "defect": "comment/field/revision anchor deleted", "fixtureId": "docx-closure", "projection": "annotations", "target": {"annotationKey": "docx-comment"}, "mutation": {"op": "delete", "path": "required.anchor"}},
+    {"caseId": "pdf-annots-marker-fabrication", "defect": "generic annotation fabricated from /Annots marker", "fixtureId": "pdf-marker-only", "projection": "annotations", "target": {"append": true}, "mutation": {"op": "append", "value": {"annotationKey": "fabricated-marker", "required": {"kind": "hyperlink", "sourceSubtype": "marker", "status": "preserved"}}}},
+    {"caseId": "pdf-subtype-action-ignored", "defect": "annotation subtype/action target ignored", "fixtureId": "pdf-rich-annotations", "projection": "annotations", "target": {"annotationKey": "pdf-link-uri"}, "mutation": {"op": "delete", "path": "required.action"}},
+    {"caseId": "resource-payloadless-available", "defect": "resource without raw payload changed to available", "fixtureId": "pdf-rich-annotations", "projection": "resources", "target": {"resourceKey": "pdf-font-no-payload"}, "mutation": {"op": "set", "path": "required.availability", "value": "available"}},
+    {"caseId": "external-availability-confused", "defect": "external source declaration confused with network availability", "fixtureId": "markdown-closure", "projection": "resources", "target": {"resourceKey": "md-external-doc"}, "mutation": {"op": "set", "path": "required.networkAvailability", "value": "available"}},
+    {"caseId": "relation-reciprocity-deleted", "defect": "relationship reciprocity deleted", "fixtureId": "xlsx-closure", "projection": "edges", "target": {"sourceOccurrenceId": "xlsx-workbook-sheet"}, "mutation": {"op": "set", "path": "reciprocity", "value": false}}
+  ],
+  "limitations": [
+    "This is a bounded qualification lane; it does not claim whole-issue completion or replace the shared relationship contract.",
+    "PDF action semantics are recorded and never executed; external URLs are never fetched.",
+    "The authored corpus covers representative closure edges, not every producer-specific DOCX/XLSX/PDF/Markdown extension.",
+    "Reports are evidence of the current source SHA and are not committed by this lane."
+  ],
+  "unmetRequirements": [
+    "Full issue #96 format profile closure remains outside this bounded lane.",
+    "Shared contract and adapter implementation changes are intentionally not part of this qualification-only change."
+  ]
+}

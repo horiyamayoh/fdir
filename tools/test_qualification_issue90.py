@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import re
+import shutil
 import unittest
 from unittest import mock
 import uuid
@@ -62,14 +63,11 @@ class QualificationIssue90Tests(unittest.TestCase):
         self.assertGreater(schema_report["positiveCaseCount"], 0)
         self.assertGreater(schema_report["negativeCaseCount"], 0)
         self.assertRegex(schema_report["sourceSha"], re.compile(r"^[0-9a-f]{40}$"))
-        # The current runtime deliberately exposes the remaining #90 gaps.  A
-        # non-zero process result is required until those gaps are fixed; a
-        # passing schema report must not mask them.
-        self.assertEqual(exit_code, 1)
+        self.assertEqual(exit_code, 0)
 
-    def test_graph_and_status_gaps_are_reported_as_failures(self) -> None:
+    def test_graph_and_status_negative_matrix_is_complete(self) -> None:
         output = self._output_dir()
-        qualification.run_qualification(out_dir=output)
+        exit_code = qualification.run_qualification(out_dir=output)
         graph_report = json.loads(
             (output / "graph-invariants.json").read_text(encoding="utf-8")
         )
@@ -77,25 +75,26 @@ class QualificationIssue90Tests(unittest.TestCase):
             (output / "status-contract.json").read_text(encoding="utf-8")
         )
 
-        self.assertEqual(graph_report["status"], "failed")
-        self.assertIn("cardinality", graph_report["coverage"]["missingCategories"])
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(graph_report["status"], "passed")
+        self.assertTrue(graph_report["coverage"]["complete"])
         relation_case = next(
             case
             for case in graph_report["cases"]
             if case["caseId"] == "relation-endpoint-kind"
         )
-        self.assertFalse(relation_case["assertions"]["expectedDiagnostic"])
-        self.assertIsNone(relation_case["runtime"].get("diagnostic"))
+        self.assertTrue(relation_case["assertions"]["expectedDiagnostic"])
+        self.assertTrue(relation_case["assertions"]["minimumFailingPath"])
 
-        self.assertEqual(status_report["status"], "failed")
-        self.assertIn("status-enum", status_report["coverage"]["missingCategories"])
+        self.assertEqual(status_report["status"], "passed")
+        self.assertTrue(status_report["coverage"]["complete"])
         status_case = next(
             case
             for case in status_report["cases"]
             if case["caseId"] == "complete-with-warnings-without-evidence"
         )
         self.assertTrue(status_case["assertions"]["expectedDiagnostic"])
-        self.assertFalse(status_case["assertions"]["minimumFailingPath"])
+        self.assertTrue(status_case["assertions"]["minimumFailingPath"])
 
     def test_missing_external_validator_writes_fail_closed_reports(self) -> None:
         output = self._output_dir()
@@ -111,6 +110,31 @@ class QualificationIssue90Tests(unittest.TestCase):
             report = json.loads((output / name).read_text(encoding="utf-8"))
             self.assertEqual(report["status"], "failed")
             self.assertEqual(report["failure"]["code"], "QUALIFICATION-SETUP-FAILED")
+
+    def test_producer_envelope_is_typed_and_closed(self) -> None:
+        output = self._output_dir()
+        try:
+            qualification.run_qualification(out_dir=output)
+            producer = json.loads((output / "producer-report.json").read_text(encoding="utf-8"))
+            try:
+                from qualification_evidence import validate_producer_report_shape
+            except ImportError:  # pragma: no cover
+                from tools.qualification_evidence import validate_producer_report_shape
+            self.assertEqual(validate_producer_report_shape(producer), [])
+            self.assertEqual(len(producer["testCases"]), len(producer["assertions"]))
+            self.assertEqual(
+                {item["classification"] for item in producer["testCases"]},
+                {"positive", "negative"},
+            )
+            self.assertEqual(
+                {item["caseId"] for item in producer["testCases"]},
+                {item["testCaseId"] for item in producer["assertions"]},
+            )
+            for item in producer["testCases"]:
+                self.assertNotEqual(item["authorityArtifact"]["path"], item["actualArtifact"]["path"])
+                self.assertNotIn(item["supportingArtifact"]["path"], {item["authorityArtifact"]["path"], item["actualArtifact"]["path"]})
+        finally:
+            shutil.rmtree(output, ignore_errors=True)
 
 
 if __name__ == "__main__":

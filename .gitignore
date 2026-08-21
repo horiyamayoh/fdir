@@ -22,4 +22,10 @@ e2e/fixtures/unsupported.docx
 e2e/fixtures/unsupported.xlsx
 e2e/fixtures/unsupported.pdf
 e2e/fixtures/unsupported.md
+# Local qualification scratch outputs and temporary inspection workspaces.
+.qualification-issue-*/
+.qualification-issue*-debug/
+.qualification-xlsx-debug/
+.query-qualification-*/
+.style-provenance-*/
 .DS_Store

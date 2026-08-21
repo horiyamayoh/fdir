@@ -212,6 +212,67 @@
       "operations": [
         {"op": "set", "path": "relations[relationId=relation-connector-target].fromId", "value": "node-paragraph"}
       ]
+    },
+    {
+      "id": "table-owner-wrong-kind",
+      "category": "owner-kind",
+      "source": "examples/cell-formula.json",
+      "expectedDiagnostic": "DFIR-REF-WRONG-TYPE",
+      "expectedPath": "table table-qualification.nodeId",
+      "operations": [
+        {"op": "append", "path": "$.tables", "value": {"tableId": "table-qualification", "nodeId": "node-sheet", "rowIds": [], "columnIds": [], "cellIds": []}},
+        {"op": "set", "path": "tables[tableId=table-qualification].nodeId", "value": "cell-b2"}
+      ]
+    },
+    {
+      "id": "scalar-child-cardinality",
+      "category": "cardinality",
+      "source": "examples/markdown-authoring.json",
+      "expectedDiagnostic": "DFIR-SCHEMA-TYPE",
+      "expectedPath": "$.nodes[0].childIds",
+      "operations": [
+        {"op": "set", "path": "nodes[nodeId=node-document].childIds", "value": "node-paragraph"}
+      ]
+    },
+    {
+      "id": "table-cell-without-row-topology",
+      "category": "table-topology",
+      "source": "examples/cell-formula.json",
+      "expectedDiagnostic": "DFIR-TABLE-CONTAINMENT",
+      "expectedPath": "table table-qualification",
+      "operations": [
+        {"op": "append", "path": "$.tables", "value": {"tableId": "table-qualification", "nodeId": "node-sheet", "rowIds": [], "columnIds": [], "cellIds": ["cell-b2"]}}
+      ]
+    },
+    {
+      "id": "extension-required-payload-field",
+      "category": "extension-target-schema",
+      "source": "examples/callout.json",
+      "expectedDiagnostic": "DFIR-SCHEMA-REQUIRED",
+      "expectedPath": "extensions[extension-docx-callout].payload",
+      "operations": [
+        {"op": "delete", "path": "extensions[extensionId=extension-docx-callout].payload.presetGeometry"}
+      ]
+    },
+    {
+      "id": "source-map-format-mismatch",
+      "category": "source-map-format",
+      "source": "examples/markdown-authoring.json",
+      "expectedDiagnostic": "DFIR-SOURCEMAP-FORMAT",
+      "expectedPath": "sourceMap map-markdown-run",
+      "operations": [
+        {"op": "set", "path": "sourceMaps[sourceMapId=map-markdown-run].format.name", "value": "docx"}
+      ]
+    },
+    {
+      "id": "diagnostic-related-target-missing",
+      "category": "diagnostic-binding",
+      "source": "examples/pdf-observation.json",
+      "expectedDiagnostic": "DFIR-REF-DANGLING",
+      "expectedPath": "diagnostic diagnostic-glyph-ocr.relatedIds",
+      "operations": [
+        {"op": "append", "path": "diagnostics[diagnosticId=diagnostic-glyph-ocr].relatedIds", "value": "missing-diagnostic-target"}
+      ]
     }
   ],
   "statusCases": [
@@ -306,6 +367,26 @@
       "operations": [
         {"op": "append", "path": "$.diagnostics", "value": {"diagnosticId": "diagnostic-error", "code": "DFIR-TEST-ERROR", "severity": "error", "phase": "validate", "message": "qualification error", "action": "review", "targetId": "node-document"}},
         {"op": "append", "path": "$.conversion.diagnostics", "value": "diagnostic-error"}
+      ]
+    },
+    {
+      "id": "conversion-status-enum",
+      "category": "status-enum",
+      "source": "examples/callout.json",
+      "expectedDiagnostic": "DFIR-SCHEMA-ENUM",
+      "expectedPath": "$.conversion.status",
+      "operations": [
+        {"op": "set", "path": "$.conversion.status", "value": "not-a-status"}
+      ]
+    },
+    {
+      "id": "feature-target-status-authority",
+      "category": "entity-feature-authority",
+      "source": "examples/pdf-observation.json",
+      "expectedDiagnostic": "DFIR-CAPABILITY-ENTITY-AUTHORITY",
+      "expectedPath": "conversion.features",
+      "operations": [
+        {"op": "set", "path": "nodes[nodeId=node-glyph].status", "value": "unsupported"}
       ]
     }
   ],

@@ -9,12 +9,12 @@
     "deterministic": true
   },
   "sourceDigestAlgorithm": "sha256(canonical-json(sources))",
-  "sourceDigest": "3c8167f02e8a43acd5bece66566f3b1876ce5928444b346ed18d4601c583e895",
+  "sourceDigest": "b2fd731e9919204bd10aa44d44c02481d0a731c16ca891af018ad41fae1d9a77",
   "sources": [
     {
       "role": "schema",
       "path": "schemas/document-form-ir.schema.json",
-      "sha256": "b5aa2ac577f65f52e0431545ae638d0c0bfd736e51be73523f9a190943f3a3e8"
+      "sha256": "1a74ba673be236ec2428b54a4e82688f6192d94b395a7bc090a499e31bdd4b76"
     },
     {
       "role": "referenceRegistry",
@@ -24,7 +24,7 @@
     {
       "role": "runtimeValidator",
       "path": "tools/ir_validation.py",
-      "sha256": "058cdcf9ee51ba0431ef469dba0de617f5a925ec08d9f47d98b609852684bae2"
+      "sha256": "c85381367ac7cfc76da57c4ac9161b5bd4c96b93a0efc67c15ed335e8c3b28ad"
     },
     {
       "role": "generator",
@@ -79,9 +79,14 @@
         "values": [
           "document",
           "section",
+          "story",
+          "footnote",
+          "endnote",
+          "comment",
           "paragraph",
           "run",
           "heading",
+          "thematicBreak",
           "list",
           "table",
           "row",
@@ -325,6 +330,7 @@
           "z-order",
           "grid",
           "tab",
+          "page-tree",
           "revision"
         ],
         "closed": true,
@@ -809,6 +815,22 @@
           }
         },
         {
+          "name": "storyType",
+          "required": false,
+          "schema": {
+            "type": "string",
+            "enum": [
+              "document",
+              "header",
+              "footer",
+              "footnote",
+              "endnote",
+              "comment",
+              "sheet"
+            ]
+          }
+        },
+        {
           "name": "contentType",
           "required": false,
           "schema": {
@@ -918,6 +940,20 @@
           }
         },
         {
+          "name": "storyId",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/id"
+          }
+        },
+        {
+          "name": "sectionBoundary",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/id"
+          }
+        },
+        {
           "name": "coordinateSpaceId",
           "required": false,
           "schema": {
@@ -929,6 +965,75 @@
           "required": false,
           "schema": {
             "ref": "#/$defs/id"
+          }
+        },
+        {
+          "name": "pageTreeIndex",
+          "required": false,
+          "schema": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        {
+          "name": "sourceObject",
+          "required": false,
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        {
+          "name": "rotation",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "name": "mediaBox",
+          "required": false,
+          "schema": {
+            "type": "array",
+            "items": {
+              "ref": "#/$defs/decimal"
+            },
+            "minItems": 4,
+            "maxItems": 4
+          }
+        },
+        {
+          "name": "cropBox",
+          "required": false,
+          "schema": {
+            "type": "array",
+            "items": {
+              "ref": "#/$defs/decimal"
+            },
+            "minItems": 4,
+            "maxItems": 4
+          }
+        },
+        {
+          "name": "dimension",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "sparse",
+          "required": false,
+          "schema": {
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "dialect",
+          "required": false,
+          "schema": {
+            "type": "string",
+            "minLength": 1
           }
         },
         {
@@ -967,9 +1072,14 @@
         "values": [
           "document",
           "section",
+          "story",
+          "footnote",
+          "endnote",
+          "comment",
           "paragraph",
           "run",
           "heading",
+          "thematicBreak",
           "list",
           "table",
           "row",
@@ -1013,9 +1123,14 @@
             "enum": [
               "document",
               "section",
+              "story",
+              "footnote",
+              "endnote",
+              "comment",
               "paragraph",
               "run",
               "heading",
+              "thematicBreak",
               "list",
               "table",
               "row",
@@ -1177,6 +1292,32 @@
           "schema": {
             "ref": "#/$defs/cellAddress"
           }
+        },
+        {
+          "name": "gridSpan",
+          "required": false,
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        {
+          "name": "mergeRole",
+          "required": false,
+          "schema": {
+            "type": "string",
+            "enum": [
+              "master",
+              "follower"
+            ]
+          }
+        },
+        {
+          "name": "mergeId",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/id"
+          }
         }
       ],
       "variants": [
@@ -1293,7 +1434,10 @@
           "name": "value",
           "required": true,
           "schema": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         {
@@ -1317,6 +1461,23 @@
             "type": "array",
             "items": {
               "ref": "#/$defs/textTransformation"
+            }
+          }
+        },
+        {
+          "name": "normalizationForm",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "mapping",
+          "required": false,
+          "schema": {
+            "type": "array",
+            "items": {
+              "ref": "#/$defs/textMapping"
             }
           }
         },
@@ -1360,6 +1521,94 @@
           "schema": {
             "type": "integer",
             "minimum": 0
+          }
+        }
+      ],
+      "variants": []
+    },
+    {
+      "name": "fieldRange",
+      "collection": null,
+      "idField": null,
+      "kind": {
+        "field": null,
+        "values": null,
+        "closed": false,
+        "policy": "not-defined"
+      },
+      "required": [
+        "balanced"
+      ],
+      "additionalProperties": false,
+      "fields": [
+        {
+          "name": "begin",
+          "required": false,
+          "schema": {
+            "oneOf": 2
+          }
+        },
+        {
+          "name": "separate",
+          "required": false,
+          "schema": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        {
+          "name": "end",
+          "required": false,
+          "schema": {
+            "oneOf": 2
+          }
+        },
+        {
+          "name": "balanced",
+          "required": true,
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "variants": []
+    },
+    {
+      "name": "revisionRange",
+      "collection": null,
+      "idField": null,
+      "kind": {
+        "field": null,
+        "values": null,
+        "closed": false,
+        "policy": "not-defined"
+      },
+      "required": [
+        "start",
+        "end",
+        "balanced"
+      ],
+      "additionalProperties": false,
+      "fields": [
+        {
+          "name": "start",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "end",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "balanced",
+          "required": true,
+          "schema": {
+            "type": "boolean"
           }
         }
       ],
@@ -1439,6 +1688,118 @@
           "schema": {
             "type": "integer",
             "minimum": 0
+          }
+        },
+        {
+          "name": "sourceUnit",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "targetUnit",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "operation",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "loss",
+          "required": false,
+          "schema": {
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "normalizationForm",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "variants": []
+    },
+    {
+      "name": "textMapping",
+      "collection": null,
+      "idField": null,
+      "kind": {
+        "field": null,
+        "values": null,
+        "closed": false,
+        "policy": "not-defined"
+      },
+      "required": [
+        "sourceRange",
+        "targetRange",
+        "sourceUnit",
+        "targetUnit",
+        "operation",
+        "loss"
+      ],
+      "additionalProperties": false,
+      "fields": [
+        {
+          "name": "sourceRange",
+          "required": true,
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        {
+          "name": "targetRange",
+          "required": true,
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        {
+          "name": "sourceUnit",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "targetUnit",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "operation",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "loss",
+          "required": true,
+          "schema": {
+            "type": "boolean"
           }
         }
       ],
@@ -1553,12 +1914,236 @@
           }
         },
         {
+          "name": "ownerSurfaceId",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/id"
+          }
+        },
+        {
+          "name": "ownerCellId",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/id"
+          }
+        },
+        {
+          "name": "range",
+          "required": false,
+          "schema": {
+            "oneOf": 2
+          }
+        },
+        {
+          "name": "scope",
+          "required": false,
+          "schema": {
+            "type": "string",
+            "enum": [
+              "sheet-grid",
+              "structured-table"
+            ]
+          }
+        },
+        {
+          "name": "memberAddresses",
+          "required": false,
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "name": "memberTopology",
+          "required": false,
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": [
+                "nodeId",
+                "address",
+                "parent",
+                "order"
+              ],
+              "required": [
+                "nodeId",
+                "address",
+                "parent",
+                "order"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "name": "sparseDeclaration",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/sparseDeclaration"
+          }
+        },
+        {
+          "name": "visibility",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/gridVisibility"
+          }
+        },
+        {
+          "name": "headerRows",
+          "required": false,
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        {
+          "name": "bodyRows",
+          "required": false,
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        {
+          "name": "totalsRows",
+          "required": false,
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        {
+          "name": "columns",
+          "required": false,
+          "schema": {
+            "type": "array",
+            "items": {
+              "ref": "#/$defs/tableColumn"
+            }
+          }
+        },
+        {
+          "name": "autoFilter",
+          "required": false,
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        {
+          "name": "separatorLines",
+          "required": false,
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        {
+          "name": "rowSourceLines",
+          "required": false,
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        {
+          "name": "alignment",
+          "required": false,
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "name": "separatorIsMetadata",
+          "required": false,
+          "schema": {
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "gridColumns",
+          "required": false,
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        {
+          "name": "gridColumnWidths",
+          "required": false,
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "name": "nestedTableIds",
+          "required": false,
+          "schema": {
+            "type": "array",
+            "items": {
+              "ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "name": "gridBefore",
+          "required": false,
+          "schema": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        {
+          "name": "gridAfter",
+          "required": false,
+          "schema": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        {
           "name": "mergedRanges",
           "required": false,
           "schema": {
             "type": "array",
             "items": {
-              "ref": "#/$defs/cellRange"
+              "oneOf": 2
             }
           }
         },
@@ -1570,6 +2155,123 @@
           }
         }
       ],
+      "variants": []
+    },
+    {
+      "name": "tableColumn",
+      "collection": null,
+      "idField": null,
+      "kind": {
+        "field": null,
+        "values": null,
+        "closed": false,
+        "policy": "not-defined"
+      },
+      "required": [
+        "name",
+        "id"
+      ],
+      "additionalProperties": false,
+      "fields": [
+        {
+          "name": "name",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "id",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        {
+          "name": "totalsRowFunction",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "variants": []
+    },
+    {
+      "name": "sparseDeclaration",
+      "collection": null,
+      "idField": null,
+      "kind": {
+        "field": null,
+        "values": null,
+        "closed": false,
+        "policy": "not-defined"
+      },
+      "required": [
+        "dimension",
+        "declaredRows",
+        "declaredColumns",
+        "actualCells"
+      ],
+      "additionalProperties": false,
+      "fields": [
+        {
+          "name": "dimension",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "declaredRows",
+          "required": true,
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        {
+          "name": "declaredColumns",
+          "required": true,
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        {
+          "name": "actualCells",
+          "required": true,
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ],
+      "variants": []
+    },
+    {
+      "name": "gridVisibility",
+      "collection": null,
+      "idField": null,
+      "kind": {
+        "field": null,
+        "values": null,
+        "closed": false,
+        "policy": "not-defined"
+      },
+      "required": [],
+      "additionalProperties": false,
+      "fields": [],
       "variants": []
     },
     {
@@ -1600,6 +2302,113 @@
           "required": true,
           "schema": {
             "ref": "#/$defs/cellAddress"
+          }
+        }
+      ],
+      "variants": []
+    },
+    {
+      "name": "gridRange",
+      "collection": null,
+      "idField": null,
+      "kind": {
+        "field": null,
+        "values": null,
+        "closed": false,
+        "policy": "not-defined"
+      },
+      "required": [
+        "rowStart",
+        "rowEnd",
+        "columnStart",
+        "columnEnd"
+      ],
+      "additionalProperties": false,
+      "fields": [
+        {
+          "name": "rowStart",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        {
+          "name": "rowEnd",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        {
+          "name": "columnStart",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        {
+          "name": "columnEnd",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      ],
+      "variants": []
+    },
+    {
+      "name": "docxMergedRange",
+      "collection": null,
+      "idField": "masterCellId",
+      "kind": {
+        "field": null,
+        "values": null,
+        "closed": false,
+        "policy": "not-defined"
+      },
+      "required": [
+        "range",
+        "masterCellId",
+        "followerCellIds",
+        "policy"
+      ],
+      "additionalProperties": false,
+      "fields": [
+        {
+          "name": "range",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        {
+          "name": "masterCellId",
+          "required": true,
+          "schema": {
+            "ref": "#/$defs/id"
+          }
+        },
+        {
+          "name": "followerCellIds",
+          "required": true,
+          "schema": {
+            "type": "array",
+            "items": {
+              "ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "name": "policy",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1
           }
         }
       ],
@@ -2172,9 +2981,7 @@
           "name": "a",
           "required": false,
           "schema": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 1
+            "oneOf": 2
           }
         },
         {
@@ -3536,6 +4343,49 @@
           }
         },
         {
+          "name": "packagePresence",
+          "required": false,
+          "schema": {
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "rawPayloadAvailable",
+          "required": false,
+          "schema": {
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "decodability",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "embeddedOrExternal",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "networkAvailability",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "consumerCount",
+          "required": false,
+          "schema": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        {
           "name": "width",
           "required": false,
           "schema": {
@@ -3590,6 +4440,13 @@
           }
         },
         {
+          "name": "ownerAddress",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
           "name": "kind",
           "required": true,
           "schema": {
@@ -3598,6 +4455,33 @@
               "spreadsheetFormula",
               "calculationField"
             ]
+          }
+        },
+        {
+          "name": "formulaType",
+          "required": false,
+          "schema": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "shared",
+              "array",
+              "dataTable"
+            ]
+          }
+        },
+        {
+          "name": "sharedIndex",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "sourceReference",
+          "required": false,
+          "schema": {
+            "type": "string"
           }
         },
         {
@@ -3623,6 +4507,13 @@
           "required": true,
           "schema": {
             "ref": "#/$defs/formulaValues"
+          }
+        },
+        {
+          "name": "range",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/formulaRange"
           }
         },
         {
@@ -3730,9 +4621,50 @@
       "variants": []
     },
     {
-      "name": "typedValue",
+      "name": "formulaRange",
       "collection": null,
       "idField": null,
+      "kind": {
+        "field": null,
+        "values": null,
+        "closed": false,
+        "policy": "not-defined"
+      },
+      "required": [
+        "start",
+        "end",
+        "balanced"
+      ],
+      "additionalProperties": false,
+      "fields": [
+        {
+          "name": "start",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "end",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "balanced",
+          "required": true,
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "variants": []
+    },
+    {
+      "name": "typedValue",
+      "collection": null,
+      "idField": "normalizationRuleId",
       "kind": {
         "field": null,
         "values": null,
@@ -3760,6 +4692,7 @@
               "string",
               "date",
               "datetime",
+              "duration",
               "error"
             ]
           }
@@ -3774,6 +4707,54 @@
               "number",
               "null"
             ]
+          }
+        },
+        {
+          "name": "unit",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "sourceRepresentation",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "logicalValue",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "boolean",
+              "number",
+              "null",
+              "object"
+            ]
+          }
+        },
+        {
+          "name": "normalizationRuleId",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "provenance",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "exactness",
+          "required": false,
+          "schema": {
+            "type": "string"
           }
         },
         {
@@ -3819,7 +4800,8 @@
               "enum": [
                 "integer",
                 "number",
-                "decimal"
+                "decimal",
+                "duration"
               ]
             }
           },
@@ -3939,6 +4921,20 @@
           }
         },
         {
+          "name": "owner",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "referenceId",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
           "name": "kind",
           "required": true,
           "schema": {
@@ -3977,7 +4973,7 @@
           "name": "range",
           "required": false,
           "schema": {
-            "ref": "#/$defs/textRange"
+            "ref": "#/$defs/fieldRange"
           }
         },
         {
@@ -4106,7 +5102,7 @@
           "name": "range",
           "required": false,
           "schema": {
-            "ref": "#/$defs/textRange"
+            "oneOf": 2
           }
         },
         {
@@ -4124,7 +5120,92 @@
           }
         },
         {
+          "name": "sourceSubtype",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "action",
+          "required": false,
+          "schema": {
+            "type": "object"
+          }
+        },
+        {
+          "name": "geometry",
+          "required": false,
+          "schema": {
+            "type": "object"
+          }
+        },
+        {
+          "name": "anchor",
+          "required": false,
+          "schema": {
+            "type": "object"
+          }
+        },
+        {
+          "name": "displayText",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        {
+          "name": "destination",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
           "name": "author",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "revisionId",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "revisionType",
+          "required": false,
+          "schema": {
+            "type": "string",
+            "enum": [
+              "insert",
+              "delete",
+              "move"
+            ]
+          }
+        },
+        {
+          "name": "date",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "before",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "after",
           "required": false,
           "schema": {
             "type": "string"
@@ -4254,6 +5335,66 @@
           }
         },
         {
+          "name": "sourceOccurrenceId",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/id"
+          }
+        },
+        {
+          "name": "sourceRelationshipId",
+          "required": false,
+          "schema": {
+            "ref": "#/$defs/id"
+          }
+        },
+        {
+          "name": "type",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "relationshipType",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "sourceType",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "target",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "resolvedTarget",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "targetMode",
+          "required": false,
+          "schema": {
+            "type": "string",
+            "enum": [
+              "internal",
+              "external"
+            ]
+          }
+        },
+        {
           "name": "endpoint",
           "required": false,
           "schema": {
@@ -4291,6 +5432,7 @@
           "z-order",
           "grid",
           "tab",
+          "page-tree",
           "revision"
         ],
         "closed": true,
@@ -4327,6 +5469,7 @@
               "z-order",
               "grid",
               "tab",
+              "page-tree",
               "revision"
             ]
           }
@@ -4346,6 +5489,14 @@
             "items": {
               "ref": "#/$defs/orderItem"
             }
+          }
+        },
+        {
+          "name": "ordinalBase",
+          "required": false,
+          "schema": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         {
@@ -4798,6 +5949,69 @@
             "type": "integer",
             "minimum": 0
           }
+        },
+        {
+          "name": "coordinateUnit",
+          "required": false,
+          "schema": {
+            "type": "string",
+            "enum": [
+              "unicode-code-point"
+            ]
+          }
+        },
+        {
+          "name": "endExclusive",
+          "required": false,
+          "schema": {
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "byteStart",
+          "required": false,
+          "schema": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        {
+          "name": "byteEnd",
+          "required": false,
+          "schema": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        {
+          "name": "codePointStart",
+          "required": false,
+          "schema": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        {
+          "name": "codePointEnd",
+          "required": false,
+          "schema": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        {
+          "name": "lineEnding",
+          "required": false,
+          "schema": {
+            "type": "string",
+            "enum": [
+              "LF",
+              "CRLF",
+              "CR",
+              "mixed",
+              "none"
+            ]
+          }
         }
       ],
       "variants": []
@@ -5151,9 +6365,14 @@
           "values": [
             "document",
             "section",
+            "story",
+            "footnote",
+            "endnote",
+            "comment",
             "paragraph",
             "run",
             "heading",
+            "thematicBreak",
             "list",
             "table",
             "row",
@@ -5188,9 +6407,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -5290,9 +6514,14 @@
           "values": [
             "document",
             "section",
+            "story",
+            "footnote",
+            "endnote",
+            "comment",
             "paragraph",
             "run",
             "heading",
+            "thematicBreak",
             "list",
             "table",
             "row",
@@ -5327,9 +6556,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -5435,9 +6669,14 @@
           "values": [
             "document",
             "section",
+            "story",
+            "footnote",
+            "endnote",
+            "comment",
             "paragraph",
             "run",
             "heading",
+            "thematicBreak",
             "list",
             "table",
             "row",
@@ -5549,9 +6788,14 @@
           "values": [
             "document",
             "section",
+            "story",
+            "footnote",
+            "endnote",
+            "comment",
             "paragraph",
             "run",
             "heading",
+            "thematicBreak",
             "list",
             "table",
             "row",
@@ -5663,9 +6907,14 @@
           "values": [
             "document",
             "section",
+            "story",
+            "footnote",
+            "endnote",
+            "comment",
             "paragraph",
             "run",
             "heading",
+            "thematicBreak",
             "list",
             "table",
             "row",
@@ -5772,9 +7021,14 @@
           "values": [
             "document",
             "section",
+            "story",
+            "footnote",
+            "endnote",
+            "comment",
             "paragraph",
             "run",
             "heading",
+            "thematicBreak",
             "list",
             "table",
             "row",
@@ -5881,9 +7135,14 @@
           "values": [
             "document",
             "section",
+            "story",
+            "footnote",
+            "endnote",
+            "comment",
             "paragraph",
             "run",
             "heading",
+            "thematicBreak",
             "list",
             "table",
             "row",
@@ -5995,9 +7254,14 @@
           "values": [
             "document",
             "section",
+            "story",
+            "footnote",
+            "endnote",
+            "comment",
             "paragraph",
             "run",
             "heading",
+            "thematicBreak",
             "list",
             "table",
             "row",
@@ -6114,9 +7378,14 @@
           "values": [
             "document",
             "section",
+            "story",
+            "footnote",
+            "endnote",
+            "comment",
             "paragraph",
             "run",
             "heading",
+            "thematicBreak",
             "list",
             "table",
             "row",
@@ -6224,9 +7493,14 @@
           "values": [
             "document",
             "section",
+            "story",
+            "footnote",
+            "endnote",
+            "comment",
             "paragraph",
             "run",
             "heading",
+            "thematicBreak",
             "list",
             "table",
             "row",
@@ -6334,9 +7608,14 @@
           "values": [
             "document",
             "section",
+            "story",
+            "footnote",
+            "endnote",
+            "comment",
             "paragraph",
             "run",
             "heading",
+            "thematicBreak",
             "list",
             "table",
             "row",
@@ -6441,9 +7720,14 @@
           "values": [
             "document",
             "section",
+            "story",
+            "footnote",
+            "endnote",
+            "comment",
             "paragraph",
             "run",
             "heading",
+            "thematicBreak",
             "list",
             "table",
             "row",
@@ -6562,9 +7846,14 @@
           "values": [
             "document",
             "section",
+            "story",
+            "footnote",
+            "endnote",
+            "comment",
             "paragraph",
             "run",
             "heading",
+            "thematicBreak",
             "list",
             "table",
             "row",
@@ -6889,9 +8178,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -7262,9 +8556,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -8044,9 +9343,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -8915,9 +10219,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -9032,9 +10341,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -9194,9 +10508,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -9321,6 +10640,7 @@
                 "z-order",
                 "grid",
                 "tab",
+                "page-tree",
                 "revision"
               ],
               "closed": true,
@@ -9483,9 +10803,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -9610,6 +10935,7 @@
                 "z-order",
                 "grid",
                 "tab",
+                "page-tree",
                 "revision"
               ],
               "closed": true,
@@ -9723,6 +11049,7 @@
             "z-order",
             "grid",
             "tab",
+            "page-tree",
             "revision"
           ],
           "closed": true,
@@ -9759,9 +11086,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -9858,6 +11190,7 @@
             "z-order",
             "grid",
             "tab",
+            "page-tree",
             "revision"
           ],
           "closed": true,
@@ -9902,9 +11235,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -10121,9 +11459,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -10493,9 +11836,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -10720,9 +12068,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -10948,9 +12301,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -11268,9 +12626,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -11519,9 +12882,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -11973,9 +13341,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -12100,6 +13473,7 @@
                 "z-order",
                 "grid",
                 "tab",
+                "page-tree",
                 "revision"
               ],
               "closed": true,
@@ -12168,9 +13542,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -12295,6 +13674,7 @@
                 "z-order",
                 "grid",
                 "tab",
+                "page-tree",
                 "revision"
               ],
               "closed": true,
@@ -12369,9 +13749,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -12496,6 +13881,7 @@
                 "z-order",
                 "grid",
                 "tab",
+                "page-tree",
                 "revision"
               ],
               "closed": true,
@@ -12564,9 +13950,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -12691,6 +14082,7 @@
                 "z-order",
                 "grid",
                 "tab",
+                "page-tree",
                 "revision"
               ],
               "closed": true,
@@ -12765,9 +14157,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -12892,6 +14289,7 @@
                 "z-order",
                 "grid",
                 "tab",
+                "page-tree",
                 "revision"
               ],
               "closed": true,
@@ -12960,9 +14358,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -13087,6 +14490,7 @@
                 "z-order",
                 "grid",
                 "tab",
+                "page-tree",
                 "revision"
               ],
               "closed": true,
@@ -13161,9 +14565,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -13288,6 +14697,7 @@
                 "z-order",
                 "grid",
                 "tab",
+                "page-tree",
                 "revision"
               ],
               "closed": true,
@@ -13356,9 +14766,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -13483,6 +14898,7 @@
                 "z-order",
                 "grid",
                 "tab",
+                "page-tree",
                 "revision"
               ],
               "closed": true,
@@ -13557,9 +14973,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -13684,6 +15105,7 @@
                 "z-order",
                 "grid",
                 "tab",
+                "page-tree",
                 "revision"
               ],
               "closed": true,
@@ -13752,9 +15174,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -13879,6 +15306,7 @@
                 "z-order",
                 "grid",
                 "tab",
+                "page-tree",
                 "revision"
               ],
               "closed": true,
@@ -13953,9 +15381,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -14080,6 +15513,7 @@
                 "z-order",
                 "grid",
                 "tab",
+                "page-tree",
                 "revision"
               ],
               "closed": true,
@@ -14148,9 +15582,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -14275,6 +15714,7 @@
                 "z-order",
                 "grid",
                 "tab",
+                "page-tree",
                 "revision"
               ],
               "closed": true,
@@ -14349,9 +15789,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -14476,6 +15921,7 @@
                 "z-order",
                 "grid",
                 "tab",
+                "page-tree",
                 "revision"
               ],
               "closed": true,
@@ -14544,9 +15990,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -14671,6 +16122,7 @@
                 "z-order",
                 "grid",
                 "tab",
+                "page-tree",
                 "revision"
               ],
               "closed": true,
@@ -14745,9 +16197,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -14872,6 +16329,7 @@
                 "z-order",
                 "grid",
                 "tab",
+                "page-tree",
                 "revision"
               ],
               "closed": true,
@@ -14940,9 +16398,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -15067,6 +16530,7 @@
                 "z-order",
                 "grid",
                 "tab",
+                "page-tree",
                 "revision"
               ],
               "closed": true,
@@ -15141,9 +16605,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -15268,6 +16737,7 @@
                 "z-order",
                 "grid",
                 "tab",
+                "page-tree",
                 "revision"
               ],
               "closed": true,
@@ -15336,9 +16806,14 @@
               "values": [
                 "document",
                 "section",
+                "story",
+                "footnote",
+                "endnote",
+                "comment",
                 "paragraph",
                 "run",
                 "heading",
+                "thematicBreak",
                 "list",
                 "table",
                 "row",
@@ -15463,6 +16938,7 @@
                 "z-order",
                 "grid",
                 "tab",
+                "page-tree",
                 "revision"
               ],
               "closed": true,
@@ -15665,9 +17141,12 @@
       "cell",
       "chart",
       "column",
+      "comment",
       "connector",
       "document",
+      "endnote",
       "field",
+      "footnote",
       "glyph",
       "heading",
       "image",
@@ -15679,8 +17158,10 @@
       "run",
       "section",
       "shape",
+      "story",
       "table",
-      "textBox"
+      "textBox",
+      "thematicBreak"
     ],
     "conversionStatuses": [
       "complete",
@@ -15691,7 +17172,7 @@
   },
   "coverage": {
     "registryReferenceCount": 52,
-    "schemaReferenceFieldCount": 148,
+    "schemaReferenceFieldCount": 162,
     "registryReferencePaths": [
       "annotation.targetIds",
       "coordinateSpace.parentSpaceId",
@@ -15775,6 +17256,8 @@
       "conversionReport.features.diagnosticIds",
       "conversionReport.features.targetId",
       "conversionReport.warnings",
+      "docxMergedRange.followerCellIds",
+      "docxMergedRange.masterCellId",
       "featureInventoryEntry.diagnosticIds",
       "field.instructionTextId",
       "field.resultTextId",
@@ -15783,9 +17266,12 @@
       "layout.anchor.nodeId",
       "layout.anchor.surfaceId",
       "node.address.sheetId",
+      "node.mergeId",
       "node.partId",
       "orderItem.id",
       "propertyProvenance.source",
+      "relation.sourceOccurrenceId",
+      "relation.sourceRelationshipId",
       "stroke.color.themeId",
       "style.authored.background.themeId",
       "style.authored.borders.bottom.color.themeId",
@@ -15839,8 +17325,17 @@
       "styleProperties.fill.color.themeId",
       "styleProperties.foreground.themeId",
       "styleProperties.stroke.color.themeId",
+      "surface.sectionBoundary",
+      "surface.storyId",
+      "table.memberTopology.address.sheetId",
+      "table.memberTopology.nodeId",
+      "table.mergedRanges.followerCellIds",
       "table.mergedRanges.from.sheetId",
+      "table.mergedRanges.masterCellId",
       "table.mergedRanges.to.sheetId",
+      "table.nestedTableIds",
+      "table.ownerCellId",
+      "table.ownerSurfaceId",
       "text.sourceTextId",
       "themeRef.themeId"
     ],

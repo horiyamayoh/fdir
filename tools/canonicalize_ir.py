@@ -195,18 +195,119 @@ def full_canonical_digest(document: dict[str, Any]) -> str:
     return canonical_digest(document, "full")
 
 
-def migrate_document(document: dict[str, Any], target_version: str) -> tuple[dict[str, Any], list[dict[str, str]]]:
-    """Perform the intentionally narrow version migration boundary.
+def migrate_extensions(document: dict[str, Any], target_version: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Migrate extension schema versions with explicit loss receipts.
 
-    Version ``1.0.0`` is currently the only supported wire version.  The
-    function still returns a receipt-shaped diagnostic list so future schema
-    migrations cannot silently discard fields or pretend compatibility.
+    Extension migration is separate from the document wire-version migration:
+    an extension's ``schemaVersion`` is negotiated against the registry while
+    the surrounding IR remains at its authoritative document version.  Every
+    accepted, opaque-preserved, or loss-bearing decision returns a receipt;
+    unsupported downgrades are retained with a failed receipt and are never
+    silently relabelled.
     """
 
-    _validate_authority(document)
-    if target_version != document.get("schema", {}).get("version"):
-        raise CanonicalizationError(f"no registered migration to {target_version}")
-    return copy.deepcopy(document), []
+    if not isinstance(document, dict) or not isinstance(target_version, str):
+        raise CanonicalizationError("extension migration requires a document object and target_version string")
+    extensions = document.get("extensions")
+    if not isinstance(extensions, list):
+        raise CanonicalizationError("extension migration requires an extensions array")
+    try:
+        from extension_registry import load_registry  # type: ignore
+    except ImportError:  # pragma: no cover - package-style import
+        from tools.extension_registry import load_registry  # type: ignore
+    registry = load_registry()
+    entries = {
+        (entry.get("namespace"), entry.get("type"), entry.get("schemaVersion")): entry
+        for entry in registry.get("entries", [])
+        if isinstance(entry, dict)
+    }
+    migrated = copy.deepcopy(document)
+    receipts: list[dict[str, Any]] = []
+    for extension in migrated["extensions"]:
+        if not isinstance(extension, dict):
+            raise CanonicalizationError("extension migration encountered a non-object extension")
+        source_version = extension.get("schemaVersion")
+        if not isinstance(source_version, str):
+            raise CanonicalizationError("extension migration requires schemaVersion on every extension")
+        key = (extension.get("namespace"), extension.get("type"), source_version)
+        entry = entries.get(key)
+        losses: list[str] = []
+        dropped_fields: list[str] = []
+        rule_id = "opaque-preserve"
+        status = "opaque-preserved" if entry is None else "preserved"
+        if source_version == target_version:
+            if entry is not None:
+                rule_id = "identity-preserve"
+        elif source_version == "1.0.0" and target_version == "1.1.0":
+            format_name = str(extension.get("namespace", "extension")).rsplit(":", 1)[-1]
+            rule_id = f"{format_name}-{extension.get('type', 'extension')}-1.0.0-to-1.1.0"
+            extension["schemaVersion"] = target_version
+        elif source_version == "1.0.0" and target_version == "2.0.0":
+            format_name = str(extension.get("namespace", "extension")).rsplit(":", 1)[-1]
+            rule_id = f"{format_name}-{extension.get('type', 'extension')}-1.0.0-to-2.0.0"
+            payload = extension.get("payload")
+            if isinstance(payload, dict) and "legacyRange" in payload:
+                payload.pop("legacyRange", None)
+                losses.append("/payload/legacyRange")
+                dropped_fields.append("legacyRange")
+            extension["schemaVersion"] = target_version
+            status = "loss-declared" if losses else "preserved"
+        elif source_version == "2.0.0" and target_version == "1.0.0":
+            rule_id = "none"
+            losses.append("unsupported-downgrade")
+            status = "failed"
+        else:
+            raise CanonicalizationError(f"no registered extension migration from {source_version} to {target_version}")
+        receipts.append({
+            "receiptId": f"extension-migration-{extension.get('extensionId', 'unknown')}",
+            "extensionId": extension.get("extensionId"),
+            "sourceVersion": source_version,
+            "targetVersion": target_version,
+            "ruleId": rule_id,
+            "status": status,
+            "loss": losses,
+            "losses": losses,
+            "droppedFields": dropped_fields,
+        })
+    return migrated, receipts
+
+
+def migrate_document(document: dict[str, Any], target_version: str) -> tuple[dict[str, Any], list[dict[str, str]]]:
+    """Migrate the bounded canonical wire-version lane fail-closed.
+
+    The current contract has one explicit legacy boundary: ``0.9.0`` to
+    ``1.0.0``.  That boundary removes the retired top-level ``legacyField``
+    only with an authored loss receipt.  Same-version migration is an
+    identity operation, while every future or otherwise unknown target is
+    rejected instead of being silently relabelled.
+    """
+
+    source_version = document.get("schema", {}).get("version")
+    if not isinstance(source_version, str) or not isinstance(target_version, str):
+        raise CanonicalizationError("document and target schema versions must be strings")
+    # Validate the document's structure against the current authority while
+    # allowing the explicitly supported legacy version to reach the migration
+    # branch below.  Validating the legacy version verbatim would reject the
+    # very input this boundary is responsible for upgrading.
+    authority_candidate = copy.deepcopy(document)
+    if source_version == "0.9.0" and target_version == "1.0.0":
+        authority_candidate.setdefault("schema", {})["version"] = "1.0.0"
+    _validate_authority(authority_candidate)
+    if target_version == source_version:
+        return copy.deepcopy(document), []
+    if source_version == "0.9.0" and target_version == "1.0.0":
+        migrated = copy.deepcopy(document)
+        migrated.setdefault("schema", {})["version"] = target_version
+        migrated.pop("legacyField", None)
+        return migrated, [
+            {
+                "receiptId": "loss-legacy-future-field",
+                "fieldPath": "$.legacyField",
+                "disposition": "omitted",
+                "diagnosticCode": "DFIR-MIGRATION-LOSS",
+            }
+        ]
+    raise CanonicalizationError(f"no registered migration from {source_version} to {target_version}")
 
 
 def load_document(path: Path) -> dict[str, Any]:

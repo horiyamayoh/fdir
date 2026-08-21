@@ -1,0 +1,287 @@
+{
+  "schema": "fdir/qualification-issue-104-corpus",
+  "version": "1.0.0",
+  "issueNumber": 104,
+  "qualificationScope": "independent-multi-producer-hostile-corpus",
+  "reportNames": [
+    "corpus-provenance-independence.json",
+    "requirement-corpus-coverage.json",
+    "multi-producer-results.json",
+    "differential-adjudication.json",
+    "metamorphic-relations.json",
+    "hostile-resource-boundaries.json",
+    "fixture-oracle-digest-manifest.json"
+  ],
+  "oracle": {
+    "expectedValuesAreRuntimeIndependent": true,
+    "expectedFactsAreAuthored": true,
+    "adapterOutputUsedForExpected": false,
+    "adapterOutputUsedToCreateCorpus": false,
+    "sourceReader": "qualification-runner-owned-byte-reader",
+    "forbiddenDerivations": [
+      "adapter output",
+      "adapter output collections or keys",
+      "runtime conversion output used as an expected value",
+      "manifest independent boolean",
+      "generic token presence as a substitute for a source fact"
+    ]
+  },
+  "gradePolicy": {
+    "scale": {
+      "A": "independently acquired official or real-producer artifact with immutable provenance and authored adjudication",
+      "B": "independently acquired artifact with complete digest and one authored adjudication record",
+      "C": "checked-in hand-authored source with immutable digest and source-side authored facts",
+      "D": "self-declared, generated, adapter-derived, or otherwise unverifiable evidence",
+      "unavailable": "required evidence is declared but no artifact is available at qualification time"
+    },
+    "minimumPassingGrade": "C",
+    "requiredPassingGrades": ["A", "B", "C"],
+    "gradeDIsNonQualifying": true,
+    "requireAtLeastOneAvailableNonD": true,
+    "requiredOfficialArtifactsCannotBeReplacedByGradeD": true
+  },
+  "fixtures": [
+    {
+      "fixtureId": "docx-independent-relationship",
+      "scenarioId": "docx-relationship-and-text",
+      "format": "docx",
+      "producerId": "synthetic-docx-author",
+      "independenceGrade": "C",
+      "source": {
+        "type": "repository-directory",
+        "path": "e2e/corpus/docx-independent"
+      },
+      "provenance": {
+        "origin": "checked-in hand-authored OOXML parts",
+        "sourceReference": "e2e/corpus/docx-independent",
+        "acquisitionMethod": "repository-checkout",
+        "available": true,
+        "producerClaim": "synthetic standards-focused author"
+      },
+      "sourceDigest": {
+        "algorithm": "sha256",
+        "mode": "member-manifest",
+        "members": [
+          {"path": "[Content_Types].xml", "bytes": 424, "sha256": "3cace3ea56c94fe33d676819592ded5bb8e1959e505bf38e08ddc080766730ab"},
+          {"path": "_rels/.rels", "bytes": 286, "sha256": "23e29b42d618f14cf038618de94a6725714917d10ec2583f7a6b25b7879381ef"},
+          {"path": "word/_rels/document.xml.rels", "bytes": 287, "sha256": "87ba91bb700c2bf6210bde9d557b0febbdd571e49bd3cfe79d0b74ab9b3f31f7"},
+          {"path": "word/document.xml", "bytes": 264, "sha256": "a51a101d70a19ba664e338f4532347126b6eeead90da117f8e6fcc875896ba96"}
+        ]
+      },
+      "expectedFacts": [
+        {"factId": "docx-text-independent", "kind": "literal", "value": "Independent DOCX", "sourceContains": true, "outputContains": true},
+        {"factId": "docx-text-relationship", "kind": "literal", "value": "relationship", "sourceContains": true, "outputContains": true},
+        {"factId": "docx-missing-target-authored", "kind": "literal", "value": "media/not-present.png", "sourceMember": "word/_rels/document.xml.rels", "sourceContains": true, "outputContains": true}
+      ],
+      "oracleDigest": "987a6011734688b8d3b3b02cabf2effeee84d13da1e125d437af169d790d535c"
+    },
+    {
+      "fixtureId": "docx-independent-story",
+      "scenarioId": "docx-story-header",
+      "format": "docx",
+      "producerId": "synthetic-docx-story-author",
+      "independenceGrade": "C",
+      "source": {
+        "type": "repository-directory",
+        "path": "e2e/corpus/docx-story-independent"
+      },
+      "provenance": {
+        "origin": "checked-in hand-authored OOXML story parts",
+        "sourceReference": "e2e/corpus/docx-story-independent",
+        "acquisitionMethod": "repository-checkout",
+        "available": true,
+        "producerClaim": "synthetic story author"
+      },
+      "sourceDigest": {
+        "algorithm": "sha256",
+        "mode": "member-manifest",
+        "members": [
+          {"path": "[Content_Types].xml", "bytes": 555, "sha256": "1e29e2665aafd0077b122bd3028f68c22c1a0cdef9752323db7c007533f37a27"},
+          {"path": "_rels/.rels", "bytes": 286, "sha256": "23e29b42d618f14cf038618de94a6725714917d10ec2583f7a6b25b7879381ef"},
+          {"path": "word/_rels/document.xml.rels", "bytes": 277, "sha256": "59c131f6644c48569b330867ffd2b3233fd0371644379c535d40f6bbaef9f61f"},
+          {"path": "word/document.xml", "bytes": 378, "sha256": "076d9ff5bb20f752a9a7328c0e350f1206c2bd3694e5bb466ca356169405c77d"},
+          {"path": "word/header1.xml", "bytes": 175, "sha256": "99f1a0dad6142b338b6e56379049d4e906dad0274956ca31626d8a2b34958be2"}
+        ]
+      },
+      "expectedFacts": [
+        {"factId": "docx-story-header", "kind": "literal", "value": "Story Header", "sourceMember": "word/header1.xml", "sourceContains": true, "outputContains": true},
+        {"factId": "docx-story-body", "kind": "literal", "value": "Independent DOCX story", "sourceMember": "word/document.xml", "sourceContains": true, "outputContains": true}
+      ],
+      "oracleDigest": "56f544a4d904fbf53b43173eed1499b1cff5b611a72eb9ba7f6116b9e09bee77"
+    },
+    {
+      "fixtureId": "xlsx-independent-values",
+      "scenarioId": "xlsx-values-and-formula",
+      "format": "xlsx",
+      "producerId": "synthetic-xlsx-author",
+      "independenceGrade": "C",
+      "source": {
+        "type": "repository-directory",
+        "path": "e2e/corpus/xlsx-independent"
+      },
+      "provenance": {
+        "origin": "checked-in hand-authored OOXML workbook parts",
+        "sourceReference": "e2e/corpus/xlsx-independent",
+        "acquisitionMethod": "repository-checkout",
+        "available": true,
+        "producerClaim": "synthetic spreadsheet author"
+      },
+      "sourceDigest": {
+        "algorithm": "sha256",
+        "mode": "member-manifest",
+        "members": [
+          {"path": "[Content_Types].xml", "bytes": 555, "sha256": "383f7e7b4f05bac13d7f9d2a05bb726d21f1b6af23ba83a98aadeabf865ce35e"},
+          {"path": "_rels/.rels", "bytes": 284, "sha256": "a9306161b7b09da358b74971c93a880d581f1f71f1dfaf4984200e6fe6f94ffb"},
+          {"path": "xl/_rels/workbook.xml.rels", "bytes": 289, "sha256": "e13de3cabe36e884fde730456801c851f41b1747f43c777fd9826d5178fe79c3"},
+          {"path": "xl/workbook.xml", "bytes": 281, "sha256": "baa185217aa3930a09f766edaea120518bf8fd2b3516d3d80c256464dbd24f5c"},
+          {"path": "xl/worksheets/sheet1.xml", "bytes": 380, "sha256": "a26c80cd1bee7a7b76daa7f0de410ec5e59a33fe60abdeb0f6d935ecc1dd5ffc"}
+        ]
+      },
+      "expectedFacts": [
+        {"factId": "xlsx-workbook-name", "kind": "literal", "value": "Independent", "sourceMember": "xl/workbook.xml", "sourceContains": true, "outputContains": true},
+        {"factId": "xlsx-formula-authored", "kind": "literal", "value": "SUM(A1:A2)", "sourceMember": "xl/worksheets/sheet1.xml", "sourceContains": true, "outputContains": true},
+        {"factId": "xlsx-stored-value-three", "kind": "literal", "value": "3", "sourceMember": "xl/worksheets/sheet1.xml", "sourceContains": true, "outputContains": true}
+      ],
+      "oracleDigest": "e5e45c4f6b90e9f281de96cf2143819591389372b70566c874919dd481d3517f"
+    },
+    {
+      "fixtureId": "pdf-independent-text",
+      "scenarioId": "pdf-basic-text",
+      "format": "pdf",
+      "producerId": "synthetic-pdf-author",
+      "independenceGrade": "C",
+      "source": {
+        "type": "repository-file",
+        "path": "e2e/corpus/pdf-independent.pdf"
+      },
+      "provenance": {
+        "origin": "checked-in hand-authored PDF bytes",
+        "sourceReference": "e2e/corpus/pdf-independent.pdf",
+        "acquisitionMethod": "repository-checkout",
+        "available": true,
+        "producerClaim": "synthetic PDF author"
+      },
+      "sourceDigest": {"algorithm": "sha256", "mode": "file", "bytes": 498, "sha256": "189e0242812b4ee9b91ebf963c67f225b6b0470104737065f6312596ba928ab5"},
+      "expectedFacts": [
+        {"factId": "pdf-text-independent", "kind": "literal", "value": "Independent PDF", "sourceContains": true, "outputContains": true}
+      ],
+      "oracleDigest": "3686e88ed6f5cb3b0c75c09afeb74ab24fee6f1135690534fccdde5e11838eab"
+    },
+    {
+      "fixtureId": "pdf-independent-cmap",
+      "scenarioId": "pdf-glyph-cmap",
+      "format": "pdf",
+      "producerId": "synthetic-pdf-cmap-author",
+      "independenceGrade": "C",
+      "source": {
+        "type": "repository-file",
+        "path": "e2e/corpus/pdf-cmap.pdf"
+      },
+      "provenance": {
+        "origin": "checked-in hand-authored PDF font mapping bytes",
+        "sourceReference": "e2e/corpus/pdf-cmap.pdf",
+        "acquisitionMethod": "repository-checkout",
+        "available": true,
+        "producerClaim": "synthetic PDF glyph author"
+      },
+      "sourceDigest": {"algorithm": "sha256", "mode": "file", "bytes": 833, "sha256": "f05a244952ea010e187bca03eeca5ac5cd6c1e2b4d02de6ed20ddd9d7ea5eef1"},
+      "expectedFacts": [
+        {"factId": "pdf-cmap-character", "kind": "literal", "value": "A", "sourceContains": true, "outputContains": true}
+      ],
+      "oracleDigest": "5e1735295e3c18089e88979c15a1cc1b8481d275323dde454e0f41831429e1a8"
+    },
+    {
+      "fixtureId": "markdown-independent-authoring",
+      "scenarioId": "markdown-nested-table-and-link",
+      "format": "markdown",
+      "producerId": "synthetic-markdown-author",
+      "independenceGrade": "C",
+      "source": {
+        "type": "repository-file",
+        "path": "e2e/corpus/markdown-independent.md"
+      },
+      "provenance": {
+        "origin": "checked-in hand-authored Markdown source",
+        "sourceReference": "e2e/corpus/markdown-independent.md",
+        "acquisitionMethod": "repository-checkout",
+        "available": true,
+        "producerClaim": "synthetic CommonMark author"
+      },
+      "sourceDigest": {"algorithm": "sha256", "mode": "file", "bytes": 282, "sha256": "d1869d2d21f1ef0ed5c1f6b5e3fdaf3727458e028f013f0970c2b12fe717973d"},
+      "expectedFacts": [
+        {"factId": "markdown-title", "kind": "literal", "value": "Independent Markdown", "sourceContains": true, "outputContains": true},
+        {"factId": "markdown-escaped-pipe", "kind": "literal", "value": "escaped \\| pipe", "sourceContains": true, "outputContains": true},
+        {"factId": "markdown-external-link", "kind": "literal", "value": "https://example.invalid/resource", "sourceContains": true, "outputContains": true}
+      ],
+      "oracleDigest": "b5c434301984ecc52298d278a378ced74b4114790ad72786ea4241c47ff239ba"
+    }
+  ],
+  "producerMatrix": [
+    {"producerId": "synthetic-docx-author", "format": "docx", "fixtureId": "docx-independent-relationship", "required": false, "availability": "available", "independenceGrade": "C", "provenance": {"kind": "hand-authored-source", "sourceReference": "e2e/corpus/docx-independent"}},
+    {"producerId": "synthetic-docx-story-author", "format": "docx", "fixtureId": "docx-independent-story", "required": false, "availability": "available", "independenceGrade": "C", "provenance": {"kind": "hand-authored-source", "sourceReference": "e2e/corpus/docx-story-independent"}},
+    {"producerId": "synthetic-xlsx-author", "format": "xlsx", "fixtureId": "xlsx-independent-values", "required": false, "availability": "available", "independenceGrade": "C", "provenance": {"kind": "hand-authored-source", "sourceReference": "e2e/corpus/xlsx-independent"}},
+    {"producerId": "synthetic-pdf-author", "format": "pdf", "fixtureId": "pdf-independent-text", "required": false, "availability": "available", "independenceGrade": "C", "provenance": {"kind": "hand-authored-source", "sourceReference": "e2e/corpus/pdf-independent.pdf"}},
+    {"producerId": "synthetic-pdf-cmap-author", "format": "pdf", "fixtureId": "pdf-independent-cmap", "required": false, "availability": "available", "independenceGrade": "C", "provenance": {"kind": "hand-authored-source", "sourceReference": "e2e/corpus/pdf-cmap.pdf"}},
+    {"producerId": "synthetic-markdown-author", "format": "markdown", "fixtureId": "markdown-independent-authoring", "required": false, "availability": "available", "independenceGrade": "C", "provenance": {"kind": "hand-authored-source", "sourceReference": "e2e/corpus/markdown-independent.md"}},
+    {"producerId": "microsoft-word-official", "format": "docx", "required": true, "availability": "missing", "targetGrade": "A", "provenance": {"kind": "official-real-producer", "sourceReference": "https://learn.microsoft.com/en-us/office/open-xml/", "artifactPath": "e2e/corpus/external/issue-104/microsoft-word-official"}, "missingReason": "No independently acquired Microsoft Word export is checked into this checkout."},
+    {"producerId": "libreoffice-writer-official", "format": "docx", "required": true, "availability": "missing", "targetGrade": "A", "provenance": {"kind": "official-real-producer", "sourceReference": "https://help.libreoffice.org/latest/en-US/text/shared/guide/convertfilters.html", "artifactPath": "e2e/corpus/external/issue-104/libreoffice-writer-official"}, "missingReason": "No independently acquired LibreOffice Writer export is checked into this checkout."},
+    {"producerId": "microsoft-excel-official", "format": "xlsx", "required": true, "availability": "missing", "targetGrade": "A", "provenance": {"kind": "official-real-producer", "sourceReference": "https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/", "artifactPath": "e2e/corpus/external/issue-104/microsoft-excel-official"}, "missingReason": "No independently acquired Microsoft Excel workbook is checked into this checkout."},
+    {"producerId": "libreoffice-calc-official", "format": "xlsx", "required": true, "availability": "missing", "targetGrade": "A", "provenance": {"kind": "official-real-producer", "sourceReference": "https://help.libreoffice.org/latest/en-US/text/scalc/main0100.html", "artifactPath": "e2e/corpus/external/issue-104/libreoffice-calc-official"}, "missingReason": "No independently acquired LibreOffice Calc workbook is checked into this checkout."},
+    {"producerId": "google-sheets-official", "format": "xlsx", "required": true, "availability": "missing", "targetGrade": "A", "provenance": {"kind": "official-real-producer", "sourceReference": "https://developers.google.com/sheets/api", "artifactPath": "e2e/corpus/external/issue-104/google-sheets-official"}, "missingReason": "No independently acquired Google Sheets export is checked into this checkout."},
+    {"producerId": "adobe-acrobat-official", "format": "pdf", "required": true, "availability": "missing", "targetGrade": "A", "provenance": {"kind": "official-real-producer", "sourceReference": "https://opensource.adobe.com/dc-acrobat-sdk-docs/pdflsdk/", "artifactPath": "e2e/corpus/external/issue-104/adobe-acrobat-official"}, "missingReason": "No independently acquired Adobe Acrobat PDF is checked into this checkout."},
+    {"producerId": "libreoffice-pdf-official", "format": "pdf", "required": true, "availability": "missing", "targetGrade": "A", "provenance": {"kind": "official-real-producer", "sourceReference": "https://help.libreoffice.org/latest/en-US/text/shared/guide/pdf_params.html", "artifactPath": "e2e/corpus/external/issue-104/libreoffice-pdf-official"}, "missingReason": "No independently acquired LibreOffice PDF export is checked into this checkout."},
+    {"producerId": "commonmark-reference-official", "format": "markdown", "required": true, "availability": "missing", "targetGrade": "A", "provenance": {"kind": "official-reference-corpus", "sourceReference": "https://spec.commonmark.org/", "artifactPath": "e2e/corpus/external/issue-104/commonmark-reference-official"}, "missingReason": "No separately acquired CommonMark official example corpus is available at runtime."},
+    {"producerId": "github-markdown-official", "format": "markdown", "required": true, "availability": "missing", "targetGrade": "A", "provenance": {"kind": "official-reference-corpus", "sourceReference": "https://github.github.com/gfm/", "artifactPath": "e2e/corpus/external/issue-104/github-markdown-official"}, "missingReason": "No separately acquired GitHub Flavored Markdown official example corpus is available at runtime."}
+  ],
+  "adjudicationGroups": [
+    {"groupId": "docx-relationship-and-text", "format": "docx", "producerIds": ["synthetic-docx-author", "microsoft-word-official", "libreoffice-writer-official"], "required": true, "factIds": ["docx-text-independent", "docx-text-relationship"]},
+    {"groupId": "xlsx-values-and-formula", "format": "xlsx", "producerIds": ["synthetic-xlsx-author", "microsoft-excel-official", "libreoffice-calc-official", "google-sheets-official"], "required": true, "factIds": ["xlsx-workbook-name", "xlsx-formula-authored", "xlsx-stored-value-three"]},
+    {"groupId": "pdf-basic-text", "format": "pdf", "producerIds": ["synthetic-pdf-author", "adobe-acrobat-official", "libreoffice-pdf-official"], "required": true, "factIds": ["pdf-text-independent"]},
+    {"groupId": "markdown-authoring", "format": "markdown", "producerIds": ["synthetic-markdown-author", "commonmark-reference-official", "github-markdown-official"], "required": true, "factIds": ["markdown-title", "markdown-escaped-pipe", "markdown-external-link"]}
+  ],
+  "metamorphicRelations": [
+    {"relationId": "docx-member-repack-preserves-facts", "fixtureId": "docx-independent-relationship", "transform": {"type": "zip-repack"}, "preservesFactIds": ["docx-text-independent", "docx-text-relationship", "docx-missing-target-authored"], "required": true},
+    {"relationId": "docx-story-member-repack-preserves-facts", "fixtureId": "docx-independent-story", "transform": {"type": "zip-repack"}, "preservesFactIds": ["docx-story-header", "docx-story-body"], "required": true},
+    {"relationId": "xlsx-member-repack-preserves-facts", "fixtureId": "xlsx-independent-values", "transform": {"type": "zip-repack"}, "preservesFactIds": ["xlsx-workbook-name", "xlsx-formula-authored", "xlsx-stored-value-three"], "required": true},
+    {"relationId": "pdf-comment-preserves-facts", "fixtureId": "pdf-independent-text", "transform": {"type": "append-pdf-comment"}, "preservesFactIds": ["pdf-text-independent"], "required": true},
+    {"relationId": "pdf-cmap-comment-preserves-facts", "fixtureId": "pdf-independent-cmap", "transform": {"type": "append-pdf-comment"}, "preservesFactIds": ["pdf-cmap-character"], "required": true},
+    {"relationId": "markdown-line-ending-preserves-facts", "fixtureId": "markdown-independent-authoring", "transform": {"type": "line-endings", "value": "crlf"}, "preservesFactIds": ["markdown-title", "markdown-escaped-pipe", "markdown-external-link"], "required": true},
+    {"relationId": "markdown-trailing-newline-preserves-facts", "fixtureId": "markdown-independent-authoring", "transform": {"type": "append-text", "value": "\n"}, "preservesFactIds": ["markdown-title", "markdown-escaped-pipe", "markdown-external-link"], "required": true}
+  ],
+  "hostileCases": [
+    {"caseId": "markdown-input-byte-budget", "fixtureId": "markdown-independent-authoring", "mutation": {"type": "repeat", "factor": 8}, "limits": {"maxInputBytes": 64}, "expected": {"conversionStatus": "failed", "diagnosticContains": "input size limit exceeded", "limitRejectedBeforeParse": true}, "required": true},
+    {"caseId": "docx-malformed-container", "fixtureId": "docx-independent-relationship", "mutation": {"type": "replace-bytes", "value": "not-a-valid-zip"}, "limits": {}, "expected": {"conversionStatus": "failed", "diagnosticContains": "", "limitRejectedBeforeParse": false}, "required": true},
+    {"caseId": "xlsx-zip-entry-budget", "fixtureId": "xlsx-independent-values", "mutation": {"type": "identity"}, "limits": {"maxZipEntries": 1}, "expected": {"conversionStatus": "failed", "diagnosticContains": "ZIP entry limit exceeded", "limitRejectedBeforeParse": false}, "required": true},
+    {"caseId": "pdf-input-byte-budget", "fixtureId": "pdf-independent-text", "mutation": {"type": "identity"}, "limits": {"maxInputBytes": 32}, "expected": {"conversionStatus": "failed", "diagnosticContains": "input size limit exceeded", "limitRejectedBeforeParse": true}, "required": true}
+  ],
+  "requirements": [
+    {"requirementId": "QUAL-104-ORACLE-INDEPENDENCE", "kind": "oracle-independence", "required": true},
+    {"requirementId": "QUAL-104-PROVENANCE-GRADE", "kind": "provenance-grade", "required": true},
+    {"requirementId": "QUAL-104-SOURCE-DIGESTS", "kind": "fixture-digests", "required": true},
+    {"requirementId": "QUAL-104-PRODUCER-MATRIX", "kind": "producer-matrix", "required": true},
+    {"requirementId": "QUAL-104-DIFFERENTIAL-ADJUDICATION", "kind": "differential-adjudication", "required": true},
+    {"requirementId": "QUAL-104-METAMORPHIC-RELATIONS", "kind": "metamorphic-relations", "required": true},
+    {"requirementId": "QUAL-104-HOSTILE-RESOURCE", "kind": "hostile-resource", "required": true},
+    {"requirementId": "QUAL-104-OFFICIAL-CORPUS", "kind": "official-corpus", "required": true}
+  ],
+  "legacyManifestAudit": {
+    "manifestPath": "e2e/corpus/manifest.json",
+    "expectedIndependenceGrade": "D",
+    "nonQualifyingReasons": [
+      "independence is a self-declared boolean",
+      "no immutable source digest manifest",
+      "no producer matrix",
+      "no differential adjudication",
+      "no metamorphic relations",
+      "no hostile/resource report"
+    ]
+  },
+  "officialCorpusPolicy": {
+    "requiredAtQualificationTime": true,
+    "missingArtifactIsUnmet": true,
+    "gradeDSubstitutionForbidden": true,
+    "artifactRoot": "e2e/corpus/external/issue-104",
+    "runtimeFetchDefault": false,
+    "runtimeFetchCanBeEnabled": true
+  }
+}

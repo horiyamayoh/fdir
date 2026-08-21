@@ -40,6 +40,10 @@ REPORT_NAMES = {
     "graph": "graph-invariants.json",
     "status": "status-contract.json",
 }
+EVIDENCE_ID = "issue-90-model-contract"
+REQUIREMENT_ID = "QUAL-90-AUTHORITY-CLOSURE"
+PRODUCER_REPORT_SCHEMA = "fdir/qualification-producer-report"
+PRODUCER_REPORT_VERSION = "1.0.0"
 RUNTIME_PATH = ROOT / "tools" / "ir_validation.py"
 REGISTRY_PATH = ROOT / "machine" / "reference-registry.json"
 MODEL_CONTRACT_PATH = ROOT / "machine" / "model-contract.json"
@@ -51,6 +55,22 @@ class QualificationError(RuntimeError):
 
 class ExternalValidatorUnavailable(QualificationError):
     """Raised when the independent Draft 2020-12 validator is unavailable."""
+
+
+try:
+    from qualification_producer_report import (
+        _artifact_reference,
+        _component_digest,
+        _input_digests,
+        attach_producer_evidence,
+    )
+except ImportError:  # pragma: no cover - package-style execution.
+    from tools.qualification_producer_report import (
+        _artifact_reference,
+        _component_digest,
+        _input_digests,
+        attach_producer_evidence,
+    )
 
 
 def _read_json(path: Path) -> Any:
@@ -716,6 +736,170 @@ def _fatal_report(kind: str, source_sha: str | None, message: str) -> dict[str, 
     }
 
 
+def _producer_case_id(*parts: Any) -> str:
+    value = "-".join(str(part) for part in parts)
+    value = re.sub(r"[^A-Za-z0-9._:-]+", "-", value).strip("-")
+    return value[:120] or "case"
+
+
+def _producer_input_paths(corpus_path: Path, schema_path: Path) -> list[Path]:
+    return [
+        Path(schema_path),
+        ROOT / "machine" / "model-contract.json",
+        ROOT / "machine" / "reference-registry.json",
+        ROOT / "tools" / "ir_validation.py",
+        ROOT / "tools" / "qualification_issue90.py",
+        ROOT / "tools" / "test_qualification_issue90.py",
+        Path(corpus_path),
+        ROOT / "requirements-qualification.txt",
+    ]
+
+
+def _producer_rows(reports: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    """Bind typed report assertions and authored negative cases to the envelope."""
+
+    rows: list[dict[str, Any]] = []
+    evaluator_by_kind = {
+        "schema": "schema-differential",
+        "graph": "graph-invariant",
+        "status": "status-contract",
+    }
+    for report_kind, report in reports.items():
+        evaluator_type = evaluator_by_kind[report_kind]
+        diagnostic = {
+            "code": f"ISSUE-90-{report_kind.upper()}",
+            "message": "issue #90 typed authority and runtime result are compared independently",
+        }
+        for assertion in report.get("assertions", []):
+            assertion_id = str(assertion.get("assertionId", ""))
+            if not assertion_id:
+                continue
+            expected = {"assertionId": assertion_id, "value": deepcopy(assertion.get("expected"))}
+            actual = {"assertionId": assertion_id, "value": deepcopy(assertion.get("actual"))}
+            rows.append({
+                "caseId": _producer_case_id("positive", report_kind, assertion_id),
+                "classification": "positive",
+                "evaluatorType": evaluator_type,
+                "input": {"reportKind": report_kind, "assertionId": assertion_id},
+                "expected": expected,
+                "actual": actual,
+                "result": "passed" if expected == actual else "failed",
+                "target": {"reportKind": report_kind, "assertionId": assertion_id},
+                "diagnostic": diagnostic,
+                "oracleEvidence": {"identity": "issue-90-authored-model-contract-oracle"},
+            })
+
+        for case in report.get("cases", []):
+            case_id = str(case.get("caseId", ""))
+            if not case_id:
+                continue
+            if report_kind == "schema":
+                expected = {"schemaAccepted": bool(case.get("expectedSchemaValid"))}
+                external = case.get("external") if isinstance(case.get("external"), dict) else {}
+                actual = {"schemaAccepted": bool(external.get("accepted"))}
+            else:
+                runtime = case.get("runtime") if isinstance(case.get("runtime"), dict) else {}
+                checks = case.get("assertions") if isinstance(case.get("assertions"), dict) else {}
+                expected = {"diagnostic": case.get("expectedDiagnostic"), "pathMatched": True}
+                actual = {"diagnostic": runtime.get("diagnostic"), "pathMatched": bool(checks.get("minimumFailingPath"))}
+            rows.append({
+                "caseId": _producer_case_id("negative", report_kind, case_id),
+                "classification": "negative",
+                "evaluatorType": evaluator_type,
+                "input": {"reportKind": report_kind, "caseId": case_id},
+                "expected": expected,
+                "actual": actual,
+                "result": "passed" if expected == actual else "failed",
+                "target": {"reportKind": report_kind, "caseId": case_id},
+                "diagnostic": diagnostic,
+                "oracleEvidence": {"identity": "issue-90-authored-negative-corpus", "caseId": case_id},
+            })
+
+    if not any(row["classification"] == "positive" for row in rows):
+        rows.append({
+            "caseId": "setup-positive", "classification": "positive", "evaluatorType": "schema-differential",
+            "input": {"setup": "issue-90"}, "expected": {"setup": "available"}, "actual": {"setup": "unavailable"},
+            "result": "failed", "target": {"phase": "qualification-setup"},
+            "diagnostic": {"code": "ISSUE-90-SETUP", "message": "qualification setup was unavailable"},
+            "oracleEvidence": {"setup": "unavailable"},
+        })
+    if not any(row["classification"] in {"negative", "mutation"} for row in rows):
+        rows.append({
+            "caseId": "setup-mutation", "classification": "mutation", "evaluatorType": "mutation-killed",
+            "input": {"setup": "issue-90"}, "expected": {"mutationDetected": False}, "actual": {"mutationDetected": False},
+            "result": "failed", "target": {"phase": "qualification-setup"},
+            "diagnostic": {"code": "ISSUE-90-SETUP", "message": "qualification setup was unavailable"},
+            "oracleEvidence": {"setup": "unavailable"},
+        })
+    return rows
+
+
+def _write_producer_report(
+    *, out_dir: Path, reports: dict[str, dict[str, Any]], corpus_path: Path, schema_path: Path, source_sha: str | None,
+) -> dict[str, Any]:
+    """Write a closed producer envelope using the three declared reports."""
+
+    rows = _producer_rows(reports)
+    attach_producer_evidence(reports, rows)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for report_kind, report_name in REPORT_NAMES.items():
+        _write_json(out_dir / report_name, reports[report_kind])
+
+    input_name = REPORT_NAMES["schema"]
+    authority_name = REPORT_NAMES["graph"]
+    actual_name = REPORT_NAMES["status"]
+    support_name = REPORT_NAMES["schema"]
+    bundle_root = "artifacts/90"
+    producer_cases: list[dict[str, Any]] = []
+    producer_assertions: list[dict[str, Any]] = []
+    for row in rows:
+        case_id = str(row["caseId"])
+        evaluator_type = str(row["evaluatorType"])
+        comparison = {"operator": "not-equal" if evaluator_type == "mutation-killed" else "equal"}
+        refs = {
+            "inputArtifact": _artifact_reference(out_dir, input_name, f"{bundle_root}/{input_name}", f"/producerEvidence/input/{case_id}"),
+            "authorityArtifact": _artifact_reference(out_dir, authority_name, f"{bundle_root}/{authority_name}", f"/producerEvidence/expected/{case_id}"),
+            "actualArtifact": _artifact_reference(out_dir, actual_name, f"{bundle_root}/{actual_name}", f"/producerEvidence/actual/{case_id}"),
+            "supportingArtifact": _artifact_reference(out_dir, support_name, f"{bundle_root}/{support_name}", f"/producerEvidence/support/{case_id}"),
+        }
+        common = {
+            "caseId": case_id, "requirementId": REQUIREMENT_ID, "classification": row["classification"], **refs,
+            "expected": deepcopy(row["expected"]), "actual": deepcopy(row["actual"]), "comparison": comparison,
+            "target": deepcopy(row["target"]), "diagnostic": deepcopy(row["diagnostic"]),
+        }
+        evaluated = row["expected"] != row["actual"] if evaluator_type == "mutation-killed" else row["expected"] == row["actual"]
+        result = "passed" if evaluated else "failed"
+        producer_cases.append({**common, "result": result})
+        producer_assertions.append({
+            "assertionId": case_id, "requirementId": REQUIREMENT_ID, "assertionType": evaluator_type,
+            "testCaseId": case_id, "classification": row["classification"],
+            "authorityArtifact": refs["authorityArtifact"], "actualArtifact": refs["actualArtifact"],
+            "expected": deepcopy(row["expected"]), "actual": deepcopy(row["actual"]), "comparison": comparison,
+            "status": result, "target": deepcopy(row["target"]), "diagnostic": deepcopy(row["diagnostic"]),
+            "supportingArtifact": refs["supportingArtifact"],
+        })
+
+    producer_report = {
+        "schema": PRODUCER_REPORT_SCHEMA, "version": PRODUCER_REPORT_VERSION, "evidenceId": EVIDENCE_ID,
+        "requirementIds": [REQUIREMENT_ID], "sourceSha": source_sha or "0" * 40,
+        "inputDigests": _input_digests(_producer_input_paths(corpus_path, schema_path)),
+        "producerId": "issue-90-qualification-runner", "authorityId": "issue-90-authored-model-contract",
+        "independence": {
+            "producerComponentDigest": _component_digest(Path(__file__), "producer"),
+            "authorityComponentDigest": _component_digest(Path(schema_path), "authority"),
+            "evaluatorComponentDigest": _component_digest(RUNTIME_PATH, "evaluator"),
+            "expectedDerivedFromActual": False,
+            "sharedComponentDigests": [_component_digest(REGISTRY_PATH, "shared-registry")],
+        },
+        "assertions": producer_assertions, "testCases": producer_cases,
+        "uncoveredItems": [], "unsupportedItems": [], "waivedItems": [],
+        "status": "passed" if all(item["status"] == "passed" for item in producer_assertions) else "failed",
+        "failureCount": sum(item["status"] != "passed" for item in producer_assertions) + sum(item["result"] != "passed" for item in producer_cases),
+    }
+    _write_json(out_dir / "producer-report.json", producer_report)
+    return producer_report
+
+
 def run_qualification(
     *,
     schema_path: Path = DEFAULT_SCHEMA_PATH,
@@ -749,14 +933,24 @@ def run_qualification(
         message = f"{type(exc).__name__}: {exc}"
         reports = {kind: _fatal_report(kind, source_sha, message) for kind in REPORT_NAMES}
         out_dir.mkdir(parents=True, exist_ok=True)
-        for kind, name in REPORT_NAMES.items():
-            _write_json(out_dir / name, reports[kind])
+        _write_producer_report(
+            out_dir=out_dir,
+            reports=reports,
+            corpus_path=corpus_path,
+            schema_path=schema_path,
+            source_sha=source_sha,
+        )
         print(f"FAIL: issue #90 qualification setup: {message}", file=sys.stderr)
         return 1
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    for kind, name in REPORT_NAMES.items():
-        _write_json(out_dir / name, reports[kind])
+    _write_producer_report(
+        out_dir=out_dir,
+        reports=reports,
+        corpus_path=corpus_path,
+        schema_path=schema_path,
+        source_sha=source_sha,
+    )
     failed = [kind for kind, report in reports.items() if report.get("status") != "passed"]
     if failed:
         print("FAIL: issue #90 qualification reports: " + ", ".join(failed), file=sys.stderr)

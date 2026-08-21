@@ -1,0 +1,111 @@
+{
+  "schema": "fdir/qualification-issue-98-corpus",
+  "version": "1.0.0",
+  "issueNumber": 98,
+  "qualificationScope": "bounded-independent-canonical-bytes-projection-stable-id-migration",
+  "reportNames": [
+    "canonical-cross-language-vectors.json",
+    "projection-identity-report.json",
+    "stable-entity-id-report.json",
+    "migration-matrix-report.json"
+  ],
+  "oracle": {
+    "expectedBytesAreAuthored": true,
+    "expectedValuesAreRuntimeIndependent": true,
+    "adapterHelpersUsedForExpected": false,
+    "independentImplementation": "tools/canonical_issue98_node.mjs",
+    "forbiddenDerivations": [
+      "tools/canonicalize_ir.py",
+      "tools/adapter_common.py",
+      "tools/adapter_docx.py",
+      "tools/adapter_xlsx.py",
+      "tools/adapter_pdf.py",
+      "tools/adapter_markdown.py",
+      "runtime-output-as-expected"
+    ]
+  },
+  "documents": {
+    "projection": {
+      "conversion": {
+        "diagnostics": ["diagnostic-extension-unknown"],
+        "warnings": ["diagnostic-extension-unknown"],
+        "featureInventory": [{"diagnosticIds":["diagnostic-extension-unknown"],"status":"unsupported","disposition":"non-preserved","occurrences":1,"feature":"unknown-extension"}],
+        "features": [{"diagnosticIds":["diagnostic-extension-unknown"],"status":"unsupported","targetId":"extension-future-widget","feature":"unknown-extension"}],
+        "capabilityProfile": "format:markdown:commonmark:1",
+        "status": "partial"
+      },
+      "diagnostics": [{"sourceMapId":"map-document","action":"review","message":"Unknown extension retained as opaque.","targetId":"extension-future-widget","phase":"validate","severity":"warning","code":"DFIR-EXTENSION-UNKNOWN-OPAQUE","diagnosticId":"diagnostic-extension-unknown"}],
+      "observations": [{"status":"preserved","method":"render","targetId":"node-document","kind":"renderer","observationId":"observation-render"}],
+      "sourceMaps": [{"locator":{"lineStart":1,"kind":"markdown"},"format":{"version":"commonmark","name":"markdown","namespace":"format"},"targetId":"node-document","sourceMapId":"map-document"}],
+      "extensions": [{"payload":{"futureField":"keep-me"},"criticality":"non-critical","schemaId":"urn:fdir:schema:future-widget","schemaVersion":"1.0.0","type":"future-widget","namespace":"urn:fdir:format:markdown","targetId":"node-document","extensionId":"extension-future-widget","retention":"opaque"}],
+      "nodes": [
+        {"status":"preserved","childIds":["node-left","node-right"],"kind":"document","nodeId":"node-document"},
+        {"status":"preserved","childIds":[],"parentId":"node-document","kind":"paragraph","nodeId":"node-right"},
+        {"status":"preserved","childIds":[],"parentId":"node-document","kind":"paragraph","nodeId":"node-left"}
+      ],
+      "rootNodeId": "node-document",
+      "sourceFormat": {"version":"commonmark","name":"markdown","namespace":"format"},
+      "documentId": "doc-issue98",
+      "schema": {"version":"1.0.0","name":"fdir/document-form"}
+    },
+    "stableBase": {
+      "conversion": {"status":"complete","featureInventory":[{"status":"preserved","disposition":"core","occurrences":1,"feature":"nodes"}],"features":[{"status":"preserved","feature":"nodes"}],"capabilityProfile":"format:markdown:commonmark:1","diagnostics":[]},
+      "nodes": [
+        {"status":"preserved","childIds":[],"parentId":"node-document","kind":"paragraph","nodeId":"node-omega"},
+        {"status":"preserved","childIds":["node-alpha","node-omega"],"kind":"document","nodeId":"node-document"},
+        {"status":"preserved","childIds":[],"parentId":"node-document","kind":"paragraph","nodeId":"node-alpha"}
+      ],
+      "rootNodeId":"node-document",
+      "sourceFormat":{"version":"commonmark","name":"markdown","namespace":"format"},
+      "documentId":"doc-stable-base",
+      "schema":{"version":"1.0.0","name":"fdir/document-form"}
+    },
+    "stableInserted": {
+      "conversion": {"status":"complete","featureInventory":[{"status":"preserved","disposition":"core","occurrences":1,"feature":"nodes"}],"features":[{"status":"preserved","feature":"nodes"}],"capabilityProfile":"format:markdown:commonmark:1","diagnostics":[]},
+      "nodes": [
+        {"status":"preserved","childIds":[],"parentId":"node-document","kind":"paragraph","nodeId":"node-omega"},
+        {"status":"preserved","childIds":["node-alpha","node-inserted","node-omega"],"kind":"document","nodeId":"node-document"},
+        {"status":"preserved","childIds":[],"parentId":"node-document","kind":"paragraph","nodeId":"node-inserted"},
+        {"status":"preserved","childIds":[],"parentId":"node-document","kind":"paragraph","nodeId":"node-alpha"}
+      ],
+      "rootNodeId":"node-document",
+      "sourceFormat":{"version":"commonmark","name":"markdown","namespace":"format"},
+      "documentId":"doc-stable-inserted",
+      "schema":{"version":"1.0.0","name":"fdir/document-form"}
+    }
+  },
+  "canonicalVectors": [
+    {"vectorId":"utf16-key-order","mode":"value","rawJson":"{\"\\uE000\":\"bmp\",\"𐀀\":\"astral\",\"aa\":\"ascii\"}","projection":"full","expected":{"outcome":"accepted","canonicalBytesBase64":"eyJhYSI6ImFzY2lpIiwi8JCAgCI6ImFzdHJhbCIsIu6AgCI6ImJtcCJ9","sha256":"e61c351a9a235ba453da2dedfe933519770db816e26ab5e93302af6b8ad57b40","terminalLf":false}},
+    {"vectorId":"negative-zero-integer","mode":"value","rawJson":"{\"negativeZero\":-0,\"integer\":7}","projection":"full","expected":{"outcome":"accepted","canonicalBytesBase64":"eyJpbnRlZ2VyIjo3LCJuZWdhdGl2ZVplcm8iOjB9","sha256":"1152667b2af7fafde3f2a32146ff17498fd2130ea92e7699ca4bf997c7964560","terminalLf":false}},
+    {"vectorId":"float-rejected","mode":"value","rawJson":"{\"value\":1.25}","projection":"full","expected":{"outcome":"rejected","errorCode":"FLOATING_POINT_NUMBER"}},
+    {"vectorId":"duplicate-key-rejected","mode":"value","rawJson":"{\"a\":1,\"a\":2}","projection":"full","expected":{"outcome":"rejected","errorCode":"DUPLICATE_OBJECT_KEY"}},
+    {"vectorId":"projection-identity","mode":"document","documentRef":"projection","expectedByProjection":{"full":{"outcome":"accepted","sha256":"cfc806744dd6bbc61e1d20826cbfa6c6f1f8539fb7f721f4ffc1e509233806cd","terminalLf":false},"content":{"outcome":"accepted","sha256":"0516e3f4f37b39400dab134972880ee48c4ea9d94ba987a0c1755d3ce16460b6","terminalLf":false},"source-map-excluded":{"outcome":"accepted","sha256":"0516e3f4f37b39400dab134972880ee48c4ea9d94ba987a0c1755d3ce16460b6","terminalLf":false}},"fieldPolicy":{"fullIncludes":["documentId","sourceMaps","diagnostics","conversion","observations"],"contentExcludes":["documentId","sourceMaps","diagnostics","conversion","observations"],"sourceMapExcludedEqualsContent":true}},
+    {"vectorId":"lf-and-no-lf","mode":"document","documentRef":"projection","variants":["no-lf","terminal-lf"],"expectedRef":"projection-identity:full"},
+    {"vectorId":"authored-child-order","mode":"document","documentRef":"stableBase","expected":{"outcome":"accepted","canonicalBytesBase64":"eyJjb252ZXJzaW9uIjp7ImNhcGFiaWxpdHlQcm9maWxlIjoiZm9ybWF0Om1hcmtkb3duOmNvbW1vbm1hcms6MSIsImRpYWdub3N0aWNzIjpbXSwiZmVhdHVyZUludmVudG9yeSI6W3siZGlzcG9zaXRpb24iOiJjb3JlIiwiZmVhdHVyZSI6Im5vZGVzIiwib2NjdXJyZW5jZXMiOjEsInN0YXR1cyI6InByZXNlcnZlZCJ9XSwiZmVhdHVyZXMiOlt7ImZlYXR1cmUiOiJub2RlcyIsInN0YXR1cyI6InByZXNlcnZlZCJ9XSwic3RhdHVzIjoiY29tcGxldGUifSwiZG9jdW1lbnRJZCI6ImRvYy1zdGFibGUtYmFzZSIsIm5vZGVzIjpbeyJjaGlsZElkcyI6W10sImtpbmQiOiJwYXJhZ3JhcGgiLCJub2RlSWQiOiJub2RlLWFscGhhIiwicGFyZW50SWQiOiJub2RlLWRvY3VtZW50Iiwic3RhdHVzIjoicHJlc2VydmVkIn0seyJjaGlsZElkcyI6WyJub2RlLWFscGhhIiwibm9kZS1vbWVnYSJdLCJraW5kIjoiZG9jdW1lbnQiLCJub2RlSWQiOiJub2RlLWRvY3VtZW50Iiwic3RhdHVzIjoicHJlc2VydmVkIn0seyJjaGlsZElkcyI6W10sImtpbmQiOiJwYXJhZ3JhcGgiLCJub2RlSWQiOiJub2RlLW9tZWdhIiwicGFyZW50SWQiOiJub2RlLWRvY3VtZW50Iiwic3RhdHVzIjoicHJlc2VydmVkIn1dLCJyb290Tm9kZUlkIjoibm9kZS1kb2N1bWVudCIsInNjaGVtYSI6eyJuYW1lIjoiZmRpci9kb2N1bWVudC1mb3JtIiwidmVyc2lvbiI6IjEuMC4wIn0sInNvdXJjZUZvcm1hdCI6eyJuYW1lIjoibWFya2Rvd24iLCJuYW1lc3BhY2UiOiJmb3JtYXQiLCJ2ZXJzaW9uIjoiY29tbW9ubWFyayJ9fQ==","sha256":"59e73f6ce6aad16aa0d33615ca28effdc546e55f1d14f6e4cf8b147647d7d1c0","terminalLf":false},"authoredOrder":{"path":"nodes[nodeId=node-document].childIds","expected":["node-alpha","node-omega"]}}
+  ],
+  "stableEntityCases": [
+    {"caseId":"stable-insertion-preserves-authored-ids","baseDocumentRef":"stableBase","insertedDocumentRef":"stableInserted","collection":"nodes","preExistingIds":["node-document","node-alpha","node-omega"],"insertedIds":["node-inserted"],"expectedBaseIds":["node-document","node-alpha","node-omega"],"expectedInsertedIds":["node-document","node-alpha","node-inserted","node-omega"],"expectedBaseSha256":"59e73f6ce6aad16aa0d33615ca28effdc546e55f1d14f6e4cf8b147647d7d1c0","expectedInsertedSha256":"144e390267bc5870e86a6bc66c5a6c833fd6b56c2b3189f586497189d5f87e7d"}
+  ],
+  "migrationCases": [
+    {"caseId":"same-version-opaque-extension-preserved","documentRef":"projection","sourceVersion":"1.0.0","targetVersion":"1.0.0","expected":{"outcome":"unchanged","lossReceipt":[],"unknownExtension":{"retained":true,"diagnosticCode":"DFIR-EXTENSION-UNKNOWN-OPAQUE"}}},
+    {"caseId":"legacy-version-requires-loss-receipt","documentRef":"projection","sourceVersion":"0.9.0","targetVersion":"1.0.0","expected":{"outcome":"migrated-with-loss-receipt","lossReceipt":[{"receiptId":"loss-legacy-future-field","fieldPath":"$.legacyField","disposition":"omitted","diagnosticCode":"DFIR-MIGRATION-LOSS"}],"unknownExtension":{"retained":true,"diagnosticCode":"DFIR-EXTENSION-UNKNOWN-OPAQUE"}}},
+    {"caseId":"future-target-version-rejected","documentRef":"projection","sourceVersion":"1.0.0","targetVersion":"2.0.0","expected":{"outcome":"rejected","lossReceipt":[]}}
+  ],
+  "negativeCases": [
+    {"caseId":"utf16-key-order-mutation","tag":"utf16-key-order","kind":"expected-byte-reorder","vectorId":"utf16-key-order"},
+    {"caseId":"lf-termination-mutation","tag":"lf-termination","kind":"expected-byte-append-lf","vectorId":"negative-zero-integer"},
+    {"caseId":"float-negative-zero-mutation","tag":"float-negative-zero","kind":"raw-number-mutation","vectorId":"negative-zero-integer"},
+    {"caseId":"authored-order-mutation","tag":"authored-order","kind":"authored-child-order-mutation","documentRef":"stableBase"},
+    {"caseId":"diagnostic-projection-inclusion-mutation","tag":"diagnostic-projection","kind":"projection-inclusion","projection":"content","field":"diagnostics","vectorId":"projection-identity"},
+    {"caseId":"source-map-projection-inclusion-mutation","tag":"sourceMap-projection","kind":"projection-inclusion","projection":"content","field":"sourceMaps","vectorId":"projection-identity"},
+    {"caseId":"observation-projection-inclusion-mutation","tag":"observation-projection","kind":"projection-inclusion","projection":"content","field":"observations","vectorId":"projection-identity"},
+    {"caseId":"positional-id-mutation","tag":"positional-ids","kind":"positional-id-mutation","stableCaseId":"stable-insertion-preserves-authored-ids"},
+    {"caseId":"duplicate-id-collision-mutation","tag":"duplicate-id-collision","kind":"duplicate-id-collision","stableCaseId":"stable-insertion-preserves-authored-ids"},
+    {"caseId":"unknown-extension-drop-mutation","tag":"unknown-extension-drop","kind":"unknown-extension-drop","migrationCaseId":"same-version-opaque-extension-preserved"},
+    {"caseId":"migration-loss-unreported-mutation","tag":"migration-loss-unreported","kind":"migration-loss-drop","migrationCaseId":"legacy-version-requires-loss-receipt"}
+  ],
+  "limitations": [
+    "This is a bounded qualification lane and is not a whole-issue completion claim.",
+    "Migration beyond the currently registered wire version is measured as an explicit requirement, not silently treated as compatible."
+  ]
+}

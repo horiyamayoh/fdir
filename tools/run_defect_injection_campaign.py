@@ -28,10 +28,23 @@ import tarfile
 import time
 from typing import Any, Iterable
 
+try:
+    from qualification_evidence import selected_artifact_digest, selected_artifact_value
+except ImportError:  # pragma: no cover - package-style imports
+    from tools.qualification_evidence import selected_artifact_digest, selected_artifact_value
+
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = ROOT / "machine" / "defect-injection-contract.json"
 RUNNER_VERSION = "1.0.0"
+ISSUE_89_EVIDENCE_ID = "issue-89-defect-injection"
+ISSUE_89_REQUIREMENT_ID = "QUAL-89-MUST-MUTATIONS"
+ISSUE_89_BUNDLE_ARTIFACT_ROOT = "artifacts/89/defect-injection-artifacts"
+ISSUE_89_INPUT_PATHS = (
+    "machine/defect-injection-contract.json",
+    "tools/run_defect_injection_campaign.py",
+    "tools/defect_profile_formats.py",
+)
 CLASSIFICATIONS = (
     "generated",
     "detected",
@@ -113,6 +126,40 @@ def _write_text(path: Path, value: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="\n") as stream:
         stream.write(value)
+
+
+def _write_json(path: Path, value: Any) -> None:
+    _write_text(path, json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+
+
+def _producer_report_path(output: Path | None) -> Path:
+    if output is None:
+        return ROOT / "e2e" / ".run" / "qualification-issue-89" / "producer-report.json"
+    resolved = output if output.is_absolute() else ROOT / output
+    return resolved.parent / resolved.stem / "producer-report.json"
+
+
+def _issue_89_input_digests() -> list[str]:
+    return [_digest_bytes((ROOT / Path(*item.split("/"))).read_bytes()) for item in ISSUE_89_INPUT_PATHS]
+
+
+def _producer_artifact_reference(local_path: Path, bundle_path: str, selector: dict[str, Any]) -> dict[str, Any]:
+    value = selected_artifact_value(local_path, selector)
+    return {
+        "path": bundle_path,
+        "sha256": _digest_bytes(local_path.read_bytes()),
+        "selector": selector,
+        "selectedSha256": selected_artifact_digest(value, selector),
+    }
+
+
+def _safe_artifact_slug(value: Any) -> str:
+    text = str(value)
+    return re.sub(r"[^A-Za-z0-9._-]", "_", text) or "unknown-case"
+
+
+def _command_passed(value: Any, expected_exit_code: int = 0) -> bool:
+    return isinstance(value, dict) and value.get("status") == "completed" and value.get("exit_code") == expected_exit_code
 
 
 def _contract_source(root: Path, path_text: str) -> str:
@@ -940,8 +987,121 @@ def _run_case(
         shutil.rmtree(work_dir, ignore_errors=True)
 
 
+def _case_qualification(report: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Return an independently checkable expected/actual mutation result."""
+
+    syntax_ok = _command_passed(report.get("syntax_check"))
+    import_ok = _command_passed(report.get("import_check"))
+    baseline_ok = _command_passed(report.get("baseline_gate"))
+    gate = report.get("gate") if isinstance(report.get("gate"), dict) else {}
+    gate_completed = gate.get("status") == "completed" and gate.get("timeout") is not True
+    patch_application = report.get("patch_application") if isinstance(report.get("patch_application"), dict) else {}
+    patch_apply = patch_application.get("apply") if isinstance(patch_application.get("apply"), dict) else {}
+    source_patched = _command_passed(patch_apply)
+    expected_outcome = report.get("expected_outcome")
+    if expected_outcome == "equivalent":
+        expected = {
+            "classification": "equivalent",
+            "sourcePatched": True,
+            "sourceValid": True,
+            "baselineGatePassed": True,
+            "gateCompleted": True,
+            "observableUnchanged": True,
+        }
+        equivalence = report.get("equivalence") if isinstance(report.get("equivalence"), dict) else {}
+        actual = {
+            "classification": report.get("classification"),
+            "sourcePatched": source_patched,
+            "sourceValid": syntax_ok and import_ok,
+            "baselineGatePassed": baseline_ok,
+            "gateCompleted": gate_completed,
+            "observableUnchanged": equivalence.get("observable_unchanged") is True,
+        }
+        return expected, actual
+    expected = {
+        "classification": "detected",
+        "sourcePatched": True,
+        "sourceValid": True,
+        "baselineGatePassed": True,
+        "gateCompleted": True,
+        "detectorObserved": True,
+    }
+    observation = report.get("detector_observation") if isinstance(report.get("detector_observation"), dict) else {}
+    actual = {
+        "classification": report.get("classification"),
+        "sourcePatched": source_patched,
+        "sourceValid": syntax_ok and import_ok,
+        "baselineGatePassed": baseline_ok,
+        "gateCompleted": gate_completed,
+        "detectorObserved": report.get("classification") == "detected" and observation.get("observable_failure") is True,
+    }
+    return expected, actual
+
+
+def _base_qualification(report: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    expected = {"baseSuitePassed": True, "detectorBaselinesPassed": True, "sourceShaAvailable": True}
+    baselines = report.get("detector_baselines") if isinstance(report.get("detector_baselines"), list) else []
+    actual = {
+        "baseSuitePassed": _command_passed(report.get("base_suite")),
+        "detectorBaselinesPassed": bool(baselines) and all(_command_passed(item) for item in baselines),
+        "sourceShaAvailable": bool(re.fullmatch(r"[0-9a-f]{40}", str(report.get("base_sha", "")))),
+    }
+    return expected, actual
+
+
+def _write_semantic_artifacts(
+    case_dir: Path,
+    *,
+    case_id: str,
+    expected: dict[str, Any],
+    actual: dict[str, Any],
+    target: dict[str, Any],
+    input_value: dict[str, Any],
+) -> None:
+    _write_json(case_dir / "input.json", input_value)
+    _write_json(case_dir / "authority.json", {"caseId": case_id, "qualification": expected, "target": target})
+    _write_json(case_dir / "actual.json", {"caseId": case_id, "qualification": actual, "target": target})
+    _write_json(
+        case_dir / "support.json",
+        {
+            "records": [
+                {
+                    "assertionId": case_id,
+                    "caseId": case_id,
+                    "actual": actual,
+                    "target": target,
+                    "status": "passed",
+                },
+                {
+                    "assertionId": f"issue-89:{case_id}:semantic",
+                    "caseId": case_id,
+                    "actual": actual,
+                    "target": target,
+                    "status": "passed" if expected == actual else "failed",
+                },
+            ]
+        },
+    )
+
+
+def _save_base_artifacts(report: dict[str, Any], artifact_dir: Path) -> None:
+    case_id = "base-suite"
+    case_dir = artifact_dir / "cases" / case_id
+    expected, actual = _base_qualification(report)
+    target = {"issueNumber": 89, "lane": "clean-base", "caseId": case_id}
+    _write_semantic_artifacts(
+        case_dir,
+        case_id=case_id,
+        expected=expected,
+        actual=actual,
+        target=target,
+        input_value={"caseId": case_id, "sourceSha": report.get("base_sha")},
+    )
+
+
 def _save_case_artifacts(report: dict[str, Any], artifact_dir: Path) -> None:
-    case_dir = artifact_dir / "cases" / str(report.get("id"))
+    case_id = str(report.get("id"))
+    case_dir = artifact_dir / "cases" / _safe_artifact_slug(case_id)
     case_dir.mkdir(parents=True, exist_ok=True)
     if isinstance(report.get("patch"), str):
         _write_text(case_dir / "patch.diff", report["patch"])
@@ -950,6 +1110,26 @@ def _save_case_artifacts(report: dict[str, Any], artifact_dir: Path) -> None:
         if isinstance(result, dict):
             _write_text(case_dir / f"{name}.stdout.txt", str(result.get("stdout", "")))
             _write_text(case_dir / f"{name}.stderr.txt", str(result.get("stderr", "")))
+    expected, actual = _case_qualification(report)
+    target = {
+        "issueNumber": 89,
+        "caseId": case_id,
+        "targetFunction": report.get("target_function"),
+        "selectors": report.get("target_selectors", []),
+    }
+    _write_semantic_artifacts(
+        case_dir,
+        case_id=case_id,
+        expected=expected,
+        actual=actual,
+        target=target,
+        input_value={
+            "caseId": case_id,
+            "baseSha": report.get("base_sha"),
+            "patchSha256": report.get("patch_sha256"),
+            "targetSelectors": report.get("target_selectors", []),
+        },
+    )
 
 
 def _run_base_command(
@@ -1129,6 +1309,433 @@ def _campaign_assertions(report: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
+def _write_summary_artifacts(report: dict[str, Any], artifact_dir: Path) -> None:
+    summary_dir = artifact_dir / "summary"
+    summary_dir.mkdir(parents=True, exist_ok=True)
+    checks = _campaign_assertions(report)
+    completion = report.get("completion") if isinstance(report.get("completion"), dict) else {}
+    expected_summary = {"campaignCalculated": True, "status": "passed", "releaseEligible": True}
+    actual_summary = {
+        "campaignCalculated": report.get("campaign_calculated") is True,
+        "status": report.get("status"),
+        "releaseEligible": completion.get("release_eligible"),
+    }
+    target = {"issueNumber": 89, "lane": "campaign-summary", "caseId": "campaign-summary"}
+    _write_json(summary_dir / "input.json", {"caseId": "campaign-summary", "sourceSha": report.get("base_sha")})
+    _write_json(
+        summary_dir / "authority.json",
+        {
+            "caseId": "campaign-summary",
+            "qualification": expected_summary,
+            "checks": {item["assertionId"]: {"expected": item["expected"]} for item in checks},
+            "target": target,
+        },
+    )
+    _write_json(
+        summary_dir / "actual.json",
+        {
+            "caseId": "campaign-summary",
+            "qualification": actual_summary,
+            "checks": {item["assertionId"]: {"actual": item["actual"]} for item in checks},
+            "target": target,
+        },
+    )
+    _write_json(
+        summary_dir / "support.json",
+        {
+            "records": [
+                {
+                    "assertionId": "campaign-summary",
+                    "caseId": "campaign-summary",
+                    "actual": actual_summary,
+                    "target": target,
+                    "status": "passed" if expected_summary == actual_summary else "failed",
+                },
+                *[
+                    {
+                        "assertionId": item["assertionId"],
+                        "caseId": "campaign-summary",
+                        "actual": item["actual"],
+                        "target": {**target, "assertionId": item["assertionId"]},
+                        "status": item["status"],
+                    }
+                    for item in checks
+                ],
+            ]
+        },
+    )
+
+
+def _campaign_producer_report(report: dict[str, Any], artifact_dir: Path, producer_path: Path) -> dict[str, Any]:
+    """Build the issue-89 envelope from mutation observations and artifacts."""
+
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    _save_base_artifacts(report, artifact_dir)
+    case_reports = report.get("cases") if isinstance(report.get("cases"), list) else []
+    if not case_reports:
+        case_reports = [
+            {
+                "id": "runner-failure",
+                "expected_outcome": "non-equivalent",
+                "classification": "infrastructure-error",
+                "base_sha": report.get("base_sha"),
+                "target_function": None,
+                "target_selectors": [],
+                "diagnostic": {"code": "REQUIRED_EVIDENCE_UNAVAILABLE", "message": report.get("failure_reason", "campaign did not produce mutation cases")},
+            }
+        ]
+    for item in case_reports:
+        if isinstance(item, dict):
+            _save_case_artifacts(item, artifact_dir)
+    _write_summary_artifacts(report, artifact_dir)
+
+    source_sha = str(report.get("base_sha", ""))
+    if not re.fullmatch(r"[0-9a-f]{40}", source_sha):
+        source_sha = "0" * 40
+    input_digests = _issue_89_input_digests()
+    if not input_digests:
+        raise CampaignError("required issue-89 input digests are unavailable")
+
+    def refs(case_id: str) -> dict[str, Any]:
+        slug = _safe_artifact_slug(case_id)
+        local_root = artifact_dir / "cases" / slug
+        bundle_root = f"{ISSUE_89_BUNDLE_ARTIFACT_ROOT}/cases/{slug}"
+        return {
+            "inputArtifact": _producer_artifact_reference(local_root / "input.json", f"{bundle_root}/input.json", {"kind": "json-pointer", "pointer": "/caseId"}),
+            "authorityArtifact": _producer_artifact_reference(local_root / "authority.json", f"{bundle_root}/authority.json", {"kind": "json-pointer", "pointer": "/qualification"}),
+            "actualArtifact": _producer_artifact_reference(local_root / "actual.json", f"{bundle_root}/actual.json", {"kind": "json-pointer", "pointer": "/qualification"}),
+            "supportingArtifact": _producer_artifact_reference(local_root / "support.json", f"{bundle_root}/support.json", {"kind": "json-pointer", "pointer": "/records/0"}),
+            "assertionSupportingArtifact": _producer_artifact_reference(local_root / "support.json", f"{bundle_root}/support.json", {"kind": "json-pointer", "pointer": "/records/1"}),
+        }
+
+    cases: list[dict[str, Any]] = []
+    assertions: list[dict[str, Any]] = []
+    case_results: list[bool] = []
+    base_expected, base_actual = _base_qualification(report)
+    base_refs = refs("base-suite")
+    base_target = {"issueNumber": 89, "lane": "clean-base", "caseId": "base-suite"}
+    base_status = "passed" if base_expected == base_actual else "failed"
+    case_results.append(base_status == "passed")
+    cases.append(
+        {
+            "caseId": "base-suite",
+            "requirementId": ISSUE_89_REQUIREMENT_ID,
+            "classification": "positive",
+            **{key: value for key, value in base_refs.items() if key != "assertionSupportingArtifact"},
+            "expected": base_expected,
+            "actual": base_actual,
+            "comparison": {"operator": "equal"},
+            "result": base_status,
+            "target": base_target,
+            "diagnostic": {"code": "BASE_SUITE_SEMANTIC_RESULT", "message": "clean base and detector baseline observations were compared"},
+            "supportingArtifact": base_refs["supportingArtifact"],
+        }
+    )
+    base_assertion_id = "issue-89:base-suite:semantic"
+    assertions.append(
+        {
+            "assertionId": base_assertion_id,
+            "requirementId": ISSUE_89_REQUIREMENT_ID,
+            "assertionType": "defect-injection",
+            "testCaseId": "base-suite",
+            "classification": "positive",
+            "authorityArtifact": base_refs["authorityArtifact"],
+            "actualArtifact": base_refs["actualArtifact"],
+            "expected": base_expected,
+            "actual": base_actual,
+            "comparison": {"operator": "equal"},
+            "status": base_status,
+            "target": base_target,
+            "diagnostic": {"code": "BASE_SUITE_SEMANTIC_RESULT", "message": "base qualification is bound to command observations"},
+            "supportingArtifact": base_refs["assertionSupportingArtifact"],
+        }
+    )
+
+    for item in case_reports:
+        if not isinstance(item, dict) or not isinstance(item.get("id"), str):
+            raise CampaignError("mutation case evidence is unavailable or malformed")
+        case_id = str(item["id"])
+        expected, actual = _case_qualification(item)
+        target = {
+            "issueNumber": 89,
+            "caseId": case_id,
+            "targetFunction": item.get("target_function"),
+            "selectors": item.get("target_selectors", []),
+        }
+        refs_for_case = refs(case_id)
+        status = "passed" if expected == actual else "failed"
+        case_results.append(status == "passed")
+        cases.append(
+            {
+                "caseId": case_id,
+                "requirementId": ISSUE_89_REQUIREMENT_ID,
+                "classification": "mutation",
+                **{key: value for key, value in refs_for_case.items() if key != "assertionSupportingArtifact"},
+                "expected": expected,
+                "actual": actual,
+                "comparison": {"operator": "equal"},
+                "result": status,
+                "target": target,
+                "diagnostic": {
+                    "code": "MUTATION_SEMANTIC_RESULT" if status == "passed" else "MUTATION_EVIDENCE_UNAVAILABLE",
+                    "message": "patched-source, baseline, and detector observations were compared",
+                },
+                "supportingArtifact": refs_for_case["supportingArtifact"],
+            }
+        )
+        assertion_id = f"issue-89:{case_id}:semantic"
+        assertions.append(
+            {
+                "assertionId": assertion_id,
+                "requirementId": ISSUE_89_REQUIREMENT_ID,
+                "assertionType": "defect-injection",
+                "testCaseId": case_id,
+                "classification": "mutation",
+                "authorityArtifact": refs_for_case["authorityArtifact"],
+                "actualArtifact": refs_for_case["actualArtifact"],
+                "expected": expected,
+                "actual": actual,
+                "comparison": {"operator": "equal"},
+                "status": status,
+                "target": target,
+                "diagnostic": {"code": "MUTATION_SEMANTIC_RESULT" if status == "passed" else "MUTATION_EVIDENCE_UNAVAILABLE", "message": "mutation classification is bound to semantic observations"},
+                "supportingArtifact": refs_for_case["assertionSupportingArtifact"],
+            }
+        )
+
+    summary_expected = {"campaignCalculated": True, "status": "passed", "releaseEligible": True}
+    completion = report.get("completion") if isinstance(report.get("completion"), dict) else {}
+    summary_actual = {
+        "campaignCalculated": report.get("campaign_calculated") is True,
+        "status": report.get("status"),
+        "releaseEligible": completion.get("release_eligible"),
+    }
+    summary_case_id = "campaign-summary"
+    summary_case_refs = {
+        "inputArtifact": _producer_artifact_reference(artifact_dir / "summary" / "input.json", f"{ISSUE_89_BUNDLE_ARTIFACT_ROOT}/summary/input.json", {"kind": "json-pointer", "pointer": "/caseId"}),
+        "authorityArtifact": _producer_artifact_reference(artifact_dir / "summary" / "authority.json", f"{ISSUE_89_BUNDLE_ARTIFACT_ROOT}/summary/authority.json", {"kind": "json-pointer", "pointer": "/qualification"}),
+        "actualArtifact": _producer_artifact_reference(artifact_dir / "summary" / "actual.json", f"{ISSUE_89_BUNDLE_ARTIFACT_ROOT}/summary/actual.json", {"kind": "json-pointer", "pointer": "/qualification"}),
+        "supportingArtifact": _producer_artifact_reference(artifact_dir / "summary" / "support.json", f"{ISSUE_89_BUNDLE_ARTIFACT_ROOT}/summary/support.json", {"kind": "json-pointer", "pointer": "/records/0"}),
+    }
+    summary_target = {"issueNumber": 89, "lane": "campaign-summary", "caseId": summary_case_id}
+    summary_status = "passed" if summary_expected == summary_actual else "failed"
+    case_results.append(summary_status == "passed")
+    cases.append(
+        {
+            "caseId": summary_case_id,
+            "requirementId": ISSUE_89_REQUIREMENT_ID,
+            "classification": "mutation",
+            **summary_case_refs,
+            "expected": summary_expected,
+            "actual": summary_actual,
+            "comparison": {"operator": "equal"},
+            "result": summary_status,
+            "target": summary_target,
+            "diagnostic": {"code": "CAMPAIGN_COMPLETION_RESULT", "message": "release eligibility is bound to calculated campaign state"},
+            "supportingArtifact": summary_case_refs["supportingArtifact"],
+        }
+    )
+    checks = _campaign_assertions(report)
+    for index, item in enumerate(checks):
+        assertion_id = str(item["assertionId"])
+        status = "passed" if item.get("status") == "passed" and item.get("expected") == item.get("actual") else "failed"
+        if status != "passed":
+            case_results.append(False)
+        authority_ref = _producer_artifact_reference(
+            artifact_dir / "summary" / "authority.json",
+            f"{ISSUE_89_BUNDLE_ARTIFACT_ROOT}/summary/authority.json",
+            {"kind": "json-pointer", "pointer": f"/checks/{assertion_id}/expected"},
+        )
+        actual_ref = _producer_artifact_reference(
+            artifact_dir / "summary" / "actual.json",
+            f"{ISSUE_89_BUNDLE_ARTIFACT_ROOT}/summary/actual.json",
+            {"kind": "json-pointer", "pointer": f"/checks/{assertion_id}/actual"},
+        )
+        support_ref = _producer_artifact_reference(
+            artifact_dir / "summary" / "support.json",
+            f"{ISSUE_89_BUNDLE_ARTIFACT_ROOT}/summary/support.json",
+            {"kind": "json-pointer", "pointer": f"/records/{index + 1}"},
+        )
+        assertions.append(
+            {
+                "assertionId": assertion_id,
+                "requirementId": ISSUE_89_REQUIREMENT_ID,
+                "assertionType": "defect-injection",
+                "testCaseId": summary_case_id,
+                "classification": "mutation",
+                "authorityArtifact": authority_ref,
+                "actualArtifact": actual_ref,
+                "expected": item["expected"],
+                "actual": item["actual"],
+                "comparison": {"operator": "equal"},
+                "status": status,
+                "target": {**summary_target, "assertionId": assertion_id},
+                "diagnostic": {"code": "CAMPAIGN_ASSERTION_RESULT" if status == "passed" else "CAMPAIGN_ASSERTION_UNAVAILABLE", "message": "campaign assertion was independently recomputed from report data"},
+                "supportingArtifact": support_ref,
+            }
+        )
+
+    # The bundle validator counts failed semantic cases.  An assertion whose
+    # expected/actual comparison independently evaluates to ``failed`` is
+    # already internally consistent and must not be counted a second time.
+    failure_count = sum(1 for item in cases if item["result"] != "passed")
+    status = "passed" if report.get("status") == "passed" and failure_count == 0 else "failed"
+    producer_report = {
+        "schema": "fdir/qualification-producer-report",
+        "version": RUNNER_VERSION,
+        "evidenceId": ISSUE_89_EVIDENCE_ID,
+        "requirementIds": [ISSUE_89_REQUIREMENT_ID],
+        "sourceSha": source_sha,
+        "inputDigests": input_digests,
+        "producerId": "issue-89-defect-injection-runner",
+        "authorityId": "issue-89-defect-injection-contract",
+        "independence": {
+            "producerComponentDigest": _digest_bytes(Path(__file__).read_bytes()),
+            "authorityComponentDigest": _digest_bytes(CONTRACT_PATH.read_bytes()),
+            "evaluatorComponentDigest": _digest_bytes((ROOT / "tools" / "defect_profile_formats.py").read_bytes()),
+            "expectedDerivedFromActual": False,
+            "sharedComponentDigests": [],
+        },
+        "assertions": assertions,
+        "testCases": cases,
+        "uncoveredItems": [] if status == "passed" else ["issue-89-required-semantic-evidence"],
+        "unsupportedItems": [],
+        "waivedItems": [],
+        "status": status,
+        "failureCount": failure_count,
+    }
+    producer_path.parent.mkdir(parents=True, exist_ok=True)
+    _write_json(producer_path, producer_report)
+    return producer_report
+
+
+def _write_failed_producer_fallback(
+    report: dict[str, Any],
+    artifact_dir: Path,
+    producer_path: Path,
+    error: Exception,
+) -> None:
+    """Emit a schema-valid failed envelope when semantic emission itself fails."""
+
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    source_sha = str(report.get("base_sha", ""))
+    if not re.fullmatch(r"[0-9a-f]{40}", source_sha):
+        source_sha = "0" * 40
+    try:
+        input_digests = _issue_89_input_digests()
+    except (OSError, CampaignError):
+        input_digests = ["0" * 64]
+
+    def digest(path: Path) -> str:
+        try:
+            return _digest_bytes(path.read_bytes())
+        except OSError:
+            return "0" * 64
+
+    expected = {"requiredEvidence": "available"}
+    actual = {"requiredEvidence": "unavailable", "error": f"{type(error).__name__}: {error}"}
+    cases: list[dict[str, Any]] = []
+    assertions: list[dict[str, Any]] = []
+    for case_id, classification in (("base-suite", "positive"), ("runner-failure", "mutation")):
+        case_dir = artifact_dir / "cases" / case_id
+        target = {"issueNumber": 89, "lane": case_id, "caseId": case_id}
+        _write_json(case_dir / "input.json", {"caseId": case_id, "sourceSha": source_sha})
+        _write_json(case_dir / "authority.json", {"caseId": case_id, "qualification": expected, "target": target})
+        _write_json(case_dir / "actual.json", {"caseId": case_id, "qualification": actual, "target": target})
+        assertion_id = f"issue-89:{case_id}:fallback"
+        _write_json(
+            case_dir / "support.json",
+            {
+                "records": [
+                    {
+                        "assertionId": case_id,
+                        "caseId": case_id,
+                        "actual": actual,
+                        "target": target,
+                        "status": "passed",
+                    },
+                    {
+                        "assertionId": assertion_id,
+                        "caseId": case_id,
+                        "actual": actual,
+                        "target": target,
+                        "status": "passed",
+                    },
+                ]
+            },
+        )
+        bundle_root = f"{ISSUE_89_BUNDLE_ARTIFACT_ROOT}/cases/{case_id}"
+        input_ref = _producer_artifact_reference(case_dir / "input.json", f"{bundle_root}/input.json", {"kind": "json-pointer", "pointer": "/caseId"})
+        authority_ref = _producer_artifact_reference(case_dir / "authority.json", f"{bundle_root}/authority.json", {"kind": "json-pointer", "pointer": "/qualification"})
+        actual_ref = _producer_artifact_reference(case_dir / "actual.json", f"{bundle_root}/actual.json", {"kind": "json-pointer", "pointer": "/qualification"})
+        support_ref = _producer_artifact_reference(case_dir / "support.json", f"{bundle_root}/support.json", {"kind": "json-pointer", "pointer": "/records/0"})
+        assertion_support_ref = _producer_artifact_reference(case_dir / "support.json", f"{bundle_root}/support.json", {"kind": "json-pointer", "pointer": "/records/1"})
+        diagnostic = {"code": "REQUIRED_SEMANTIC_EVIDENCE_UNAVAILABLE", "message": "producer evidence generation failed closed"}
+        cases.append(
+            {
+                "caseId": case_id,
+                "requirementId": ISSUE_89_REQUIREMENT_ID,
+                "classification": classification,
+                "inputArtifact": input_ref,
+                "authorityArtifact": authority_ref,
+                "actualArtifact": actual_ref,
+                "expected": expected,
+                "actual": actual,
+                "comparison": {"operator": "equal"},
+                "result": "failed",
+                "target": target,
+                "diagnostic": diagnostic,
+                "supportingArtifact": support_ref,
+            }
+        )
+        assertions.append(
+            {
+                "assertionId": assertion_id,
+                "requirementId": ISSUE_89_REQUIREMENT_ID,
+                "assertionType": "defect-injection",
+                "testCaseId": case_id,
+                "classification": classification,
+                "authorityArtifact": authority_ref,
+                "actualArtifact": actual_ref,
+                "expected": expected,
+                "actual": actual,
+                "comparison": {"operator": "equal"},
+                "status": "failed",
+                "target": target,
+                "diagnostic": diagnostic,
+                "supportingArtifact": assertion_support_ref,
+            }
+        )
+    producer_path.parent.mkdir(parents=True, exist_ok=True)
+    _write_json(
+        producer_path,
+        {
+            "schema": "fdir/qualification-producer-report",
+            "version": RUNNER_VERSION,
+            "evidenceId": ISSUE_89_EVIDENCE_ID,
+            "requirementIds": [ISSUE_89_REQUIREMENT_ID],
+            "sourceSha": source_sha,
+            "inputDigests": input_digests,
+            "producerId": "issue-89-defect-injection-runner",
+            "authorityId": "issue-89-defect-injection-contract",
+            "independence": {
+                "producerComponentDigest": digest(Path(__file__)),
+                "authorityComponentDigest": digest(CONTRACT_PATH),
+                "evaluatorComponentDigest": digest(ROOT / "tools" / "defect_profile_formats.py"),
+                "expectedDerivedFromActual": False,
+                "sharedComponentDigests": [],
+            },
+            "assertions": assertions,
+            "testCases": cases,
+            "uncoveredItems": ["issue-89-required-semantic-evidence"],
+            "unsupportedItems": [],
+            "waivedItems": [],
+            "status": "failed",
+            "failureCount": 2,
+        },
+    )
+
+
 def _write_report(path: Path | None, report: dict[str, Any]) -> None:
     rendered = json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     if path is not None:
@@ -1248,6 +1855,9 @@ def run_campaign(
         base_result = _run_base_command(archive, root, base_command, float(base_suite.get("timeoutSeconds", 900)), int(contract["runner"].get("maxOutputBytes", 262144)), support_files)
         report["base_suite"] = base_result
         report["resource_usage"] = _resource_usage(base_result, [], [], jobs)
+        if artifact_dir is not None:
+            artifact_dir.mkdir(parents=True, exist_ok=True)
+            _save_base_artifacts(report, artifact_dir)
         if base_result.get("status") != "completed" or base_result.get("exit_code") != base_suite.get("expectedExitCode", 0):
             report["failure_reason"] = "base suite did not complete with its declared passing exit code"
             report["report_digest"] = _report_digest(report)
@@ -1256,6 +1866,8 @@ def run_campaign(
         baselines, baseline_failures = _prepare_baselines(archive, root, selected, contract["releaseProfiles"], int(contract["runner"].get("maxOutputBytes", 262144)), support_files)
         report["detector_baselines"] = [baselines[key] for key in sorted(baselines)]
         report["resource_usage"] = _resource_usage(base_result, report["detector_baselines"], [], jobs)
+        if artifact_dir is not None:
+            _save_base_artifacts(report, artifact_dir)
         if baseline_failures:
             report["failure_reason"] = "one or more detector commands failed on the clean base"
             report["baseline_failures"] = baseline_failures
@@ -1593,6 +2205,10 @@ def main(argv: list[str] | None = None) -> int:
         report["report_digest"] = _report_digest(report)
         _write_report(out_path, report)
         return 0 if report.get("status") == "passed" else 1
+    artifact_path = args.artifact_dir if args.artifact_dir is None or args.artifact_dir.is_absolute() else ROOT / args.artifact_dir
+    if artifact_path is None:
+        artifact_path = ROOT / "e2e" / ".run" / "qualification-issue-89-artifacts"
+    producer_path = _producer_report_path(out_path)
     try:
         contract_path = args.contract if args.contract.is_absolute() else ROOT / args.contract
         contract = _load_json(contract_path)
@@ -1624,7 +2240,7 @@ def main(argv: list[str] | None = None) -> int:
             jobs=args.jobs,
             allow_dirty_base=args.allow_dirty_base,
             allow_incomplete_matrix=args.allow_incomplete_matrix,
-            artifact_dir=(args.artifact_dir if args.artifact_dir is None or args.artifact_dir.is_absolute() else ROOT / args.artifact_dir),
+            artifact_dir=artifact_path,
         )
     except (CampaignError, OSError, ValueError, json.JSONDecodeError) as exc:
         report = {
@@ -1634,6 +2250,13 @@ def main(argv: list[str] | None = None) -> int:
             "campaign_calculated": False,
             "failure_reason": f"{type(exc).__name__}: {exc}",
         }
+    try:
+        _campaign_producer_report(report, artifact_path, producer_path)
+    except Exception as exc:  # pragma: no cover - required evidence must fail closed
+        report["status"] = "failed"
+        report["campaign_calculated"] = False
+        report["failure_reason"] = f"producer-report generation failed: {type(exc).__name__}: {exc}"
+        _write_failed_producer_fallback(report, artifact_path, producer_path, exc)
     report["report_digest"] = _report_digest(report)
     _write_report(out_path, report)
     return 0 if report.get("status") == "passed" else 1

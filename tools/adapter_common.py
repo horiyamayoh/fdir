@@ -419,10 +419,12 @@ class DocumentBuilder:
         source_text_id: str | None = None,
         source_range: dict[str, int] | None = None,
         transformations: Iterable[dict[str, Any]] = (),
+        normalization_form: str | None = None,
+        mapping: Iterable[dict[str, Any]] = (),
         status: str = "preserved",
     ) -> dict[str, Any]:
-        text = text_value(value, max_chars=self.limits.max_text_chars - self._text_chars)
-        self._text_chars += len(text)
+        text = None if value is None else text_value(value, max_chars=self.limits.max_text_chars - self._text_chars)
+        self._text_chars += len(text or "")
         if status not in STATUS_VALUES:
             raise AdapterError(f"invalid text status: {status}")
         item = {
@@ -439,6 +441,11 @@ class DocumentBuilder:
         transformation_list = list(transformations)
         if transformation_list:
             item["transformations"] = transformation_list
+        if normalization_form is not None:
+            item["normalizationForm"] = normalization_form
+        mapping_list = list(mapping)
+        if mapping_list:
+            item["mapping"] = mapping_list
         self.document["texts"].append(item)
         return item
 
@@ -516,6 +523,16 @@ class DocumentBuilder:
                 for item in self.document.get(collection, [])
                 if isinstance(item, dict)
             ) or any(item.get("status") in {"approximated", "ambiguous", "unsupported", "omitted-by-policy", "failed"} for item in self.features)
+            # An opaque extension is intentionally retained, but the runtime
+            # extension policy forbids claiming a complete conversion until a
+            # consumer knows its vocabulary.  Mark that result partial before
+            # deriving the content identity so canonical validation can still
+            # validate the preserved envelope and its required diagnostic.
+            source_loss = source_loss or any(
+                item.get("retention") == "opaque"
+                for item in self.document.get("extensions", [])
+                if isinstance(item, dict)
+            )
             has_error = any(d.get("severity") in {"fatal", "error"} for d in self.diagnostics)
             has_warning = any(d.get("severity") in {"info", "warning"} for d in self.diagnostics)
             status = "failed" if has_error else "partial" if source_loss else "complete-with-warnings" if has_warning else "complete"

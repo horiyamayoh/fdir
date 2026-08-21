@@ -217,6 +217,31 @@ class QualificationIssue94Tests(unittest.TestCase):
         finally:
             shutil.rmtree(output, ignore_errors=True)
 
+    def test_producer_envelope_is_typed_and_closed(self) -> None:
+        output = self._output_dir()
+        try:
+            qualification.run_qualification(out_dir=output)
+            producer = json.loads((output / "producer-report.json").read_text(encoding="utf-8"))
+            try:
+                from qualification_evidence import validate_producer_report_shape
+            except ImportError:  # pragma: no cover
+                from tools.qualification_evidence import validate_producer_report_shape
+            self.assertEqual(validate_producer_report_shape(producer), [])
+            self.assertEqual(len(producer["testCases"]), len(producer["assertions"]))
+            self.assertEqual(
+                {item["classification"] for item in producer["testCases"]},
+                {"positive", "mutation"},
+            )
+            self.assertEqual(
+                {item["caseId"] for item in producer["testCases"]},
+                {item["testCaseId"] for item in producer["assertions"]},
+            )
+            for item in producer["testCases"]:
+                self.assertNotEqual(item["authorityArtifact"]["path"], item["actualArtifact"]["path"])
+                self.assertNotIn(item["supportingArtifact"]["path"], {item["authorityArtifact"]["path"], item["actualArtifact"]["path"]})
+        finally:
+            shutil.rmtree(output, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()

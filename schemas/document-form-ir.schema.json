@@ -130,6 +130,7 @@
         "kind": {"type": "string", "minLength": 1},
         "parentPartId": {"$ref": "#/$defs/id"},
         "name": {"type": "string"},
+        "storyType": {"type": "string", "enum": ["document", "header", "footer", "footnote", "endnote", "comment", "sheet"]},
         "contentType": {"type": "string"},
         "external": {"type": "boolean"},
         "rootNodeIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
@@ -148,8 +149,18 @@
         "partId": {"$ref": "#/$defs/id"},
         "kind": {"type": "string", "minLength": 1},
         "ordinal": {"type": "integer", "minimum": 0},
+        "storyId": {"$ref": "#/$defs/id"},
+        "sectionBoundary": {"$ref": "#/$defs/id"},
         "coordinateSpaceId": {"$ref": "#/$defs/id"},
         "gridId": {"$ref": "#/$defs/id"},
+        "pageTreeIndex": {"type": "integer", "minimum": 0},
+        "sourceObject": {"type": "string", "minLength": 1},
+        "rotation": {"type": "integer"},
+        "mediaBox": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"$ref": "#/$defs/decimal"}},
+        "cropBox": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"$ref": "#/$defs/decimal"}},
+        "dimension": {"type": "string"},
+        "sparse": {"type": "boolean"},
+        "dialect": {"type": "string", "minLength": 1},
         "layoutIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
         "visibility": {"$ref": "#/$defs/visibility"},
         "status": {"$ref": "#/$defs/status"}
@@ -161,7 +172,7 @@
       "required": ["nodeId", "kind", "childIds", "status"],
       "properties": {
         "nodeId": {"$ref": "#/$defs/id"},
-        "kind": {"type": "string", "enum": ["document", "section", "paragraph", "run", "heading", "list", "table", "row", "column", "cell", "shape", "textBox", "connector", "image", "chart", "glyph", "path", "field", "annotation", "resource"]},
+        "kind": {"type": "string", "enum": ["document", "section", "story", "footnote", "endnote", "comment", "paragraph", "run", "heading", "thematicBreak", "list", "table", "row", "column", "cell", "shape", "textBox", "connector", "image", "chart", "glyph", "path", "field", "annotation", "resource"]},
         "partId": {"$ref": "#/$defs/id"},
         "parentId": {"$ref": "#/$defs/id"},
         "childIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
@@ -179,7 +190,10 @@
         "value": {"$ref": "#/$defs/typedValue"},
         "status": {"$ref": "#/$defs/status"},
         "visibility": {"$ref": "#/$defs/visibility"},
-        "address": {"$ref": "#/$defs/cellAddress"}
+        "address": {"$ref": "#/$defs/cellAddress"},
+        "gridSpan": {"type": "integer", "minimum": 1},
+        "mergeRole": {"type": "string", "enum": ["master", "follower"]},
+        "mergeId": {"$ref": "#/$defs/id"}
       },
       "allOf": [
         {
@@ -204,10 +218,12 @@
         "textId": {"$ref": "#/$defs/id"},
         "representation": {"type": "string", "enum": ["source", "normalized", "stored", "computed", "displayed", "rendered", "observed"]},
         "provenance": {"type": "string", "enum": ["authored", "decoded", "calculated", "formatter", "renderer", "ocr"]},
-        "value": {"type": "string"},
+        "value": {"type": ["string", "null"]},
         "sourceTextId": {"$ref": "#/$defs/id"},
         "sourceRange": {"$ref": "#/$defs/textRange"},
         "transformations": {"type": "array", "items": {"$ref": "#/$defs/textTransformation"}},
+        "normalizationForm": {"type": "string"},
+        "mapping": {"type": "array", "items": {"$ref": "#/$defs/textMapping"}},
         "status": {"$ref": "#/$defs/status"}
       }
     },
@@ -220,6 +236,27 @@
         "end": {"type": "integer", "minimum": 0}
       }
     },
+    "fieldRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["balanced"],
+      "properties": {
+        "begin": {"oneOf": [{"type": "integer", "minimum": 0}, {"type": "string", "minLength": 1}]},
+        "separate": {"type": "integer", "minimum": 0},
+        "end": {"oneOf": [{"type": "integer", "minimum": 0}, {"type": "string", "minLength": 1}]},
+        "balanced": {"type": "boolean"}
+      }
+    },
+    "revisionRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end", "balanced"],
+      "properties": {
+        "start": {"type": "string"},
+        "end": {"type": "string"},
+        "balanced": {"type": "boolean"}
+      }
+    },
     "textTransformation": {
       "type": "object",
       "additionalProperties": false,
@@ -229,7 +266,25 @@
         "sourceStart": {"type": "integer", "minimum": 0},
         "sourceEnd": {"type": "integer", "minimum": 0},
         "targetStart": {"type": "integer", "minimum": 0},
-        "targetEnd": {"type": "integer", "minimum": 0}
+        "targetEnd": {"type": "integer", "minimum": 0},
+        "sourceUnit": {"type": "string"},
+        "targetUnit": {"type": "string"},
+        "operation": {"type": "string"},
+        "loss": {"type": "boolean"},
+        "normalizationForm": {"type": "string"}
+      }
+    },
+    "textMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceRange", "targetRange", "sourceUnit", "targetUnit", "operation", "loss"],
+      "properties": {
+        "sourceRange": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "integer", "minimum": 0}},
+        "targetRange": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "integer", "minimum": 0}},
+        "sourceUnit": {"type": "string"},
+        "targetUnit": {"type": "string"},
+        "operation": {"type": "string"},
+        "loss": {"type": "boolean"}
       }
     },
     "cellAddress": {
@@ -252,8 +307,73 @@
         "rowIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
         "columnIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
         "cellIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
-        "mergedRanges": {"type": "array", "items": {"$ref": "#/$defs/cellRange"}},
+        "ownerSurfaceId": {"$ref": "#/$defs/id"},
+        "ownerCellId": {"$ref": "#/$defs/id"},
+        "range": {"oneOf": [{"$ref": "#/$defs/gridRange"}, {"type": "string", "minLength": 1}]},
+        "scope": {"type": "string", "enum": ["sheet-grid", "structured-table"]},
+        "memberAddresses": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "memberTopology": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["nodeId", "address", "parent", "order"],
+            "properties": {
+              "nodeId": {"$ref": "#/$defs/id"},
+              "address": {"$ref": "#/$defs/cellAddress"},
+              "parent": {"type": "string", "minLength": 1},
+              "order": {"type": "integer", "minimum": 0}
+            }
+          }
+        },
+        "sparseDeclaration": {"$ref": "#/$defs/sparseDeclaration"},
+        "visibility": {"$ref": "#/$defs/gridVisibility"},
+        "headerRows": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+        "bodyRows": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+        "totalsRows": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+        "columns": {"type": "array", "items": {"$ref": "#/$defs/tableColumn"}},
+        "autoFilter": {"type": "string", "minLength": 1},
+        "separatorLines": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+        "rowSourceLines": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+        "alignment": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "separatorIsMetadata": {"type": "boolean"},
+        "gridColumns": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+        "gridColumnWidths": {"type": "array", "items": {"type": "string"}},
+        "nestedTableIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "gridBefore": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 1}},
+        "gridAfter": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 1}},
+        "mergedRanges": {"type": "array", "items": {"oneOf": [{"$ref": "#/$defs/cellRange"}, {"$ref": "#/$defs/docxMergedRange"}]}},
         "status": {"$ref": "#/$defs/status"}
+      }
+    },
+    "tableColumn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "id"],
+      "properties": {
+        "name": {"type": "string"},
+        "id": {"type": "integer", "minimum": 0},
+        "totalsRowFunction": {"type": "string"}
+      }
+    },
+    "sparseDeclaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dimension", "declaredRows", "declaredColumns", "actualCells"],
+      "properties": {
+        "dimension": {"type": "string"},
+        "declaredRows": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+        "declaredColumns": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+        "actualCells": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "gridVisibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^row[0-9]+$": {"type": "string", "enum": ["visible", "hidden", "unknown"]},
+        "^column[0-9]+-[0-9]+$": {"type": "string", "enum": ["visible", "hidden", "unknown"]},
+        "^columnOutlineLevel$": {"type": "integer", "minimum": 0}
       }
     },
     "cellRange": {
@@ -263,6 +383,28 @@
       "properties": {
         "from": {"$ref": "#/$defs/cellAddress"},
         "to": {"$ref": "#/$defs/cellAddress"}
+      }
+    },
+    "gridRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rowStart", "rowEnd", "columnStart", "columnEnd"],
+      "properties": {
+        "rowStart": {"type": "integer", "minimum": 1},
+        "rowEnd": {"type": "integer", "minimum": 1},
+        "columnStart": {"type": "integer", "minimum": 1},
+        "columnEnd": {"type": "integer", "minimum": 1}
+      }
+    },
+    "docxMergedRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["range", "masterCellId", "followerCellIds", "policy"],
+      "properties": {
+        "range": {"type": "string", "minLength": 1},
+        "masterCellId": {"$ref": "#/$defs/id"},
+        "followerCellIds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+        "policy": {"type": "string", "minLength": 1}
       }
     },
     "style": {
@@ -361,7 +503,7 @@
         "r": {"type": "integer", "minimum": 0, "maximum": 255},
         "g": {"type": "integer", "minimum": 0, "maximum": 255},
         "b": {"type": "integer", "minimum": 0, "maximum": 255},
-        "a": {"type": "number", "minimum": 0, "maximum": 1},
+        "a": {"oneOf": [{"type": "number", "minimum": 0, "maximum": 1}, {"$ref": "#/$defs/decimal"}]},
         "gray": {"type": "number", "minimum": 0, "maximum": 1},
         "c": {"type": "number", "minimum": 0, "maximum": 1},
         "m": {"type": "number", "minimum": 0, "maximum": 1},
@@ -572,6 +714,12 @@
         "intrinsicWidth": {"type": "integer", "minimum": 0},
         "intrinsicHeight": {"type": "integer", "minimum": 0},
         "externalTarget": {"type": "string"},
+        "packagePresence": {"type": "boolean"},
+        "rawPayloadAvailable": {"type": "boolean"},
+        "decodability": {"type": "string"},
+        "embeddedOrExternal": {"type": "string"},
+        "networkAvailability": {"type": "string"},
+        "consumerCount": {"type": "integer", "minimum": 0},
         "width": {"$ref": "#/$defs/length"},
         "height": {"$ref": "#/$defs/length"}
       }
@@ -583,9 +731,14 @@
       "properties": {
         "formulaId": {"$ref": "#/$defs/id"},
         "ownerCellId": {"$ref": "#/$defs/id"},
+        "ownerAddress": {"type": "string"},
         "kind": {"type": "string", "enum": ["spreadsheetFormula", "calculationField"]},
+        "formulaType": {"type": "string", "enum": ["normal", "shared", "array", "dataTable"]},
+        "sharedIndex": {"type": "string"},
+        "sourceReference": {"type": "string"},
         "expression": {"type": "object", "additionalProperties": false, "required": ["source", "language", "status"], "properties": {"source": {"type": "string"}, "language": {"type": "string"}, "status": {"$ref": "#/$defs/status"}}},
         "values": {"$ref": "#/$defs/formulaValues"},
+        "range": {"$ref": "#/$defs/formulaRange"},
         "numberFormat": {"$ref": "#/$defs/numberFormat"},
         "calculationContext": {"$ref": "#/$defs/calculationContext"},
         "status": {"$ref": "#/$defs/status"}
@@ -603,19 +756,35 @@
         "laneProvenance": {"type": "object", "additionalProperties": false, "required": ["stored", "cached", "computed", "displayed"], "properties": {"stored": {"type": "string"}, "cached": {"type": "string"}, "computed": {"type": "string"}, "displayed": {"type": "string"}}}
       }
     },
+    "formulaRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end", "balanced"],
+      "properties": {
+        "start": {"type": "string"},
+        "end": {"type": "string"},
+        "balanced": {"type": "boolean"}
+      }
+    },
     "typedValue": {
       "type": "object",
       "additionalProperties": false,
       "required": ["type", "value", "status"],
       "properties": {
-        "type": {"type": "string", "enum": ["blank", "boolean", "integer", "number", "decimal", "string", "date", "datetime", "error"]},
+        "type": {"type": "string", "enum": ["blank", "boolean", "integer", "number", "decimal", "string", "date", "datetime", "duration", "error"]},
         "value": {"type": ["string", "boolean", "number", "null"]},
+        "unit": {"type": "string"},
+        "sourceRepresentation": {"type": "string"},
+        "logicalValue": {"type": ["string", "boolean", "number", "null", "object"]},
+        "normalizationRuleId": {"type": "string"},
+        "provenance": {"type": "string"},
+        "exactness": {"type": "string"},
         "status": {"$ref": "#/$defs/status"}
       },
       "oneOf": [
         {"properties": {"type":{"const":"blank"},"value":{"type":"null"},"status":{"$ref":"#/$defs/status"}}, "required": ["value"]},
         {"properties": {"type":{"const":"boolean"},"value":{"type":"boolean"},"status":{"$ref":"#/$defs/status"}}, "required": ["value"]},
-        {"properties": {"type":{"enum":["integer","number","decimal"]},"value":{"type":["string","number","integer"]},"status":{"$ref":"#/$defs/status"}}, "required": ["value"]},
+        {"properties": {"type":{"enum":["integer","number","decimal","duration"]},"value":{"type":["string","number","integer"]},"status":{"$ref":"#/$defs/status"}}, "required": ["value"]},
         {"properties": {"type":{"enum":["string","date","datetime","error"]},"value":{"type":["string","null"]},"status":{"$ref":"#/$defs/status"}}, "required": ["value"]}
       ]
     },
@@ -636,12 +805,14 @@
       "properties": {
         "fieldId": {"$ref": "#/$defs/id"},
         "ownerNodeId": {"$ref": "#/$defs/id"},
+        "owner": {"type": "string"},
+        "referenceId": {"type": "string"},
         "kind": {"type": "string"},
         "instruction": {"type": "string"},
         "storedResult": {"type": "string"},
         "computedResult": {"type": "string"},
         "displayedResult": {"type": "string"},
-        "range": {"$ref": "#/$defs/textRange"},
+        "range": {"$ref": "#/$defs/fieldRange"},
         "instructionTextId": {"$ref": "#/$defs/id"},
         "resultTextId": {"$ref": "#/$defs/id"},
         "flags": {"type": "array", "items": {"type": "string", "enum": ["dirty", "locked", "private"]}},
@@ -659,10 +830,21 @@
         "body": {"type": "string"},
         "bodyNodeId": {"$ref": "#/$defs/id"},
         "bodyTextId": {"$ref": "#/$defs/id"},
-        "range": {"$ref": "#/$defs/textRange"},
+        "range": {"oneOf": [{"$ref": "#/$defs/textRange"}, {"$ref": "#/$defs/revisionRange"}]},
         "referenceId": {"type": "string"},
         "metadata": {"$ref": "#/$defs/annotationMetadata"},
+        "sourceSubtype": {"type": "string"},
+        "action": {"type": "object"},
+        "geometry": {"type": "object"},
+        "anchor": {"type": "object"},
+        "displayText": {"type": ["string", "null"]},
+        "destination": {"type": "string"},
         "author": {"type": "string"},
+        "revisionId": {"type": "string"},
+        "revisionType": {"type": "string", "enum": ["insert", "delete", "move"]},
+        "date": {"type": "string"},
+        "before": {"type": "string"},
+        "after": {"type": "string"},
         "status": {"$ref": "#/$defs/status"}
       }
     },
@@ -685,6 +867,14 @@
         "kind": {"type": "string", "enum": ["contains", "references", "connectorTarget", "anchor", "basedOnStyle", "usesResource", "annotates", "links", "groups"]},
         "fromId": {"$ref": "#/$defs/id"},
         "toId": {"$ref": "#/$defs/id"},
+        "sourceOccurrenceId": {"$ref": "#/$defs/id"},
+        "sourceRelationshipId": {"$ref": "#/$defs/id"},
+        "type": {"type": "string"},
+        "relationshipType": {"type": "string"},
+        "sourceType": {"type": "string"},
+        "target": {"type": "string"},
+        "resolvedTarget": {"type": "string"},
+        "targetMode": {"type": "string", "enum": ["internal", "external"]},
         "endpoint": {"type": "string", "enum": ["start", "to", "from", "body"]},
         "status": {"$ref": "#/$defs/status"}
       }
@@ -695,9 +885,10 @@
       "required": ["orderId", "kind", "ownerId", "items", "status"],
       "properties": {
         "orderId": {"$ref": "#/$defs/id"},
-        "kind": {"type": "string", "enum": ["structure", "source", "document", "reading", "draw", "z-order", "grid", "tab", "revision"]},
+        "kind": {"type": "string", "enum": ["structure", "source", "document", "reading", "draw", "z-order", "grid", "tab", "page-tree", "revision"]},
         "ownerId": {"$ref": "#/$defs/id"},
         "items": {"type": "array", "items": {"$ref": "#/$defs/orderItem"}},
+        "ordinalBase": {"type": "integer", "minimum": 0},
         "context": {"type": "string"},
         "status": {"$ref": "#/$defs/status"}
       }
@@ -774,7 +965,14 @@
         "lineEnd": {"type": "integer", "minimum": 1},
         "columnEnd": {"type": "integer", "minimum": 1},
         "tokenStart": {"type": "integer", "minimum": 0},
-        "tokenEnd": {"type": "integer", "minimum": 0}
+        "tokenEnd": {"type": "integer", "minimum": 0},
+        "coordinateUnit": {"type": "string", "enum": ["unicode-code-point"]},
+        "endExclusive": {"type": "boolean"},
+        "byteStart": {"type": "integer", "minimum": 0},
+        "byteEnd": {"type": "integer", "minimum": 0},
+        "codePointStart": {"type": "integer", "minimum": 0},
+        "codePointEnd": {"type": "integer", "minimum": 0},
+        "lineEnding": {"type": "string", "enum": ["LF", "CRLF", "CR", "mixed", "none"]}
       }
     },
     "conversionReport": {

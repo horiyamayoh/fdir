@@ -21,6 +21,49 @@ import subprocess
 import sys
 from typing import Any
 
+try:
+    from qualification_evidence import (
+        ASSERTION_EVALUATOR_REGISTRY,
+        ARTIFACT_REFERENCE_ALLOWED_FIELDS,
+        ARTIFACT_REFERENCE_REQUIRED_FIELDS,
+        CLASSIFICATIONS,
+        PRODUCER_ASSERTION_ALLOWED_FIELDS,
+        PRODUCER_ASSERTION_REQUIRED_FIELDS,
+        PRODUCER_CASE_ALLOWED_FIELDS,
+        PRODUCER_CASE_REQUIRED_FIELDS,
+        PRODUCER_REPORT_ALLOWED_FIELDS,
+        PRODUCER_REPORT_REQUIRED_FIELDS,
+        PRODUCER_REPORT_OUTPUT_ROLE,
+        PRODUCER_REPORT_SCHEMA,
+        PRODUCER_REPORT_VERSION,
+        allowed_producer_assertion_types,
+        canonical_json_bytes as evidence_canonical_json_bytes,
+        selected_artifact_digest,
+        selected_artifact_value,
+        validate_producer_report_shape,
+    )
+except ImportError:  # pragma: no cover - package-style imports
+    from tools.qualification_evidence import (
+        ASSERTION_EVALUATOR_REGISTRY,
+        ARTIFACT_REFERENCE_ALLOWED_FIELDS,
+        ARTIFACT_REFERENCE_REQUIRED_FIELDS,
+        CLASSIFICATIONS,
+        PRODUCER_ASSERTION_ALLOWED_FIELDS,
+        PRODUCER_ASSERTION_REQUIRED_FIELDS,
+        PRODUCER_CASE_ALLOWED_FIELDS,
+        PRODUCER_CASE_REQUIRED_FIELDS,
+        PRODUCER_REPORT_ALLOWED_FIELDS,
+        PRODUCER_REPORT_REQUIRED_FIELDS,
+        PRODUCER_REPORT_OUTPUT_ROLE,
+        PRODUCER_REPORT_SCHEMA,
+        PRODUCER_REPORT_VERSION,
+        allowed_producer_assertion_types,
+        canonical_json_bytes as evidence_canonical_json_bytes,
+        selected_artifact_digest,
+        selected_artifact_value,
+        validate_producer_report_shape,
+    )
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = ROOT / "schemas" / "qualification-evidence.schema.json"
@@ -49,6 +92,7 @@ SCHEMA_REQUIRED = {
     "environment",
     "inputs",
     "outputs",
+    "producerReport",
     "assertions",
     "testCases",
     "status",
@@ -63,9 +107,17 @@ SCHEMA_DEFS = {
     "environment",
     "input",
     "output",
-    "supportingOutput",
-    "assertion",
-    "testCase",
+    "selector",
+    "artifactReference",
+    "producerReportBinding",
+    "packagingAssertion",
+    "packagingCase",
+    "comparison",
+    "diagnostic",
+    "producerAssertion",
+    "producerCase",
+    "independence",
+    "producerReportDocument",
     "waiver",
     "ci",
 }
@@ -395,6 +447,317 @@ def _validate_ci(ci: Any, report: dict[str, Any], contract: dict[str, Any], diag
             _add(diagnostics, "CI_URL_MISMATCH", "GitHub Actions runUrl belongs to another repository or URL shape", report_path)
 
 
+PACKAGING_ASSERTION_TYPES = {
+    "producer-report-digest",
+    "producer-report-source-binding",
+    "output-digest-binding",
+    "manifest-completeness",
+    "command-metadata",
+}
+
+
+def _selector_shape(selector: Any) -> bool:
+    if not isinstance(selector, dict) or set(selector) - {"kind", "pointer", "lineStart", "lineEnd"}:
+        return False
+    kind = selector.get("kind")
+    if kind == "json-pointer":
+        return isinstance(selector.get("pointer"), str) and selector["pointer"].startswith("/") or selector.get("pointer") == ""
+    if kind == "whole-file":
+        return "pointer" not in selector and "lineStart" not in selector and "lineEnd" not in selector
+    return False
+
+
+def _artifact_ref_value(
+    ref: Any,
+    *,
+    bundle_root: Path,
+    output_paths: set[str],
+    output_roles: dict[str, str],
+    diagnostics: list[dict[str, str]],
+    report_path: str,
+    label: str,
+    forbid_source_roles: bool = False,
+) -> tuple[Any, str | None]:
+    """Resolve an artifact reference and recompute both digest layers."""
+
+    if not isinstance(ref, dict):
+        _add(diagnostics, "ARTIFACT_REFERENCE_REQUIRED", f"{label} must be an artifact reference", report_path)
+        return None, None
+    missing = sorted(ARTIFACT_REFERENCE_REQUIRED_FIELDS - set(ref))
+    extra = sorted(set(ref) - ARTIFACT_REFERENCE_ALLOWED_FIELDS)
+    if missing:
+        _add(diagnostics, "ARTIFACT_REFERENCE_REQUIRED", f"{label} is missing: {', '.join(missing)}", report_path)
+    if extra:
+        _add(diagnostics, "ARTIFACT_REFERENCE_UNKNOWN_FIELDS", f"{label} has unknown fields: {', '.join(extra)}", report_path)
+    path = ref.get("path")
+    if not _safe_relative(path) or path not in output_paths:
+        _add(diagnostics, "ARTIFACT_REFERENCE_PATH", f"{label} is not a declared bundle output: {path!r}", report_path)
+        return None, path if isinstance(path, str) else None
+    role = output_roles.get(path, "")
+    if forbid_source_roles and (role.casefold() == "producer-report" or any(token in role.casefold() for token in ("snapshot", "source", "manifest", "schema", "contract", "workflow", "stdout", "stderr", "static", "code"))):
+        _add(diagnostics, "PRODUCER_SOURCE_SNAPSHOT", f"{label} uses a source/static snapshot role: {role!r}", report_path)
+    target = _resolve_relative(bundle_root, path)
+    if not target.is_file():
+        _add(diagnostics, "ARTIFACT_REFERENCE_MISSING", f"{label} artifact is missing: {path}", report_path)
+        return None, path
+    selector = ref.get("selector")
+    if not _selector_shape(selector):
+        _add(diagnostics, "ARTIFACT_SELECTOR_INVALID", f"{label} selector is invalid", report_path)
+        return None, path
+    try:
+        value = selected_artifact_value(target, selector)
+        selected_digest = selected_artifact_digest(value, selector)
+    except (OSError, UnicodeError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        _add(diagnostics, "ARTIFACT_SELECTOR_UNRESOLVED", f"{label} selector cannot be resolved: {exc}", report_path)
+        return None, path
+    whole_digest = sha256_file(target)
+    if ref.get("sha256") != whole_digest:
+        _add(diagnostics, "ARTIFACT_DIGEST_MISMATCH", f"{label} declares {ref.get('sha256')} but actual digest is {whole_digest}", report_path)
+    if ref.get("selectedSha256") != selected_digest:
+        _add(diagnostics, "ARTIFACT_SELECTED_DIGEST_MISMATCH", f"{label} declares selected digest {ref.get('selectedSha256')} but actual is {selected_digest}", report_path)
+    if not SHA256.fullmatch(str(ref.get("sha256", ""))) or not SHA256.fullmatch(str(ref.get("selectedSha256", ""))):
+        _add(diagnostics, "ARTIFACT_DIGEST_INVALID", f"{label} digest is not a lowercase SHA-256", report_path)
+    return value, path
+
+
+def _semantic_value(value: Any, ref: dict[str, Any]) -> Any:
+    """Use a stable digest for whole-file binary selections."""
+
+    return ref.get("selectedSha256") if isinstance(ref, dict) and isinstance(ref.get("selector"), dict) and ref["selector"].get("kind") == "whole-file" else value
+
+
+def _support_record(
+    support_value: Any,
+    *,
+    assertion_id: str,
+    case_id: str,
+    actual_value: Any,
+    target: Any,
+    diagnostics: list[dict[str, str]],
+    report_path: str,
+) -> None:
+    if not isinstance(support_value, dict):
+        _add(diagnostics, "SUPPORT_SELECTOR_MISMATCH", f"support for {assertion_id} does not select a structured record", report_path)
+        return
+    if support_value.get("assertionId") != assertion_id or support_value.get("caseId") != case_id:
+        _add(diagnostics, "SUPPORT_SELECTOR_MISMATCH", f"support for {assertion_id} is attached to another assertion or case", report_path)
+    if not _same_json(support_value.get("actual"), actual_value):
+        _add(diagnostics, "SUPPORT_CONTENT_MISMATCH", f"support for {assertion_id} does not contain the recomputed actual value", report_path)
+    if not _same_json(support_value.get("target"), target):
+        _add(diagnostics, "SUPPORT_TARGET_MISMATCH", f"support for {assertion_id} does not contain the assertion target", report_path)
+    if support_value.get("status", support_value.get("result")) != "passed":
+        _add(diagnostics, "SUPPORT_STATUS_MISMATCH", f"support for {assertion_id} is not a passed structured record", report_path)
+
+
+def _evaluate_registered_assertion(assertion_type: Any, expected: Any, actual: Any, comparison: Any) -> bool | None:
+    if not isinstance(assertion_type, str) or assertion_type not in ASSERTION_EVALUATOR_REGISTRY:
+        return None
+    if not isinstance(comparison, dict) or set(comparison) != {"operator"}:
+        return None
+    try:
+        return bool(ASSERTION_EVALUATOR_REGISTRY[assertion_type](expected, actual, comparison))
+    except (TypeError, ValueError, KeyError):
+        return False
+
+
+def _comparison_operator(value: Any) -> Any:
+    return value.get("operator") if isinstance(value, dict) else None
+
+
+def _validate_producer_report(
+    producer: Any,
+    *,
+    evidence_id: str,
+    issue_numbers: list[int],
+    requirement_ids: list[str],
+    source_sha: str,
+    input_digests: set[str],
+    bundle_root: Path,
+    output_paths: set[str],
+    output_roles: dict[str, str],
+    diagnostics: list[dict[str, str]],
+    report_path: str,
+) -> None:
+    """Independently recalculate every requirement assertion and test case."""
+
+    shape_errors = validate_producer_report_shape(producer)
+    for detail in shape_errors:
+        _add(diagnostics, "PRODUCER_REPORT_SCHEMA", detail, report_path)
+    if not isinstance(producer, dict):
+        return
+    if producer.get("schema") != PRODUCER_REPORT_SCHEMA or producer.get("version") != PRODUCER_REPORT_VERSION:
+        _add(diagnostics, "PRODUCER_REPORT_SCHEMA", "producer report schema/version is invalid", report_path)
+    if producer.get("evidenceId") != evidence_id:
+        _add(diagnostics, "PRODUCER_REPORT_EVIDENCE_ID", "producer report evidenceId does not match the bundle Evidence ID", report_path)
+    if set(producer.get("requirementIds", [])) != set(requirement_ids):
+        _add(diagnostics, "PRODUCER_REPORT_REQUIREMENTS", "producer report requirementIds do not match the contract", report_path)
+    if producer.get("sourceSha") != source_sha:
+        _add(diagnostics, "PRODUCER_REPORT_SOURCE_SHA", "producer report sourceSha does not match the current source SHA", report_path)
+    if set(producer.get("inputDigests", [])) != input_digests:
+        _add(diagnostics, "PRODUCER_REPORT_INPUT_DIGESTS", "producer report inputDigests do not match recomputed bundle inputs", report_path)
+    independence = producer.get("independence")
+    if isinstance(independence, dict):
+        for field in ("producerComponentDigest", "authorityComponentDigest", "evaluatorComponentDigest"):
+            if not SHA256.fullmatch(str(independence.get(field, ""))):
+                _add(diagnostics, "PRODUCER_INDEPENDENCE_DIGEST", f"producer independence {field} is invalid", report_path)
+        if independence.get("expectedDerivedFromActual") is not False:
+            _add(diagnostics, "EXPECTED_DERIVED_FROM_ACTUAL", "producer report declares expected output derived from actual output", report_path)
+        if not isinstance(independence.get("sharedComponentDigests"), list):
+            _add(diagnostics, "PRODUCER_INDEPENDENCE", "sharedComponentDigests must be an array", report_path)
+    if producer.get("producerId") == producer.get("authorityId"):
+        _add(diagnostics, "PRODUCER_AUTHORITY_NOT_INDEPENDENT", "producerId and authorityId must identify separate authorities", report_path)
+    if producer.get("uncoveredItems") or producer.get("unsupportedItems") or producer.get("waivedItems"):
+        _add(diagnostics, "PRODUCER_COVERAGE_INCOMPLETE", "uncovered, unsupported, or waived items cannot support a passed Evidence", report_path)
+
+    cases = producer.get("testCases") if isinstance(producer.get("testCases"), list) else []
+    case_by_id: dict[str, dict[str, Any]] = {}
+    case_failures = 0
+    classifications: set[str] = set()
+    for index, case in enumerate(cases):
+        case_path = f"{report_path}#/testCases/{index}"
+        if not isinstance(case, dict):
+            _add(diagnostics, "PRODUCER_CASE_ENTRY", "producer test case must be an object", case_path)
+            case_failures += 1
+            continue
+        missing = sorted(PRODUCER_CASE_REQUIRED_FIELDS - set(case))
+        extra = sorted(set(case) - PRODUCER_CASE_ALLOWED_FIELDS)
+        if missing:
+            _add(diagnostics, "PRODUCER_CASE_REQUIRED_FIELDS", "producer test case is missing: " + ", ".join(missing), case_path)
+            case_failures += len(missing)
+        if extra:
+            _add(diagnostics, "PRODUCER_CASE_UNKNOWN_FIELDS", "producer test case has unknown fields: " + ", ".join(extra), case_path)
+            case_failures += 1
+        case_id = case.get("caseId")
+        if not isinstance(case_id, str) or not ID.fullmatch(case_id) or case_id in case_by_id:
+            _add(diagnostics, "PRODUCER_CASE_ID", f"producer caseId is missing or duplicated: {case_id!r}", case_path)
+            case_failures += 1
+            continue
+        case_by_id[case_id] = case
+        classification = case.get("classification")
+        if classification not in CLASSIFICATIONS:
+            _add(diagnostics, "PRODUCER_CASE_CLASSIFICATION", f"invalid producer case classification: {case_id}", case_path)
+            case_failures += 1
+        else:
+            classifications.add(classification)
+        if case.get("requirementId") not in requirement_ids:
+            _add(diagnostics, "PRODUCER_CASE_REQUIREMENT", f"producer case is not bound to this requirement: {case_id}", case_path)
+            case_failures += 1
+        refs: dict[str, Any] = {}
+        for field in ("inputArtifact", "authorityArtifact", "actualArtifact", "supportingArtifact"):
+            value, path = _artifact_ref_value(case.get(field), bundle_root=bundle_root, output_paths=output_paths, output_roles=output_roles, diagnostics=diagnostics, report_path=case_path, label=f"case {case_id} {field}", forbid_source_roles=field != "supportingArtifact")
+            refs[field] = (value, path)
+        authority_ref = case.get("authorityArtifact")
+        actual_ref = case.get("actualArtifact")
+        if isinstance(authority_ref, dict) and isinstance(actual_ref, dict) and authority_ref.get("path") == actual_ref.get("path"):
+            _add(diagnostics, "PRODUCER_CASE_SAME_ARTIFACT", f"case {case_id} uses the same authority and actual artifact", case_path)
+            case_failures += 1
+        support_ref = case.get("supportingArtifact")
+        if isinstance(support_ref, dict) and isinstance(authority_ref, dict) and isinstance(actual_ref, dict) and support_ref.get("path") in {authority_ref.get("path"), actual_ref.get("path")}:
+            _add(diagnostics, "PRODUCER_CASE_SUPPORT_SAME_ARTIFACT", f"case {case_id} support is not a separate artifact", case_path)
+            case_failures += 1
+        expected_value = _semantic_value(refs["authorityArtifact"][0], authority_ref if isinstance(authority_ref, dict) else {})
+        actual_value = _semantic_value(refs["actualArtifact"][0], actual_ref if isinstance(actual_ref, dict) else {})
+        if not _same_json(case.get("expected"), expected_value):
+            _add(diagnostics, "PRODUCER_EXPECTED_MISMATCH", f"case {case_id} expected value is not from the authority artifact", case_path)
+            case_failures += 1
+        if not _same_json(case.get("actual"), actual_value):
+            _add(diagnostics, "PRODUCER_ACTUAL_MISMATCH", f"case {case_id} actual value is not from the actual artifact", case_path)
+            case_failures += 1
+        evaluated = _evaluate_registered_assertion("json-value-equals" if _comparison_operator(case.get("comparison")) == "equal" else "json-value-not-equals" if _comparison_operator(case.get("comparison")) == "not-equal" else "artifact-contains", expected_value, actual_value, case.get("comparison"))
+        expected_result = "passed" if evaluated else "failed"
+        if evaluated is None:
+            _add(diagnostics, "PRODUCER_CASE_EVALUATOR", f"case {case_id} has no registered evaluator for its comparison", case_path)
+            case_failures += 1
+        if case.get("result") != expected_result:
+            _add(diagnostics, "PRODUCER_CASE_RESULT_MISMATCH", f"case {case_id} result is self-attested and does not match recomputation", case_path)
+            case_failures += 1
+        _support_record(refs["supportingArtifact"][0], assertion_id=case_id, case_id=case_id, actual_value=actual_value, target=case.get("target"), diagnostics=diagnostics, report_path=case_path)
+
+    if "positive" not in classifications or not ({"negative", "mutation"} & classifications):
+        _add(diagnostics, "PRODUCER_CASE_COVERAGE", "producer report requires positive and negative/mutation cases", report_path)
+        case_failures += 1
+
+    assertions = producer.get("assertions") if isinstance(producer.get("assertions"), list) else []
+    assertion_ids: set[str] = set()
+    referenced_cases: set[str] = set()
+    assertion_failures = 0
+    allowed_types = allowed_producer_assertion_types(issue_numbers)
+    for index, assertion in enumerate(assertions):
+        assertion_path = f"{report_path}#/assertions/{index}"
+        if not isinstance(assertion, dict):
+            _add(diagnostics, "PRODUCER_ASSERTION_ENTRY", "producer assertion must be an object", assertion_path)
+            assertion_failures += 1
+            continue
+        missing = sorted(PRODUCER_ASSERTION_REQUIRED_FIELDS - set(assertion))
+        extra = sorted(set(assertion) - PRODUCER_ASSERTION_ALLOWED_FIELDS)
+        if missing:
+            _add(diagnostics, "PRODUCER_ASSERTION_REQUIRED_FIELDS", "producer assertion is missing: " + ", ".join(missing), assertion_path)
+            assertion_failures += len(missing)
+        if extra:
+            _add(diagnostics, "PRODUCER_ASSERTION_UNKNOWN_FIELDS", "producer assertion has unknown fields: " + ", ".join(extra), assertion_path)
+            assertion_failures += 1
+        assertion_id = assertion.get("assertionId")
+        if not isinstance(assertion_id, str) or not ID.fullmatch(assertion_id) or assertion_id in assertion_ids:
+            _add(diagnostics, "PRODUCER_ASSERTION_ID", f"producer assertionId is missing or duplicated: {assertion_id!r}", assertion_path)
+            assertion_failures += 1
+            continue
+        assertion_ids.add(assertion_id)
+        assertion_type = assertion.get("assertionType")
+        if assertion_type not in ASSERTION_EVALUATOR_REGISTRY or assertion_type not in allowed_types:
+            _add(diagnostics, "PRODUCER_ASSERTION_TYPE", f"unknown or disallowed assertion evaluator: {assertion_type!r}", assertion_path)
+            assertion_failures += 1
+        case_id = assertion.get("testCaseId")
+        referenced_cases.add(str(case_id))
+        if case_id not in case_by_id:
+            _add(diagnostics, "PRODUCER_ASSERTION_CASE", f"assertion {assertion_id} references no producer case: {case_id!r}", assertion_path)
+            assertion_failures += 1
+        if assertion.get("requirementId") not in requirement_ids:
+            _add(diagnostics, "PRODUCER_ASSERTION_REQUIREMENT", f"assertion {assertion_id} is not requirement-specific", assertion_path)
+            assertion_failures += 1
+        if assertion.get("classification") not in CLASSIFICATIONS:
+            _add(diagnostics, "PRODUCER_ASSERTION_CLASSIFICATION", f"assertion {assertion_id} has invalid classification", assertion_path)
+            assertion_failures += 1
+        refs: dict[str, Any] = {}
+        for field in ("authorityArtifact", "actualArtifact", "supportingArtifact"):
+            value, path = _artifact_ref_value(assertion.get(field), bundle_root=bundle_root, output_paths=output_paths, output_roles=output_roles, diagnostics=diagnostics, report_path=assertion_path, label=f"assertion {assertion_id} {field}", forbid_source_roles=field != "supportingArtifact")
+            refs[field] = (value, path)
+        authority_ref = assertion.get("authorityArtifact")
+        actual_ref = assertion.get("actualArtifact")
+        if isinstance(authority_ref, dict) and isinstance(actual_ref, dict) and authority_ref.get("path") == actual_ref.get("path"):
+            _add(diagnostics, "PRODUCER_ASSERTION_SAME_ARTIFACT", f"assertion {assertion_id} uses the same authority and actual artifact", assertion_path)
+            assertion_failures += 1
+        support_ref = assertion.get("supportingArtifact")
+        if isinstance(support_ref, dict) and isinstance(authority_ref, dict) and isinstance(actual_ref, dict) and support_ref.get("path") in {authority_ref.get("path"), actual_ref.get("path")}:
+            _add(diagnostics, "PRODUCER_ASSERTION_SUPPORT_SAME_ARTIFACT", f"assertion {assertion_id} support is not a separate artifact", assertion_path)
+            assertion_failures += 1
+        expected_value = _semantic_value(refs["authorityArtifact"][0], authority_ref if isinstance(authority_ref, dict) else {})
+        actual_value = _semantic_value(refs["actualArtifact"][0], actual_ref if isinstance(actual_ref, dict) else {})
+        if not _same_json(assertion.get("expected"), expected_value):
+            _add(diagnostics, "PRODUCER_EXPECTED_MISMATCH", f"assertion {assertion_id} expected value is not from the authority artifact", assertion_path)
+            assertion_failures += 1
+        if not _same_json(assertion.get("actual"), actual_value):
+            _add(diagnostics, "PRODUCER_ACTUAL_MISMATCH", f"assertion {assertion_id} actual value is not from the actual artifact", assertion_path)
+            assertion_failures += 1
+        evaluated = _evaluate_registered_assertion(assertion_type, expected_value, actual_value, assertion.get("comparison"))
+        expected_status = "passed" if evaluated is True else "failed"
+        if evaluated is None:
+            _add(diagnostics, "ASSERTION_EVALUATOR_MISSING", f"assertion {assertion_id} has no independent evaluator", assertion_path)
+            assertion_failures += 1
+        if assertion.get("status") != expected_status:
+            _add(diagnostics, "ASSERTION_STATUS_MISMATCH", f"assertion {assertion_id} status is self-attested and does not match recomputation", assertion_path)
+            assertion_failures += 1
+        _support_record(refs["supportingArtifact"][0], assertion_id=assertion_id, case_id=str(case_id), actual_value=actual_value, target=assertion.get("target"), diagnostics=diagnostics, report_path=assertion_path)
+
+    if set(case_by_id) != referenced_cases:
+        _add(diagnostics, "PRODUCER_CASE_ASSERTION_COVERAGE", "every producer case must be represented by a requirement assertion", report_path)
+        assertion_failures += 1
+    recomputed_failures = assertion_failures + case_failures
+    if producer.get("failureCount") != recomputed_failures:
+        _add(diagnostics, "PRODUCER_FAILURE_COUNT", f"producer failureCount {producer.get('failureCount')!r} does not match recomputation {recomputed_failures}", report_path)
+    if producer.get("status") != "passed" or recomputed_failures:
+        _add(diagnostics, "PRODUCER_STATUS", "producer report is not independently passed", report_path)
+
+
 def _validate_evidence(
     report: Any,
     report_path: str,
@@ -515,6 +878,7 @@ def _validate_evidence(
 
     output_digests: set[str] = set()
     output_paths: set[str] = set()
+    output_roles: dict[str, str] = {}
     outputs = report.get("outputs")
     if not isinstance(outputs, list) or not outputs:
         _add(diagnostics, "OUTPUTS_REQUIRED", "Evidence outputs must be a non-empty array", report_path)
@@ -536,6 +900,8 @@ def _validate_evidence(
         if path in output_paths:
             _add(diagnostics, "DUPLICATE_OUTPUT", f"Evidence output is listed more than once: {path}", report_path)
         output_paths.add(path)
+        if isinstance(item.get("role"), str):
+            output_roles[path] = item["role"]
         target = _resolve_relative(bundle_root, path)
         if not target.is_file():
             _add(diagnostics, "OUTPUT_MISSING", f"Evidence output is missing: {path}", report_path)
@@ -555,87 +921,169 @@ def _validate_evidence(
         if not isinstance(item.get("mediaType"), str) or not item["mediaType"] or not isinstance(item.get("role"), str) or not item["role"]:
             _add(diagnostics, "OUTPUT_METADATA", f"Evidence output mediaType and role are required: {path}", report_path)
 
+    producer_binding = report.get("producerReport")
+    if not isinstance(producer_binding, dict):
+        _add(diagnostics, "PRODUCER_REPORT_BINDING", "Evidence producerReport binding is required", report_path)
+    else:
+        required_binding = {"path", "sha256", "schema", "version", "evidenceId", "requirementIds"}
+        missing_binding = sorted(required_binding - set(producer_binding))
+        extra_binding = sorted(set(producer_binding) - required_binding)
+        if missing_binding:
+            _add(diagnostics, "PRODUCER_REPORT_BINDING", "producerReport is missing: " + ", ".join(missing_binding), report_path)
+        if extra_binding:
+            _add(diagnostics, "PRODUCER_REPORT_BINDING", "producerReport has unknown fields: " + ", ".join(extra_binding), report_path)
+        producer_path = producer_binding.get("path")
+        if not isinstance(producer_path, str) or producer_path not in output_paths or output_roles.get(producer_path, "").casefold() != PRODUCER_REPORT_OUTPUT_ROLE:
+            _add(diagnostics, "PRODUCER_REPORT_BINDING", "producerReport must resolve to exactly one output with role producer-report", report_path)
+        else:
+            producer_file = _resolve_relative(bundle_root, producer_path)
+            if not producer_file.is_file():
+                _add(diagnostics, "PRODUCER_REPORT_MISSING", f"producer report output is missing: {producer_path}", report_path)
+                producer_value = None
+            else:
+                try:
+                    producer_value = load_json(producer_file)
+                except (OSError, json.JSONDecodeError) as exc:
+                    _add(diagnostics, "PRODUCER_REPORT_JSON", f"cannot load producer report {producer_path}: {exc}", report_path)
+                    producer_value = None
+            if producer_binding.get("schema") != PRODUCER_REPORT_SCHEMA or producer_binding.get("version") != PRODUCER_REPORT_VERSION:
+                _add(diagnostics, "PRODUCER_REPORT_BINDING", "producerReport schema/version is invalid", report_path)
+            if producer_binding.get("evidenceId") != evidence_id or producer_binding.get("requirementIds") != requirement_ids:
+                _add(diagnostics, "PRODUCER_REPORT_BINDING", "producerReport binding does not match the Evidence root", report_path)
+            if producer_file.is_file():
+                actual_producer_digest = sha256_file(producer_file)
+                if producer_binding.get("sha256") != actual_producer_digest:
+                    _add(diagnostics, "PRODUCER_REPORT_DIGEST_MISMATCH", "producerReport digest does not match the copied artifact", report_path)
+            _validate_producer_report(
+                producer_value,
+                evidence_id=evidence_id,
+                issue_numbers=issue_numbers,
+                requirement_ids=requirement_ids,
+                source_sha=str(manifest.get("sourceSha", "")),
+                input_digests=input_digests,
+                bundle_root=bundle_root,
+                output_paths=output_paths,
+                output_roles=output_roles,
+                diagnostics=diagnostics,
+                report_path=f"{report_path}#producerReport",
+            )
+
     assertions = report.get("assertions")
     assertion_failures = 0
     if not isinstance(assertions, list) or not assertions:
-        _add(diagnostics, "ASSERTIONS_REQUIRED", "Evidence assertions must be a non-empty array", report_path)
+        _add(diagnostics, "ASSERTIONS_REQUIRED", "Evidence packaging assertions must be a non-empty array", report_path)
         assertions = []
     assertion_ids: set[str] = set()
-    for item in assertions:
+    for index, item in enumerate(assertions):
+        assertion_path = f"{report_path}#/assertions/{index}"
         if not isinstance(item, dict):
-            _add(diagnostics, "ASSERTION_ENTRY", "Evidence assertion is not an object", report_path)
+            _add(diagnostics, "ASSERTION_ENTRY", "Evidence packaging assertion is not an object", assertion_path)
             assertion_failures += 1
             continue
-        missing = sorted({"assertionId", "expected", "actual", "status", "supportingOutput"} - set(item))
+        required = {"assertionId", "assertionType", "expected", "actual", "status", "supportingOutput"}
+        missing = sorted(required - set(item))
+        extra = sorted(set(item) - required)
         if missing:
-            _add(diagnostics, "ASSERTION_REQUIRED_FIELDS", "Evidence assertion is missing: " + ", ".join(missing), report_path)
+            _add(diagnostics, "ASSERTION_REQUIRED_FIELDS", "Evidence packaging assertion is missing: " + ", ".join(missing), assertion_path)
             assertion_failures += len(missing)
-        extra = sorted(set(item) - {"assertionId", "expected", "actual", "status", "supportingOutput"})
         if extra:
-            _add(diagnostics, "ASSERTION_UNKNOWN_FIELDS", "Evidence assertion has unknown fields: " + ", ".join(extra), report_path)
+            _add(diagnostics, "ASSERTION_UNKNOWN_FIELDS", "Evidence packaging assertion has unknown fields: " + ", ".join(extra), assertion_path)
             assertion_failures += 1
         assertion_id = item.get("assertionId")
         if not isinstance(assertion_id, str) or not ID.fullmatch(assertion_id):
-            _add(diagnostics, "ASSERTION_ID", "Evidence assertionId is invalid", report_path)
+            _add(diagnostics, "ASSERTION_ID", "Evidence packaging assertionId is invalid", assertion_path)
+            assertion_failures += 1
         elif assertion_id in assertion_ids:
-            _add(diagnostics, "DUPLICATE_ASSERTION_ID", f"assertionId is repeated: {assertion_id}", report_path)
+            _add(diagnostics, "DUPLICATE_ASSERTION_ID", f"assertionId is repeated: {assertion_id}", assertion_path)
+            assertion_failures += 1
         assertion_ids.add(str(assertion_id))
-        if not _same_json(item.get("expected"), item.get("actual")):
-            _add(diagnostics, "ASSERTION_MISMATCH", f"assertion does not match expected value: {assertion_id}", report_path)
+        assertion_type = item.get("assertionType")
+        if assertion_type not in PACKAGING_ASSERTION_TYPES:
+            _add(diagnostics, "PACKAGING_ASSERTION_TYPE", f"requirement assertion cannot be manufactured by the bundle: {assertion_type!r}", assertion_path)
+            assertion_failures += 1
+        support_value, _ = _artifact_ref_value(item.get("supportingOutput"), bundle_root=bundle_root, output_paths=output_paths, output_roles=output_roles, diagnostics=diagnostics, report_path=assertion_path, label=f"packaging assertion {assertion_id} support")
+        recomputed_expected = item.get("expected")
+        recomputed_actual = item.get("actual")
+        producer_path = producer_binding.get("path") if isinstance(producer_binding, dict) else None
+        producer_file = _resolve_relative(bundle_root, producer_path) if isinstance(producer_path, str) and _safe_relative(producer_path) else None
+        producer_value = None
+        if producer_file is not None and producer_file.is_file():
+            try:
+                producer_value = load_json(producer_file)
+            except (OSError, json.JSONDecodeError):
+                producer_value = None
+        if assertion_type == "producer-report-digest" and producer_file is not None and producer_file.is_file():
+            recomputed_expected = producer_binding.get("sha256")
+            recomputed_actual = sha256_file(producer_file)
+        elif assertion_type == "producer-report-source-binding" and isinstance(producer_value, dict):
+            recomputed_expected = manifest.get("sourceSha")
+            recomputed_actual = producer_value.get("sourceSha")
+        elif assertion_type == "output-digest-binding":
+            recomputed_actual = {path: sha256_file(_resolve_relative(bundle_root, path)) for path in sorted(output_paths) if _resolve_relative(bundle_root, path).is_file()}
+            recomputed_expected = item.get("expected")
+        elif assertion_type == "manifest-completeness":
+            recomputed_actual = sorted(output_paths)
+            recomputed_expected = sorted(item.get("expected", [])) if isinstance(item.get("expected"), list) else item.get("expected")
+        elif assertion_type == "command-metadata":
+            recomputed_expected = item.get("expected")
+            recomputed_actual = report.get("command")
+        if not _same_json(item.get("expected"), recomputed_expected) or not _same_json(item.get("actual"), recomputed_actual):
+            _add(diagnostics, "ASSERTION_RECOMPUTE_MISMATCH", f"packaging assertion {assertion_id} does not match independent recomputation", assertion_path)
+            _add(diagnostics, "ASSERTION_MISMATCH", f"assertion does not match recomputed packaging value: {assertion_id}", assertion_path)
             assertion_failures += 1
         if item.get("status") != "passed":
-            _add(diagnostics, "ASSERTION_FAILED", f"assertion is not passed: {assertion_id}", report_path)
+            _add(diagnostics, "ASSERTION_FAILED", f"packaging assertion is not passed: {assertion_id}", assertion_path)
             assertion_failures += 1
-        supporting = item.get("supportingOutput")
-        if not isinstance(supporting, dict):
-            _add(diagnostics, "ASSERTION_SUPPORT", f"assertion has no supporting output: {assertion_id}", report_path)
-            assertion_failures += 1
-            continue
-        support_path = supporting.get("path")
-        if support_path not in output_paths:
-            _add(diagnostics, "ASSERTION_SUPPORT", f"assertion support is not a declared output: {support_path}", report_path)
-            assertion_failures += 1
-            continue
-        support_file = _resolve_relative(bundle_root, support_path)
-        start, end = supporting.get("lineStart"), supporting.get("lineEnd")
-        if not isinstance(start, int) or not isinstance(end, int) or start < 1 or end < start or end > _line_count(support_file):
-            _add(diagnostics, "ASSERTION_OUTPUT_RANGE", f"assertion support range is invalid: {support_path}", report_path)
+        if support_value is None:
             assertion_failures += 1
 
     test_cases = report.get("testCases")
     testcase_failures = 0
     if not isinstance(test_cases, list) or not test_cases:
-        _add(diagnostics, "TEST_CASES_REQUIRED", "Evidence testCases must be a non-empty array", report_path)
+        _add(diagnostics, "TEST_CASES_REQUIRED", "Evidence packaging testCases must be a non-empty array", report_path)
         test_cases = []
     testcase_ids: set[str] = set()
-    for item in test_cases:
+    for index, item in enumerate(test_cases):
+        case_path = f"{report_path}#/testCases/{index}"
         if not isinstance(item, dict):
-            _add(diagnostics, "TEST_CASE_ENTRY", "Evidence testCase is not an object", report_path)
+            _add(diagnostics, "TEST_CASE_ENTRY", "Evidence packaging testCase is not an object", case_path)
             testcase_failures += 1
             continue
-        missing = sorted({"caseId", "oracle", "inputDigest", "result"} - set(item))
+        required = {"caseId", "caseType", "inputDigest", "actualArtifact", "expected", "actual", "comparison", "result"}
+        missing = sorted(required - set(item))
+        extra = sorted(set(item) - required)
         if missing:
-            _add(diagnostics, "TEST_CASE_REQUIRED_FIELDS", "Evidence testCase is missing: " + ", ".join(missing), report_path)
+            _add(diagnostics, "TEST_CASE_REQUIRED_FIELDS", "Evidence packaging testCase is missing: " + ", ".join(missing), case_path)
             testcase_failures += len(missing)
-        extra = sorted(set(item) - {"caseId", "oracle", "inputDigest", "result"})
         if extra:
-            _add(diagnostics, "TEST_CASE_UNKNOWN_FIELDS", "Evidence testCase has unknown fields: " + ", ".join(extra), report_path)
+            _add(diagnostics, "TEST_CASE_UNKNOWN_FIELDS", "Evidence packaging testCase has unknown fields: " + ", ".join(extra), case_path)
             testcase_failures += 1
         case_id = item.get("caseId")
         if not isinstance(case_id, str) or not ID.fullmatch(case_id):
-            _add(diagnostics, "TEST_CASE_ID", "testCase caseId is invalid", report_path)
+            _add(diagnostics, "TEST_CASE_ID", "packaging testCase caseId is invalid", case_path)
+            testcase_failures += 1
         elif case_id in testcase_ids:
-            _add(diagnostics, "DUPLICATE_TEST_CASE_ID", f"caseId is repeated: {case_id}", report_path)
+            _add(diagnostics, "DUPLICATE_TEST_CASE_ID", f"caseId is repeated: {case_id}", case_path)
+            testcase_failures += 1
         testcase_ids.add(str(case_id))
-        if not isinstance(item.get("oracle"), str) or not item["oracle"]:
-            _add(diagnostics, "TEST_CASE_ORACLE", f"testCase oracle is missing: {case_id}", report_path)
         digest = item.get("inputDigest")
         if not SHA256.fullmatch(str(digest)):
-            _add(diagnostics, "TEST_CASE_INPUT_DIGEST", f"testCase inputDigest is invalid: {case_id}", report_path)
+            _add(diagnostics, "TEST_CASE_INPUT_DIGEST", f"packaging testCase inputDigest is invalid: {case_id}", case_path)
+            testcase_failures += 1
         elif digest not in input_digests:
-            _add(diagnostics, "TEST_CASE_INPUT_DIGEST_MISMATCH", f"testCase inputDigest is not one of the recomputed input digests: {case_id}", report_path)
+            _add(diagnostics, "TEST_CASE_INPUT_DIGEST_MISMATCH", f"packaging testCase inputDigest is not one of the recomputed input digests: {case_id}", case_path)
+            testcase_failures += 1
+        actual_value, _ = _artifact_ref_value(item.get("actualArtifact"), bundle_root=bundle_root, output_paths=output_paths, output_roles=output_roles, diagnostics=diagnostics, report_path=case_path, label=f"packaging case {case_id} actual")
+        actual_ref = item.get("actualArtifact") if isinstance(item.get("actualArtifact"), dict) else {}
+        recomputed = _semantic_value(actual_value, actual_ref)
+        if not _same_json(item.get("actual"), recomputed):
+            _add(diagnostics, "TEST_CASE_ACTUAL_MISMATCH", f"packaging case {case_id} actual is not recomputed from its artifact", case_path)
+            testcase_failures += 1
+        if not _same_json(item.get("expected"), recomputed) or _comparison_operator(item.get("comparison")) != "equal":
+            _add(diagnostics, "TEST_CASE_RECOMPUTE_MISMATCH", f"packaging case {case_id} is not an independently verified digest comparison", case_path)
+            testcase_failures += 1
         if item.get("result") != "passed":
-            _add(diagnostics, "TEST_CASE_FAILED", f"testCase is not passed: {case_id}", report_path)
+            _add(diagnostics, "TEST_CASE_FAILED", f"packaging testCase is not passed: {case_id}", case_path)
             testcase_failures += 1
 
     waivers = report.get("waivers")

@@ -8,7 +8,29 @@
       "version": "ECMA-376",
       "supportedFeatures": ["package-parts", "relationships", "paragraphs", "runs", "tables", "styles", "fields", "annotations", "revisions", "drawings", "resources", "source-maps"],
       "disposition": "preserve-or-diagnose",
-      "unknownConstructPolicy": "partial-with-diagnostic"
+      "unknownConstructPolicy": "partial-with-diagnostic",
+      "occurrenceAccounting": {
+        "version": "1.0.0",
+        "profileBound": true,
+        "completeEligibleDispositions": ["preserved", "normalized"],
+        "unknownConstructDisposition": "failed",
+        "requiredOccurrenceFields": ["sourceOccurrenceId", "formatProfileId", "sourceLocator", "constructId", "parentOccurrenceId", "sourceDigest", "tokenDigest", "policyRuleId", "evidenceCaseId"],
+        "requiredTestVectors": ["positive-supported", "unknown-construct", "handler-omission", "duplicate-accounting", "locator-identity", "missing-resource"],
+        "rules": [
+          {"id":"docx-occurrence-opc-content-type-declaration","constructId":"opc.content-type-declaration","support":"diagnosed","allowedDispositions":["preserved","normalized","omitted-by-policy","unsupported","failed"],"targetRequired":false,"diagnosticRequired":false,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"docx-occurrence-opc-extension-element","constructId":"opc.extension-element","support":"diagnosed","allowedDispositions":["preserved","normalized","unsupported","failed"],"targetRequired":true,"diagnosticRequired":false,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"docx-occurrence-opc-package-part","constructId":"opc.package-part","support":"supported","allowedDispositions":["preserved","normalized","omitted-by-policy","unsupported","failed"],"targetRequired":false,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"docx-occurrence-opc-relationship","constructId":"opc.relationship","support":"diagnosed","allowedDispositions":["preserved","normalized","unsupported","unavailable-observation","failed"],"targetRequired":true,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"docx-occurrence-opc-relationship-attribute","constructId":"opc.relationship-attribute","support":"diagnosed","allowedDispositions":["preserved","normalized","unsupported","failed"],"targetRequired":false,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"docx-occurrence-opc-resource-part","constructId":"opc.resource-part","support":"supported","allowedDispositions":["preserved","normalized"],"targetRequired":true,"diagnosticRequired":false,"requiredDiagnosticCode":null},
+          {"id":"docx-occurrence-opc-unreadable-input","constructId":"opc.unreadable-input","support":"diagnosed","allowedDispositions":["failed"],"targetRequired":false,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"docx-occurrence-opc-xml-attribute","constructId":"opc.xml-attribute","support":"diagnosed","allowedDispositions":["preserved","normalized","omitted-by-policy","unsupported","approximated","ambiguous","failed"],"targetRequired":false,"diagnosticRequired":false,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"docx-occurrence-opc-xml-comment","constructId":"opc.xml-comment","support":"diagnosed","allowedDispositions":["omitted-by-policy","unsupported","failed"],"targetRequired":false,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"docx-occurrence-opc-xml-element","constructId":"opc.xml-element","support":"diagnosed","allowedDispositions":["preserved","normalized","omitted-by-policy","unsupported","approximated","ambiguous","failed"],"targetRequired":false,"diagnosticRequired":false,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"docx-occurrence-opc-xml-parse-failure","constructId":"opc.xml-parse-failure","support":"diagnosed","allowedDispositions":["failed"],"targetRequired":false,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"docx-occurrence-opc-xml-text","constructId":"opc.xml-text","support":"diagnosed","allowedDispositions":["preserved","normalized","omitted-by-policy","unsupported","approximated","ambiguous","failed"],"targetRequired":false,"diagnosticRequired":false,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"}
+        ]
+      }
     },
     {
       "id": "format:xlsx:Office Open XML:1",
@@ -17,7 +39,29 @@
       "supportedFeatures": ["package-parts", "relationships", "workbook", "worksheets", "cells", "formulas", "values", "styles", "tables", "conditional-formatting", "grids", "source-maps"],
       "exactnessLanes": ["stored-value", "formula", "cached-value", "computed-value", "displayed-value", "date-system", "relationship-graph"],
       "disposition": "preserve-or-diagnose",
-      "unknownConstructPolicy": "partial-with-diagnostic"
+      "unknownConstructPolicy": "partial-with-diagnostic",
+      "occurrenceAccounting": {
+        "version": "1.0.0",
+        "profileBound": true,
+        "completeEligibleDispositions": ["preserved", "normalized"],
+        "unknownConstructDisposition": "failed",
+        "requiredOccurrenceFields": ["sourceOccurrenceId", "formatProfileId", "sourceLocator", "constructId", "parentOccurrenceId", "sourceDigest", "tokenDigest", "policyRuleId", "evidenceCaseId"],
+        "requiredTestVectors": ["positive-supported", "unknown-construct", "handler-omission", "duplicate-accounting", "locator-identity", "missing-resource"],
+        "rules": [
+          {"id":"xlsx-occurrence-opc-content-type-declaration","constructId":"opc.content-type-declaration","support":"diagnosed","allowedDispositions":["preserved","normalized","omitted-by-policy","unsupported","failed"],"targetRequired":false,"diagnosticRequired":false,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"xlsx-occurrence-opc-extension-element","constructId":"opc.extension-element","support":"diagnosed","allowedDispositions":["preserved","normalized","unsupported","failed"],"targetRequired":true,"diagnosticRequired":false,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"xlsx-occurrence-opc-package-part","constructId":"opc.package-part","support":"supported","allowedDispositions":["preserved","normalized","omitted-by-policy","unsupported","failed"],"targetRequired":false,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"xlsx-occurrence-opc-relationship","constructId":"opc.relationship","support":"diagnosed","allowedDispositions":["preserved","normalized","unsupported","unavailable-observation","failed"],"targetRequired":true,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"xlsx-occurrence-opc-relationship-attribute","constructId":"opc.relationship-attribute","support":"diagnosed","allowedDispositions":["preserved","normalized","unsupported","failed"],"targetRequired":false,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"xlsx-occurrence-opc-resource-part","constructId":"opc.resource-part","support":"supported","allowedDispositions":["preserved","normalized"],"targetRequired":true,"diagnosticRequired":false,"requiredDiagnosticCode":null},
+          {"id":"xlsx-occurrence-opc-unreadable-input","constructId":"opc.unreadable-input","support":"diagnosed","allowedDispositions":["failed"],"targetRequired":false,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"xlsx-occurrence-opc-xml-attribute","constructId":"opc.xml-attribute","support":"diagnosed","allowedDispositions":["preserved","normalized","omitted-by-policy","unsupported","approximated","ambiguous","failed"],"targetRequired":false,"diagnosticRequired":false,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"xlsx-occurrence-opc-xml-comment","constructId":"opc.xml-comment","support":"diagnosed","allowedDispositions":["omitted-by-policy","unsupported","failed"],"targetRequired":false,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"xlsx-occurrence-opc-xml-element","constructId":"opc.xml-element","support":"diagnosed","allowedDispositions":["preserved","normalized","omitted-by-policy","unsupported","approximated","ambiguous","failed"],"targetRequired":false,"diagnosticRequired":false,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"xlsx-occurrence-opc-xml-parse-failure","constructId":"opc.xml-parse-failure","support":"diagnosed","allowedDispositions":["failed"],"targetRequired":false,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"xlsx-occurrence-opc-xml-text","constructId":"opc.xml-text","support":"diagnosed","allowedDispositions":["preserved","normalized","omitted-by-policy","unsupported","approximated","ambiguous","failed"],"targetRequired":false,"diagnosticRequired":false,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"}
+        ]
+      }
     },
     {
       "id": "format:pdf:1.7:1",
@@ -26,7 +70,30 @@
       "supportedFeatures": ["pages", "text", "glyph-codes", "paths", "clipping", "paint-order", "graphics-state", "font-mapping", "resources", "annotations", "source-maps"],
       "exactnessLanes": ["indirect-object", "content-operator", "graphics-state", "font-mapping", "glyph-geometry"],
       "disposition": "preserve-or-diagnose",
-      "unknownConstructPolicy": "partial-with-diagnostic"
+      "unknownConstructPolicy": "partial-with-diagnostic",
+      "occurrenceAccounting": {
+        "version": "1.0.0",
+        "profileBound": true,
+        "completeEligibleDispositions": ["preserved", "normalized"],
+        "unknownConstructDisposition": "failed",
+        "requiredOccurrenceFields": ["sourceOccurrenceId", "formatProfileId", "sourceLocator", "constructId", "parentOccurrenceId", "sourceDigest", "tokenDigest", "policyRuleId", "evidenceCaseId"],
+        "requiredTestVectors": ["positive-supported", "unknown-construct", "handler-omission", "duplicate-accounting", "locator-identity", "missing-resource"],
+        "rules": [
+          {"id":"pdf-occurrence-pdf-annotation-action","constructId":"pdf.annotation-action","support":"diagnosed","allowedDispositions":["preserved","normalized","unsupported","ambiguous","failed"],"targetRequired":true,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"pdf-occurrence-pdf-content-operator","constructId":"pdf.content-operator","support":"supported","allowedDispositions":["preserved","normalized","approximated","unsupported","failed"],"targetRequired":true,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"pdf-occurrence-pdf-encryption-filter","constructId":"pdf.encryption-filter","support":"diagnosed","allowedDispositions":["unavailable-observation","unsupported","failed"],"targetRequired":false,"diagnosticRequired":false,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"pdf-occurrence-pdf-font-cmap","constructId":"pdf.font-cmap","support":"diagnosed","allowedDispositions":["preserved","normalized","unavailable-observation","unsupported","failed"],"targetRequired":true,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"pdf-occurrence-pdf-indirect-object","constructId":"pdf.indirect-object","support":"supported","allowedDispositions":["preserved","normalized"],"targetRequired":true,"diagnosticRequired":false,"requiredDiagnosticCode":null},
+          {"id":"pdf-occurrence-pdf-indirect-reference","constructId":"pdf.indirect-reference","support":"supported","allowedDispositions":["preserved","normalized","unsupported","unavailable-observation","failed"],"targetRequired":true,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"pdf-occurrence-pdf-inline-image","constructId":"pdf.inline-image","support":"diagnosed","allowedDispositions":["preserved","normalized","unsupported","failed"],"targetRequired":true,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"pdf-occurrence-pdf-invalid-sequence","constructId":"pdf.invalid-sequence","support":"diagnosed","allowedDispositions":["unsupported","ambiguous","failed"],"targetRequired":false,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"pdf-occurrence-pdf-page","constructId":"pdf.page","support":"supported","allowedDispositions":["preserved","normalized"],"targetRequired":true,"diagnosticRequired":false,"requiredDiagnosticCode":null},
+          {"id":"pdf-occurrence-pdf-resource-entry","constructId":"pdf.resource-entry","support":"supported","allowedDispositions":["preserved","normalized","unsupported","failed"],"targetRequired":true,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"pdf-occurrence-pdf-revision","constructId":"pdf.revision","support":"diagnosed","allowedDispositions":["unavailable-observation","unsupported","failed"],"targetRequired":false,"diagnosticRequired":false,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"pdf-occurrence-pdf-unreadable-input","constructId":"pdf.unreadable-input","support":"diagnosed","allowedDispositions":["failed"],"targetRequired":false,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"pdf-occurrence-pdf-xref-entry","constructId":"pdf.xref-entry","support":"diagnosed","allowedDispositions":["preserved","normalized","unavailable-observation","failed"],"targetRequired":false,"diagnosticRequired":false,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"}
+        ]
+      }
     },
     {
       "id": "format:markdown:commonmark:1",
@@ -34,12 +101,51 @@
       "version": "commonmark",
       "supportedFeatures": ["blocks", "inline", "links", "images", "tables", "lists", "footnotes", "front-matter", "authoring", "source-maps"],
       "dialect": {
-        "name": "commonmark",
-        "extensions": ["gfm-tables", "front-matter", "raw-html"],
-        "parserLanes": ["block-state-machine", "inline-token-stream", "source-span", "resource-resolution"]
+        "name": "fdir-commonmark-bounded",
+        "baseSpec": "CommonMark",
+        "baseSpecVersion": "0.31.2",
+        "extensions": ["gfm-tables", "front-matter", "raw-html", "footnotes"],
+        "extensionVersions": {"gfm-tables": "0.29-gfm", "front-matter": "fdir-yaml-scalar-1", "raw-html": "CommonMark-0.31.2", "footnotes": "fdir-footnote-1"},
+        "gfm": {"tables": "enabled", "taskLists": "disabled", "strikethrough": "disabled", "autolink": "disabled"},
+        "frontMatter": {"syntax": "yaml-scalar", "opening": "exact-line-1:---", "closing": "exact---", "requiresScalarEntry": true, "ambiguousWithoutClosing": "thematic-break"},
+        "rawHtml": {"policy": "preserve-source-no-execute", "blockStatus": "unsupported-with-diagnostic"},
+        "sourceSpan": {"unit": "utf-8-byte-and-unicode-code-point", "end": "exclusive", "columns": "unicode-code-point", "lineEndings": ["LF", "CRLF", "CR"], "tabs": "one-code-point-column-no-expansion", "normalization": "none"},
+        "constructPolicy": [
+          {"construct": "gfm.table-separator", "status": "metadata-not-data-row"},
+          {"construct": "commonmark.setext-heading", "status": "preserved"},
+          {"construct": "commonmark.thematic-break", "status": "preserved"},
+          {"construct": "markdown.reference-definition-use", "status": "relation-closed"},
+          {"construct": "gfm.task-list", "status": "unsupported-with-diagnostic"},
+          {"construct": "gfm.strikethrough", "status": "unsupported-with-diagnostic"},
+          {"construct": "commonmark.indented-code", "status": "unsupported-with-diagnostic"},
+          {"construct": "directive", "status": "unsupported-with-diagnostic"}
+        ],
+        "parserLanes": ["bounded-block-parser", "bounded-inline-token-stream", "byte-and-code-point-source-span", "authored-resource-relation"]
       },
       "disposition": "preserve-or-diagnose",
-      "unknownConstructPolicy": "partial-with-diagnostic"
+      "unknownConstructPolicy": "partial-with-diagnostic",
+      "occurrenceAccounting": {
+        "version": "1.0.0",
+        "profileBound": true,
+        "completeEligibleDispositions": ["preserved", "normalized"],
+        "unknownConstructDisposition": "failed",
+        "requiredOccurrenceFields": ["sourceOccurrenceId", "formatProfileId", "sourceLocator", "constructId", "parentOccurrenceId", "sourceDigest", "tokenDigest", "policyRuleId", "evidenceCaseId"],
+        "requiredTestVectors": ["positive-supported", "unknown-construct", "handler-omission", "duplicate-accounting", "locator-identity", "missing-resource"],
+        "rules": [
+          {"id":"markdown-occurrence-markdown-block","constructId":"markdown.block","support":"supported","allowedDispositions":["preserved","normalized"],"targetRequired":true,"diagnosticRequired":false,"requiredDiagnosticCode":null},
+          {"id":"markdown-occurrence-markdown-delimiter","constructId":"markdown.delimiter","support":"supported","allowedDispositions":["preserved","normalized","unsupported","ambiguous","failed"],"targetRequired":true,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"markdown-occurrence-markdown-dialect-extension","constructId":"markdown.dialect-extension","support":"diagnosed","allowedDispositions":["unsupported","approximated","ambiguous","failed"],"targetRequired":false,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"markdown-occurrence-markdown-entity","constructId":"markdown.entity","support":"supported","allowedDispositions":["preserved","normalized","unsupported","failed"],"targetRequired":true,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"markdown-occurrence-markdown-escape","constructId":"markdown.escape","support":"supported","allowedDispositions":["preserved","normalized"],"targetRequired":true,"diagnosticRequired":false,"requiredDiagnosticCode":null},
+          {"id":"markdown-occurrence-markdown-inline-token","constructId":"markdown.inline-token","support":"supported","allowedDispositions":["preserved","normalized"],"targetRequired":true,"diagnosticRequired":false,"requiredDiagnosticCode":null},
+          {"id":"markdown-occurrence-markdown-invalid-sequence","constructId":"markdown.invalid-sequence","support":"diagnosed","allowedDispositions":["unsupported","ambiguous","failed"],"targetRequired":false,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"markdown-occurrence-markdown-raw-html","constructId":"markdown.raw-html","support":"diagnosed","allowedDispositions":["preserved","normalized","unsupported","failed"],"targetRequired":true,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"markdown-occurrence-markdown-reference-definition","constructId":"markdown.reference-definition","support":"supported","allowedDispositions":["preserved","normalized","unsupported","failed"],"targetRequired":true,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"markdown-occurrence-markdown-reference-use","constructId":"markdown.reference-use","support":"supported","allowedDispositions":["preserved","normalized","unsupported","failed"],"targetRequired":true,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
+          {"id":"markdown-occurrence-markdown-source-span","constructId":"markdown.source-span","support":"supported","allowedDispositions":["preserved","normalized"],"targetRequired":true,"diagnosticRequired":false,"requiredDiagnosticCode":null},
+          {"id":"markdown-occurrence-markdown-unreadable-input","constructId":"markdown.unreadable-input","support":"diagnosed","allowedDispositions":["failed"],"targetRequired":false,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"}
+        ]
+      }
     }
   ],
   "statusContract": {

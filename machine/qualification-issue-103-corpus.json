@@ -1,0 +1,81 @@
+{
+  "schema": "fdir/issue-103-query-index-corpus",
+  "version": "1.0.0",
+  "issueNumber": 103,
+  "qualificationScope": "bounded-independent-query-index-oracle",
+  "oracle": {
+    "expectedValuesAreRuntimeIndependent": true,
+    "expectedFactsAreHandReviewed": true,
+    "expectedFactsGeneratedFromCollectionKeys": false,
+    "directAndIndexUsedToGenerateExpected": false
+  },
+  "reportNames": [
+    "query-field-coverage.json",
+    "direct-oracle-conformance.json",
+    "index-oracle-conformance.json",
+    "direct-index-parity.json",
+    "reverse-reference-closure.json",
+    "index-version-integrity.json",
+    "query-resource-limits.json"
+  ],
+  "fixtures": [
+    {
+      "id": "callout",
+      "path": "examples/callout.json",
+      "kind": "json-ir",
+      "expectedDocumentId": "doc-callout"
+    },
+    {
+      "id": "cell-formula-null-lane",
+      "path": "examples/cell-formula.json",
+      "kind": "json-ir",
+      "expectedDocumentId": "doc-cell",
+      "mutation": {
+        "nodeId": "cell-b2",
+        "pointer": "/value",
+        "value": {
+          "type": "blank",
+          "value": null,
+          "status": "preserved"
+        }
+      }
+    }
+  ],
+  "expectedFacts": [
+    {"caseId":"callout-node-kind","fixture":"callout","collection":"nodes","entityId":"node-callout","pointer":"/kind","value":"textBox"},
+    {"caseId":"callout-layout-ordinal","fixture":"callout","collection":"nodes","entityId":"node-callout","pointer":"/layoutIds/0","value":"layout-callout"},
+    {"caseId":"callout-z-index-integer","fixture":"callout","collection":"layouts","entityId":"layout-callout","pointer":"/zIndex","value":20},
+    {"caseId":"callout-geometry-width","fixture":"callout","collection":"geometries","entityId":"geometry-callout","pointer":"/primitives/0/width/value","value":"180"},
+    {"caseId":"callout-order-ordinal","fixture":"callout","collection":"orders","entityId":"order-paint","pointer":"/items/2/ordinal","value":2},
+    {"caseId":"callout-extension-payload","fixture":"callout","collection":"extensions","entityId":"extension-docx-callout","pointer":"/payload/presetGeometry","value":"wedgeRoundRectCallout"},
+    {"caseId":"callout-document-status","fixture":"callout","collection":"__document__","entityId":"doc-callout","pointer":"/conversion/status","value":"complete"},
+    {"caseId":"cell-null-value","fixture":"cell-formula-null-lane","collection":"nodes","entityId":"cell-b2","pointer":"/value/value","value":null}
+  ],
+  "expectedReferences": [
+    {"caseId":"callout-node-layout-ordinal","fixture":"callout","sourceCollection":"nodes","sourceId":"node-callout","pointer":"/layoutIds/0","targetCollection":"layouts","targetId":"layout-callout","ordinal":0},
+    {"caseId":"callout-layout-anchor","fixture":"callout","sourceCollection":"layouts","sourceId":"layout-callout","pointer":"/anchor/surfaceId","targetCollection":"surfaces","targetId":"surface-page-1","ordinal":null},
+    {"caseId":"callout-extension-target","fixture":"callout","sourceCollection":"extensions","sourceId":"extension-docx-callout","pointer":"/targetId","targetCollection":"nodes","targetId":"node-callout","ordinal":null},
+    {"caseId":"callout-document-root","fixture":"callout","sourceCollection":"__document__","sourceId":"doc-callout","pointer":"/rootNodeId","targetCollection":"nodes","targetId":"node-document","ordinal":null}
+  ],
+  "typedNegativeCases": [
+    {"caseId":"integer-is-not-string","fixture":"callout","collection":"layouts","pointer":"/zIndex","value":"20","operator":"eq","expectedMatch":false},
+    {"caseId":"null-is-not-missing","fixture":"cell-formula-null-lane","collection":"nodes","entityId":"cell-b2","pointer":"/value/value","operator":"is-missing","expectedMatch":false},
+    {"caseId":"unregistered-field-rejected","fixture":"callout","collection":"nodes","entityId":"node-callout","pointer":"/notRegistered","operator":"get-field","expectedRejection":true}
+  ],
+  "negativeCases": [
+    {"caseId":"stale-source-digest","expectedDiagnostic":"index content digest does not match current IR"},
+    {"caseId":"wrong-capability-profile","expectedDiagnostic":"unknown capability profile"},
+    {"caseId":"wrong-query-contract","expectedDiagnostic":"index contract digest is stale or wrong"},
+    {"caseId":"unsupported-newer-index-version","expectedDiagnostic":"unsupported index manifest schema/version"},
+    {"caseId":"manifest-digest-corruption","expectedDiagnostic":"index database digest mismatch"},
+    {"caseId":"deleted-index-row","expectedDiagnostic":"index database digest mismatch"},
+    {"caseId":"partial-index-write","expectedDiagnostic":"index database digest mismatch"},
+    {"caseId":"deleted-query-field-registration","expectedDiagnostic":"observed field path is absent from query contract"},
+    {"caseId":"changed-reference-ordinal","expectedDiagnostic":"index database digest mismatch"}
+  ],
+  "resourcePolicy": {
+    "maxPageSize": 1000,
+    "deterministicRepeatedQueryRequired": true,
+    "unboundedFullPayloadProjectionForbidden": true
+  }
+}

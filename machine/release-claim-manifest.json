@@ -15,7 +15,7 @@
       "requiredLiveState": "GitHub issue API or captured response with retrieval metadata"
     },
     "qualificationBinding": {
-      "status": "passed",
+      "status": "blocked",
       "manifestPath": "qualification/<source-sha>/manifest.json",
       "sourceShaPolicy": "exact-bundle-manifest",
       "requiredEvidenceIds": [

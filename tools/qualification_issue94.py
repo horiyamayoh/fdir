@@ -52,6 +52,11 @@ W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 WP_NS = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
 A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
 
+try:
+    from qualification_producer_report import write_producer_report
+except ImportError:  # pragma: no cover - package-style execution.
+    from tools.qualification_producer_report import write_producer_report
+
 
 class QualificationError(RuntimeError):
     """Raised when the independent qualification cannot be evaluated safely."""
@@ -1892,12 +1897,122 @@ def _run_adapter_integration(
     return adapter_cases_by_report, adapter_mutations_by_report
 
 
+def _producer_case_id(*parts: Any) -> str:
+    value = "-".join(str(part) for part in parts)
+    value = re.sub(r"[^A-Za-z0-9._:-]+", "-", value).strip("-")
+    return value[:120] or "case"
+
+
+def _producer_input_paths(corpus_path: Path) -> list[Path]:
+    return [
+        Path(corpus_path),
+        ROOT / "tools" / "qualification_issue94.py",
+        ROOT / "tools" / "test_qualification_issue94.py",
+        ROOT / "tools" / "adapter_docx.py",
+        ROOT / "tools" / "adapter_xlsx.py",
+        ROOT / "tools" / "adapter_pdf.py",
+        ROOT / "tools" / "adapter_markdown.py",
+    ]
+
+
+def _producer_rows(reports: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for report_kind, report in reports.items():
+        diagnostic = {
+            "code": f"ISSUE-94-{report_kind.upper()}",
+            "message": "issue #94 typed geometry/order authority and actual values are compared independently",
+        }
+        for assertion in report.get("assertions", []):
+            assertion_id = str(assertion.get("assertionId", assertion.get("id", "")))
+            if not assertion_id:
+                continue
+            expected = {"assertionId": assertion_id, "value": deepcopy(assertion.get("expected"))}
+            actual = {"assertionId": assertion_id, "value": deepcopy(assertion.get("actual"))}
+            rows.append({
+                "caseId": _producer_case_id("positive", report_kind, assertion_id),
+                "classification": "positive",
+                "evaluatorType": "geometry-order",
+                "input": {"reportKind": report_kind, "assertionId": assertion_id},
+                "expected": expected,
+                "actual": actual,
+                "result": "passed" if expected == actual else "failed",
+                "target": {"reportKind": report_kind, "assertionId": assertion_id},
+                "diagnostic": diagnostic,
+                "oracleEvidence": {"identity": "issue-94-authored-source-facts-oracle"},
+            })
+
+        for mutation_group in ("mutations", "adapterMutations"):
+            for mutation in report.get(mutation_group, []):
+                mutation_id = str(mutation.get("mutationId", ""))
+                if not mutation_id:
+                    continue
+                detected = bool(mutation.get("detected"))
+                expected = {"mutationDetected": False, "mutationId": mutation_id}
+                actual = {"mutationDetected": detected, "mutationId": mutation_id}
+                rows.append({
+                    "caseId": _producer_case_id("mutation", report_kind, mutation_group, mutation_id),
+                    "classification": "mutation",
+                    "evaluatorType": "mutation-killed",
+                    "input": {"reportKind": report_kind, "mutationGroup": mutation_group, "mutationId": mutation_id},
+                    "expected": expected,
+                    "actual": actual,
+                    "result": "passed" if detected else "failed",
+                    "target": {"reportKind": report_kind, "mutationId": mutation_id, "group": mutation_group},
+                    "diagnostic": diagnostic,
+                    "oracleEvidence": {"identity": "issue-94-authored-mutation", "mutation": deepcopy(mutation)},
+                })
+
+    if not rows:
+        rows = [{
+            "caseId": "setup-positive", "classification": "positive", "evaluatorType": "geometry-order",
+            "input": {"setup": "issue-94"}, "expected": {"setup": "available"}, "actual": {"setup": "unavailable"},
+            "result": "failed", "target": {"phase": "qualification-setup"},
+            "diagnostic": {"code": "ISSUE-94-SETUP", "message": "qualification setup was unavailable"},
+            "oracleEvidence": {"setup": "unavailable"},
+        }]
+    if not any(row["classification"] in {"negative", "mutation"} for row in rows):
+        rows.append({
+            "caseId": "setup-mutation", "classification": "mutation", "evaluatorType": "mutation-killed",
+            "input": {"setup": "issue-94"}, "expected": {"mutationDetected": False}, "actual": {"mutationDetected": False},
+            "result": "failed", "target": {"phase": "qualification-setup"},
+            "diagnostic": {"code": "ISSUE-94-SETUP", "message": "qualification setup was unavailable"},
+            "oracleEvidence": {"setup": "unavailable"},
+        })
+    return rows
+
+
+def _write_producer_report(
+    *, out_dir: Path, reports: dict[str, dict[str, Any]], corpus_path: Path, source_sha: str | None,
+) -> dict[str, Any]:
+    rows = _producer_rows(reports)
+    return write_producer_report(
+        out_dir=out_dir,
+        reports=reports,
+        report_names=REPORT_NAMES,
+        artifact_report_names=tuple(list(REPORT_NAMES.values())[:4]),
+        issue_number=94,
+        evidence_id=EVIDENCE_ID,
+        requirement_id=REQUIREMENT_IDS[0],
+        source_sha=source_sha or "0" * 40,
+        input_paths=_producer_input_paths(corpus_path),
+        producer_id="issue-94-qualification-runner",
+        authority_id="issue-94-authored-source-facts-oracle",
+        producer_component_path=Path(__file__),
+        authority_component_path=Path(corpus_path),
+        evaluator_component_path=Path(__file__),
+        rows=rows,
+        shared_component_paths=[CONVERTER_PATH],
+    )
+
+
 def run_qualification(*, corpus_path: Path = DEFAULT_CORPUS_PATH, out_dir: Path = DEFAULT_OUT_DIR) -> int:
     """Write all five reports and return nonzero unless the slice is complete."""
 
-    source_sha = _source_sha()
-    corpus_sha = _sha256_file(corpus_path)
+    source_sha: str | None = None
+    corpus_sha: str | None = None
     try:
+        source_sha = _source_sha()
+        corpus_sha = _sha256_file(corpus_path)
         corpus = _read_json(corpus_path)
         if not isinstance(corpus, dict):
             raise QualificationError("issue #94 corpus root must be an object")
@@ -1915,9 +2030,14 @@ def run_qualification(*, corpus_path: Path = DEFAULT_CORPUS_PATH, out_dir: Path 
         }
     except Exception as exc:
         message = f"{type(exc).__name__}: {exc}"
-        reports = {kind: _fatal_report(kind, source_sha, corpus_sha, message) for kind in REPORT_NAMES}
-    for kind, name in REPORT_NAMES.items():
-        _write_json(out_dir / name, reports[kind])
+        reports = {kind: _fatal_report(kind, source_sha or "0" * 40, corpus_sha or "", message) for kind in REPORT_NAMES}
+    out_dir.mkdir(parents=True, exist_ok=True)
+    _write_producer_report(
+        out_dir=out_dir,
+        reports=reports,
+        corpus_path=corpus_path,
+        source_sha=source_sha,
+    )
     return 0 if all(report["status"] == "passed" for report in reports.values()) else 1
 
 

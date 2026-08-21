@@ -1,0 +1,183 @@
+{
+  "schema": "fdir/qualification-issue-101-corpus",
+  "version": "1.0.0",
+  "issueNumber": 101,
+  "qualificationScope": "independent-pdf-profile",
+  "reportNames": [
+    "pdf-profile-matrix.json",
+    "pdf-object-xref-revision.json",
+    "pdf-page-resource-closure.json",
+    "pdf-content-event-trace.json",
+    "pdf-font-cmap-glyph.json",
+    "pdf-annotation-form-report.json",
+    "pdf-multi-parser-differential.json",
+    "pdf-unsupported-occurrences.json"
+  ],
+  "oracle": {
+    "expectedValuesAreRuntimeIndependent": true,
+    "adapterHelpersUsedForExpected": false,
+    "identity": "authored PDF object dictionaries, streams, and hand-authored source facts",
+    "sourceConstruction": "qualification-runner-authored-object-list",
+    "forbiddenDerivations": [
+      "tools/adapter_pdf.py",
+      "tools/adapter_common.py",
+      "convert_document.py expected-value projection",
+      "the same parser implementation used by the adapter"
+    ],
+    "independentParserPolicy": {
+      "minimumParserCount": 2,
+      "sourceParser": "qualification_issue101 byte lexer and page-tree walker",
+      "secondaryParser": "PyMuPDF when installed",
+      "rendererIsSeparateObservation": true
+    }
+  },
+  "requirements": [
+    {"id": "PDF-101-OCCURRENCES", "gate": "source occurrence accounting has unaccounted=0 and duplicate=0"},
+    {"id": "PDF-101-GRAPH", "gate": "object, xref, page, and resource graph mismatch=0"},
+    {"id": "PDF-101-EVENT-ORDER", "gate": "content paint event order mismatch=0"},
+    {"id": "PDF-101-FABRICATION", "gate": "fabricated preserved annotation/text/resource count=0"},
+    {"id": "PDF-101-NEGATIVE-DEFECTS", "gate": "all executable negative oracle mutations are detected"},
+    {"id": "PDF-101-REAL-PRODUCERS", "gate": "all required producer fixtures have provenance and exact SHA-256"},
+    {"id": "PDF-101-MULTI-PARSER-RENDERER", "gate": "independent parser and renderer blockers are zero"},
+    {"id": "PDF-101-EXACT-SHA", "gate": "source SHA is exact and checkout is clean"},
+    {"id": "PDF-101-EVIDENCE-BUNDLE", "gate": "reports are bound into an exact-SHA evidence manifest"},
+    {"id": "PDF-101-CI-BINDING", "gate": "a GitHub Actions run is bound to the exact evidence"}
+  ],
+  "fixtures": [
+    {
+      "fixtureId": "classic-page-tree-paint-order",
+      "producerId": "authored-synthetic",
+      "format": "pdf",
+      "profile": "PDF-1.7-classic-xref",
+      "sha256": "38d0ee485735bb72cc75ee5e000a0841dfad2c992a6e09d45275b3da629444e2",
+      "source": {
+        "kind": "authored-object-list",
+        "header": "%PDF-1.7\n",
+        "xref": "classic",
+        "rootObject": 20,
+        "objects": [
+          {"number": 20, "body": "<< /Type /Catalog /Pages 30 0 R >>"},
+          {"number": 30, "body": "<< /Type /Pages /Kids [50 0 R 40 0 R] /Count 2 /MediaBox [0 0 600 800] /CropBox [10 20 500 700] /Rotate 90 /Resources << /Font << /F1 60 0 R >> /XObject << /Im1 70 0 R >> >> >>"},
+          {"number": 50, "body": "<< /Type /Page /Parent 30 0 R /Contents [80 0 R 81 0 R] /Annots [90 0 R 91 0 R] >>"},
+          {"number": 40, "body": "<< /Type /Page /Parent 30 0 R /Contents 82 0 R >>"},
+          {"number": 60, "body": "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"},
+          {"number": 70, "dictionary": "<< /Type /XObject /Subtype /Image /Width 2 /Height 1 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Length {length} >>", "stream": "IMAGE"},
+          {"number": 80, "dictionary": "<< /Length {length} >>", "stream": "BT /F1 12 Tf 10 20 Td (first) Tj ET\n0 0 20 20 re S\n"},
+          {"number": 81, "dictionary": "<< /Length {length} >>", "stream": "1 2 UnknownOp\n/Im1 Do\nBT /F1 12 Tf 10 40 Td (second) Tj ET\n"},
+          {"number": 82, "dictionary": "<< /Length {length} >>", "stream": "BT /F1 12 Tf 10 60 Td (third) Tj ET\n"},
+          {"number": 90, "body": "<< /Type /Annot /Subtype /Text /Rect [0 0 10 10] /Contents (actual comment) >>"},
+          {"number": 91, "body": "<< /Subtype /Text /Contents (marker-like) >>"}
+        ]
+      },
+      "expectedSourceFacts": {
+        "header": "%PDF-1.7",
+        "objectIds": ["20 0", "30 0", "40 0", "50 0", "60 0", "70 0", "80 0", "81 0", "82 0", "90 0", "91 0"],
+        "features": {"classicXref": true, "xrefStream": false, "objectStream": false, "incrementalRevisionCount": 1, "encrypted": false, "linearized": false},
+        "pages": [
+          {"object": "50 0", "ordinal": 0, "contents": ["80 0", "81 0"], "annotations": ["90 0", "91 0"], "mediaBox": [0, 0, 600, 800], "cropBox": [10, 20, 500, 700], "rotate": 90},
+          {"object": "40 0", "ordinal": 1, "contents": ["82 0"], "annotations": [], "mediaBox": [0, 0, 600, 800], "cropBox": [10, 20, 500, 700], "rotate": 90}
+        ],
+        "contentObjects": ["80 0", "81 0", "82 0"],
+        "paintEvents": [
+          {"pageObject": "50 0", "streamObject": "80 0", "operator": "Tj", "codeHex": "6669727374"},
+          {"pageObject": "50 0", "streamObject": "80 0", "operator": "S"},
+          {"pageObject": "50 0", "streamObject": "81 0", "operator": "Do", "resourceName": "/Im1"},
+          {"pageObject": "50 0", "streamObject": "81 0", "operator": "Tj", "codeHex": "7365636f6e64"},
+          {"pageObject": "40 0", "streamObject": "82 0", "operator": "Tj", "codeHex": "7468697264"}
+        ],
+        "unknownOperators": [{"pageObject": "50 0", "streamObject": "81 0", "operator": "UnknownOp"}],
+        "fonts": [{"object": "60 0", "subtype": "/Type1", "toUnicodeObject": null, "mappings": {}}],
+        "xobjects": ["70 0"],
+        "annotations": [
+          {"object": "90 0", "pageObject": "50 0", "valid": true, "type": "/Annot", "subtype": "/Text", "body": "actual comment"},
+          {"object": "91 0", "pageObject": "50 0", "valid": false, "type": null, "subtype": "/Text"}
+        ]
+      },
+      "expectedIR": {
+        "objectIds": ["20 0", "30 0", "40 0", "50 0", "60 0", "70 0", "80 0", "81 0", "82 0", "90 0", "91 0"],
+        "pages": [
+          {"sourceObject": "50 0", "ordinal": 0, "pageTreeIndex": 0, "rotation": 90, "mediaBox": ["0", "0", "600", "800"], "cropBox": ["10", "20", "500", "700"]},
+          {"sourceObject": "40 0", "ordinal": 1, "pageTreeIndex": 1, "rotation": 90, "mediaBox": ["0", "0", "600", "800"], "cropBox": ["10", "20", "500", "700"]}
+        ],
+        "paintOrder": [["glyph", "path", "image", "glyph"], ["glyph"]],
+        "annotationObjects": ["90 0"],
+        "resources": [
+          {"kind": "font", "object": "60 0", "availability": "available"},
+          {"kind": "image", "object": "70 0", "availability": "available"}
+        ],
+        "fontMappings": [{"fontObject": "60 0", "mappingStatus": "unavailable", "mappings": []}],
+        "conversionStatus": "partial"
+      }
+    },
+    {
+      "fixtureId": "type1-tounicode-glyph-mapping",
+      "producerId": "authored-synthetic",
+      "format": "pdf",
+      "profile": "PDF-1.7-classic-xref-font-cmap",
+      "sha256": "4090ba58f2edaf5108c3ee9830af41d2f81c5b9ccbfb31df6f79985c227db8a7",
+      "source": {
+        "kind": "authored-object-list",
+        "header": "%PDF-1.7\n",
+        "xref": "classic",
+        "rootObject": 1,
+        "objects": [
+          {"number": 1, "body": "<< /Type /Catalog /Pages 2 0 R >>"},
+          {"number": 2, "body": "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"},
+          {"number": 3, "body": "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>"},
+          {"number": 4, "body": "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /ToUnicode 6 0 R >>"},
+          {"number": 5, "dictionary": "<< /Length {length} >>", "stream": "BT /F1 12 Tf 72 720 Td <41> Tj ET"},
+          {"number": 6, "dictionary": "<< /Length {length} >>", "stream": "/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n1 beginbfchar\n<41> <0041>\nendbfchar\nendcmap\nCMapName currentdict /CMap defineresource pop\nend\nend"}
+        ]
+      },
+      "expectedSourceFacts": {
+        "header": "%PDF-1.7",
+        "objectIds": ["1 0", "2 0", "3 0", "4 0", "5 0", "6 0"],
+        "features": {"classicXref": true, "xrefStream": false, "objectStream": false, "incrementalRevisionCount": 1, "encrypted": false, "linearized": false},
+        "pages": [{"object": "3 0", "ordinal": 0, "contents": ["5 0"], "annotations": [], "mediaBox": [0, 0, 612, 792], "cropBox": null, "rotate": 0}],
+        "contentObjects": ["5 0"],
+        "paintEvents": [{"pageObject": "3 0", "streamObject": "5 0", "operator": "Tj", "codeHex": "41"}],
+        "unknownOperators": [],
+        "fonts": [{"object": "4 0", "subtype": "/Type1", "toUnicodeObject": "6 0", "mappings": {"41": "A"}}],
+        "xobjects": [],
+        "annotations": []
+      },
+      "expectedIR": {
+        "objectIds": ["1 0", "2 0", "3 0", "4 0", "5 0", "6 0"],
+        "pages": [{"sourceObject": "3 0", "ordinal": 0, "pageTreeIndex": 0, "rotation": 0, "mediaBox": ["0", "0", "612", "792"]}],
+        "paintOrder": [["glyph"]],
+        "annotationObjects": [],
+        "resources": [{"kind": "font", "object": "4 0", "availability": "available"}],
+        "fontMappings": [{"fontObject": "4 0", "mappingStatus": "preserved", "mappings": [{"sourceCode": "41", "unicode": "A"}]}],
+        "conversionStatus": "partial"
+      }
+    }
+  ],
+  "producerMatrix": [
+    {"producerId": "authored-synthetic", "required": true, "availability": "available", "fixtureId": "classic-page-tree-paint-order"},
+    {"producerId": "adobe-acrobat", "required": true, "availability": "missing", "fixturePath": "e2e/corpus/external/pdf/adobe-acrobat", "missingReason": "no independently acquired Adobe Acrobat PDF fixture is present in this checkout"},
+    {"producerId": "libreoffice", "required": true, "availability": "missing", "fixturePath": "e2e/corpus/external/pdf/libreoffice", "missingReason": "no independently acquired LibreOffice PDF fixture is present in this checkout"},
+    {"producerId": "browser-export", "required": true, "availability": "missing", "fixturePath": "e2e/corpus/external/pdf/browser-export", "missingReason": "no independently acquired browser-export PDF fixture is present in this checkout"},
+    {"producerId": "office-export", "required": true, "availability": "missing", "fixturePath": "e2e/corpus/external/pdf/office-export", "missingReason": "no independently acquired office-export PDF fixture is present in this checkout"}
+  ],
+  "negativeCases": [
+    {"caseId": "page-tree-kids-swapped", "fixtureId": "classic-page-tree-paint-order", "mutation": "swap-page-tree-kids", "expectedDefectCode": "PDF-PAGE-TREE-ORDER"},
+    {"caseId": "font-stream-treated-as-content", "fixtureId": "classic-page-tree-paint-order", "mutation": "font-stream-as-content", "expectedDefectCode": "PDF-CONTENT-RESOURCE-SEPARATION"},
+    {"caseId": "marker-annotation-fabricated", "fixtureId": "classic-page-tree-paint-order", "mutation": "fabricate-marker-annotation", "expectedDefectCode": "PDF-ANNOTATION-FABRICATION"},
+    {"caseId": "unicode-fabricated-without-map", "fixtureId": "classic-page-tree-paint-order", "mutation": "fabricate-unicode", "expectedDefectCode": "PDF-FONT-MAPPING-FABRICATION"},
+    {"caseId": "unknown-operator-dropped", "fixtureId": "classic-page-tree-paint-order", "mutation": "drop-unknown-operator", "expectedDefectCode": "PDF-UNKNOWN-OPERATOR-ACCOUNTING"},
+    {"caseId": "paint-event-dropped", "fixtureId": "type1-tounicode-glyph-mapping", "mutation": "drop-paint-event", "expectedDefectCode": "PDF-PAINT-EVENT-LOSS"}
+  ],
+  "bindings": {
+    "requiredIssues": [
+      {"issueNumber": 88, "reportPath": "e2e/.run/qualification-issue-88/manifest.json"},
+      {"issueNumber": 89, "reportPath": "e2e/.run/qualification-issue-89/defect-injection-report.json"},
+      {"issueNumber": 91, "reportPath": "e2e/.run/qualification-issue-91/source-occurrence-accounting.json"},
+      {"issueNumber": 92, "reportPath": "e2e/.run/qualification-issue-92/pdf-glyph-provenance-report.json"},
+      {"issueNumber": 94, "reportPath": "e2e/.run/qualification-issue-94/clip-and-paint-order-report.json"},
+      {"issueNumber": 96, "reportPath": "e2e/.run/qualification-issue-96/annotation-link-field-report.json"}
+    ],
+    "evidenceBundlePathTemplate": "e2e/.run/qualification/{sourceSha}/manifest.json",
+    "rendererStatus": "missing",
+    "status": "unavailable"
+  }
+}
