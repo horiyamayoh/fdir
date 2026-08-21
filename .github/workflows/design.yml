@@ -367,6 +367,7 @@ jobs:
               repository,
               sourceSha,
               generatedAt: new Date().toISOString(),
+              candidateReady: false,
               releaseReady: false,
               status: "blocked",
               run: {
@@ -520,14 +521,18 @@ jobs:
             }
 
             const runSuccess = base.run.status === "completed" && base.run.conclusion === "success";
-            base.releaseReady = runSuccess && diagnostics.length === 0;
-            base.status = base.releaseReady ? "passed" : "blocked";
+            // This inspection is Phase B evidence only.  Final release
+            // authority is the separately published attestation.
+            base.candidateReady = runSuccess && diagnostics.length === 0;
+            base.releaseReady = false;
+            base.status = base.candidateReady ? "pending-attestation" : "blocked";
             base.attestationDigest = digest(base);
             fs.mkdirSync(path.dirname(outputPath), { recursive: true });
             fs.writeFileSync(outputPath, `${JSON.stringify(base, null, 2)}\n`, "utf8");
             const bundleName = `fdir-qualification-bundle-${sourceSha}-attempt-${attemptText}`;
             const bundle = base.artifacts.find((artifact) => artifact.name === bundleName);
-            core.setOutput("release-ready", base.releaseReady ? "true" : "false");
+            core.setOutput("candidate-ready", base.candidateReady ? "true" : "false");
+            core.setOutput("release-ready", "false");
             core.setOutput("evidence-path", outputPath);
             core.setOutput("workflow-conclusion", base.run.conclusion || "");
             core.setOutput("bundle-artifact-id", bundle?.id || "");
@@ -549,7 +554,8 @@ jobs:
         run: |
           {
             echo "## GitHub Actions evidence"
-            echo "- Release-ready: ${{ steps.inspect.outputs.release-ready }}"
+            echo "- Candidate-ready: ${{ steps.inspect.outputs.candidate-ready }}"
+            echo "- Release-ready: ${{ steps.inspect.outputs.release-ready }} (requires final attestation publication)"
             echo "- Source commit: https://github.com/${GITHUB_REPOSITORY}/commit/${EVIDENCE_SHA}"
             echo "- Verified run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${EVIDENCE_RUN_ID}"
             echo "- Verified attempt: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${EVIDENCE_RUN_ID}/attempts/${EVIDENCE_ATTEMPT}"
@@ -562,12 +568,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "${{ steps.inspect.outputs.release-ready }}" != "true" ]]; then
+          if [[ "${{ steps.inspect.outputs.candidate-ready }}" != "true" ]]; then
             echo "FINAL_ATTESTATION_BLOCKED: target run/job/step/artifact evidence was not completed and successful" >&2
             exit 1
           fi
       - name: Download qualification bundle for attestation
-        if: ${{ env.EVIDENCE_MANUAL == 'true' && steps.inspect.outputs.release-ready == 'true' }}
+        if: ${{ env.EVIDENCE_MANUAL == 'true' && steps.inspect.outputs.candidate-ready == 'true' }}
         uses: actions/download-artifact@v4
         with:
           name: fdir-qualification-bundle-${{ env.EVIDENCE_SHA }}-attempt-${{ env.EVIDENCE_ATTEMPT }}
@@ -576,7 +582,7 @@ jobs:
           repository: ${{ github.repository }}
           run-id: ${{ env.EVIDENCE_RUN_ID }}
       - name: Download qualification upload receipt
-        if: ${{ env.EVIDENCE_MANUAL == 'true' && steps.inspect.outputs.release-ready == 'true' }}
+        if: ${{ env.EVIDENCE_MANUAL == 'true' && steps.inspect.outputs.candidate-ready == 'true' }}
         uses: actions/download-artifact@v4
         with:
           name: fdir-qualification-receipt-${{ env.EVIDENCE_SHA }}-attempt-${{ env.EVIDENCE_ATTEMPT }}
@@ -585,7 +591,7 @@ jobs:
           repository: ${{ github.repository }}
           run-id: ${{ env.EVIDENCE_RUN_ID }}
       - name: Validate downloaded candidate bundle
-        if: ${{ env.EVIDENCE_MANUAL == 'true' && steps.inspect.outputs.release-ready == 'true' }}
+        if: ${{ env.EVIDENCE_MANUAL == 'true' && steps.inspect.outputs.candidate-ready == 'true' }}
         id: candidate
         shell: python
         env:
@@ -623,7 +629,7 @@ jobs:
               print(f"artifact-digest={bundle_record['digest']}", file=output)
               print(f"artifact-url={bundle_record['url']}", file=output)
       - name: Build final release attestation
-        if: ${{ env.EVIDENCE_MANUAL == 'true' && steps.inspect.outputs.release-ready == 'true' }}
+        if: ${{ env.EVIDENCE_MANUAL == 'true' && steps.inspect.outputs.candidate-ready == 'true' }}
         id: build-attestation
         shell: python
         env:
@@ -660,7 +666,7 @@ jobs:
               environment=external_environment,
           )
       - name: Run final release gate
-        if: ${{ success() && env.EVIDENCE_MANUAL == 'true' && steps.inspect.outputs.release-ready == 'true' }}
+        if: ${{ success() && env.EVIDENCE_MANUAL == 'true' && steps.inspect.outputs.candidate-ready == 'true' }}
         shell: bash
         env:
           BUNDLE_MANIFEST: ${{ steps.candidate.outputs.manifest }}
@@ -669,7 +675,7 @@ jobs:
           set -euo pipefail
           python tools/release_gate.py --bundle "$BUNDLE_MANIFEST" --attestation "$ATTESTATION"
       - name: Upload release attestation
-        if: ${{ success() && env.EVIDENCE_MANUAL == 'true' && steps.inspect.outputs.release-ready == 'true' }}
+        if: ${{ success() && env.EVIDENCE_MANUAL == 'true' && steps.inspect.outputs.candidate-ready == 'true' }}
         id: upload-attestation
         uses: actions/upload-artifact@v4
         with:

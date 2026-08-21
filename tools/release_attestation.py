@@ -4,8 +4,8 @@ The qualification bundle is a candidate produced before the final release
 decision.  This module supplies the separate Phase-C attestation: it binds the
 candidate manifest and every report to the exact source SHA, CI attempt,
 uploaded artifact, and verified GitHub issue-state snapshot.  The #105 report
-inside a candidate bundle is accepted only as a blocked receipt; it can never
-be the authority that makes itself release-ready.
+inside a candidate bundle is accepted only as a pending behavioral candidate;
+it can never be the authority that makes itself release-ready.
 """
 
 from __future__ import annotations
@@ -187,25 +187,39 @@ def _output_path(report: dict[str, Any], basename: str) -> str:
 
 
 def _candidate_105_receipt(bundle_root: Path, report: dict[str, Any]) -> dict[str, Any]:
-    """Accept only the blocked smoke receipt for #105 inside Phase A."""
+    """Accept only the issue-specific Phase-A #105 report.
+
+    The candidate bundle may contain the behavioral #105 report, but it must
+    not run ``release_gate.py`` or ``release_attestation.py`` from inside the
+    bundle.  Those commands are Phase-C authorities and using either one as a
+    producer would make #105 self-qualifying.
+    """
 
     command = report.get("command")
-    if not isinstance(command, list) or "tools/release_gate.py" not in command:
-        raise AttestationError("CIRCULAR_105_EVIDENCE", "#105 evidence must be the release-gate smoke receipt")
+    if not isinstance(command, list) or "tools/qualification_issue105.py" not in command:
+        raise AttestationError(
+            "CIRCULAR_105_EVIDENCE",
+            "#105 candidate evidence must be produced by tools/qualification_issue105.py",
+        )
+    if any(item in command for item in ("tools/release_gate.py", "tools/release_attestation.py")):
+        raise AttestationError("CIRCULAR_105_EVIDENCE", "#105 candidate evidence must not invoke a release authority")
     if "--bundle" in command or "--attestation" in command:
         raise AttestationError("CIRCULAR_105_EVIDENCE", "#105 evidence must not invoke a bundle or attestation from inside the candidate bundle")
-    stdout_path = bundle_root / Path(*_output_path(report, "stdout.txt").split("/"))
+    producer_path = bundle_root / Path(*_output_path(report, "producer-report.json").split("/"))
     try:
-        stdout = stdout_path.read_text(encoding="utf-8")
-        value = json.loads(stdout)
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise AttestationError("CIRCULAR_105_EVIDENCE", "#105 smoke receipt stdout is not a JSON release-gate report") from exc
-    if not isinstance(value, dict) or value.get("mode") != "smoke" or value.get("status") != "blocked" or value.get("releaseReady") is not False:
-        raise AttestationError("CIRCULAR_105_EVIDENCE", "#105 bundle receipt is not an explicit blocked smoke result")
-    diagnostics = value.get("diagnostics")
-    if not isinstance(diagnostics, list) or not any(isinstance(item, dict) and item.get("code") == "RELEASE_AUTHORITY_REQUIRED" for item in diagnostics):
-        raise AttestationError("CIRCULAR_105_EVIDENCE", "#105 smoke receipt lacks RELEASE_AUTHORITY_REQUIRED")
-    return {"status": "pending-attestation", "command": command, "releaseReady": False}
+        value = _load_json(producer_path)
+    except AttestationError as exc:
+        raise AttestationError("CIRCULAR_105_EVIDENCE", "#105 producer report is not valid JSON") from exc
+    if not isinstance(value, dict) or value.get("schema") != "fdir/qualification-producer-report":
+        raise AttestationError("CIRCULAR_105_EVIDENCE", "#105 candidate output is not a producer report")
+    if value.get("evidenceId") != "issue-105-release-quality" or value.get("requirementIds") != ["QUAL-105-RELEASE-BARRIER"]:
+        raise AttestationError("CIRCULAR_105_EVIDENCE", "#105 producer report binding is invalid")
+    independence = value.get("independence")
+    if not isinstance(independence, dict) or independence.get("expectedDerivedFromActual") is not False:
+        raise AttestationError("CIRCULAR_105_EVIDENCE", "#105 producer report lacks an independent expected-value binding")
+    if value.get("status") != "passed" or value.get("failureCount") != 0:
+        raise AttestationError("CANDIDATE_105_NOT_PASSED", "#105 behavioral candidate report is not passed")
+    return {"status": "pending-attestation", "command": command, "releaseReady": False, "producerReport": _output_path(report, "producer-report.json")}
 
 
 def _bundle_metadata(bundle_manifest: Path, *, repo_root: Path, expected_source_sha: str) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
@@ -325,6 +339,11 @@ def _ci_metadata(
 
 def _without_attestation_digest(value: dict[str, Any]) -> dict[str, Any]:
     return {key: item for key, item in value.items() if key != "attestationDigest"}
+
+
+def _validate_final_ci_provider(ci: dict[str, Any]) -> None:
+    if ci.get("provider") != "github-actions":
+        raise AttestationError("ATTESTATION_CI_PROVIDER", "final attestation authority must be GitHub Actions")
 
 
 def _load_snapshot_for_attestation(
@@ -509,6 +528,7 @@ def validate_attestation(
     ci = attestation.get("ci")
     if not isinstance(snapshot_ci, dict) or not isinstance(ci, dict):
         raise AttestationError("ATTESTATION_CI_BINDING", "attestation and issue-state CI bindings are required")
+    _validate_final_ci_provider(ci)
     if snapshot_ci.get("repository") != expected_repository or snapshot_ci.get("sourceSha") != source_sha:
         raise AttestationError("ATTESTATION_CI_BINDING", "issue-state CI binding does not match attestation")
     if snapshot_ci.get("runId") != ci.get("runId") or snapshot_ci.get("attempt") != ci.get("attempt"):

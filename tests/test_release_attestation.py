@@ -20,29 +20,34 @@ class ReleaseAttestationTests(unittest.TestCase):
             )
         self.assertEqual(raised.exception.code, "ATTESTATION_ARTIFACT_MISSING")
 
-    def test_bundleless_105_report_is_only_accepted_as_blocked_receipt(self) -> None:
+    def test_candidate_105_report_is_pending_until_external_attestation(self) -> None:
         root = attestation.ROOT
-        stdout = root / "tests" / "fixture-issue-105.stdout.txt"
-        pending = json.dumps({
-                "schema": "fdir/release-gate-summary",
-                "status": "blocked",
-                "mode": "smoke",
-                "releaseReady": False,
-                "diagnostics": [{"code": "RELEASE_AUTHORITY_REQUIRED"}],
-            })
-        report = {"evidenceId": "issue-105-release-quality", "command": ["python", "tools/release_gate.py"], "outputs": [{"path": "logs/issue-105.stdout.txt"}]}
-        with mock.patch.object(Path, "read_text", return_value=pending):
+        producer = json.dumps({
+            "schema": "fdir/qualification-producer-report",
+            "version": "1.0.0",
+            "evidenceId": "issue-105-release-quality",
+            "requirementIds": ["QUAL-105-RELEASE-BARRIER"],
+            "independence": {"expectedDerivedFromActual": False},
+            "status": "passed",
+            "failureCount": 0,
+        })
+        report = {
+            "evidenceId": "issue-105-release-quality",
+            "command": ["python", "tools/qualification_issue105.py", "--out-dir", "e2e/.run/qualification-issue-105"],
+            "outputs": [{"path": "artifacts/105/producer-report.json"}],
+        }
+        with mock.patch.object(Path, "read_text", return_value=producer):
             receipt = attestation._candidate_105_receipt(root, report)
             self.assertEqual(receipt["status"], "pending-attestation")
 
-        passed = json.dumps({
-                "schema": "fdir/release-gate-summary",
-                "status": "passed",
-                "mode": "release",
-                "releaseReady": True,
-                "diagnostics": [],
-            })
-        with mock.patch.object(Path, "read_text", return_value=passed):
+    def test_release_gate_cannot_be_the_phase_a_105_producer(self) -> None:
+        root = attestation.ROOT
+        report = {
+            "evidenceId": "issue-105-release-quality",
+            "command": ["python", "tools/release_gate.py"],
+            "outputs": [{"path": "artifacts/105/producer-report.json"}],
+        }
+        with mock.patch.object(Path, "read_text", return_value="{}"):
             with self.assertRaises(attestation.AttestationError) as raised:
                 attestation._candidate_105_receipt(root, report)
             self.assertEqual(raised.exception.code, "CIRCULAR_105_EVIDENCE")
@@ -66,6 +71,11 @@ class ReleaseAttestationTests(unittest.TestCase):
                 },
             )
         self.assertEqual(raised.exception.code, "ATTESTATION_ATTEMPT")
+
+    def test_local_ci_provider_is_not_final_authority(self) -> None:
+        with self.assertRaises(attestation.AttestationError) as raised:
+            attestation._validate_final_ci_provider({"provider": "local"})
+        self.assertEqual(raised.exception.code, "ATTESTATION_CI_PROVIDER")
 
 
 if __name__ == "__main__":

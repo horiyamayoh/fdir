@@ -43,6 +43,10 @@ class DesignWorkflowEvidenceTests(unittest.TestCase):
         self.assertIn("python tools/release_gate.py --bundle \"$BUNDLE_MANIFEST\" --attestation \"$ATTESTATION\"", self.text)
         self.assertIn("from tools import release_attestation", self.text)
         self.assertIn("Upload release attestation publication receipt", self.text)
+        self.assertIn("candidateReady: false", self.text)
+        self.assertIn("base.candidateReady = runSuccess && diagnostics.length === 0", self.text)
+        self.assertIn("base.releaseReady = false", self.text)
+        self.assertIn('core.setOutput("candidate-ready", base.candidateReady ? "true" : "false")', self.text)
 
 
 if __name__ == "__main__":

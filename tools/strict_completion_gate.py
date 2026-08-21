@@ -63,6 +63,123 @@ def _require(condition: bool, code: str, detail: str, blockers: list[dict[str, s
         blockers.append({"code": code, "detail": detail})
 
 
+def _bundle_issue_reports(manifest: Path) -> list[dict[str, Any]]:
+    """Materialize one strict-report entry for every recovery issue.
+
+    A list of issue numbers is not sufficient evidence for #113: reviewers
+    need to see which Evidence report, outputs, assertions, and cases were
+    actually resolved for each issue.  This helper is intentionally tolerant
+    of an invalid candidate so a blocked report still explains missing
+    material instead of hiding it behind a top-level validator error.
+    """
+
+    issue_numbers = list(range(88, 106))
+    try:
+        bundle_root = manifest.resolve().parent
+        json.loads(manifest.resolve().read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return [
+            {
+                "issueNumber": issue,
+                "status": "blocked",
+                "evidenceIds": [],
+                "reportPaths": [],
+                "reports": [],
+                "outputPaths": [],
+                "assertionCount": 0,
+                "testCaseCount": 0,
+                "sourceSha": None,
+                "blockers": [{"code": "BUNDLE_UNREADABLE", "detail": str(manifest)}],
+                "liveState": "pending-final-attestation",
+            }
+            for issue in issue_numbers
+        ]
+
+    parsed_reports: list[tuple[str, dict[str, Any]]] = []
+    reports_dir = bundle_root / "reports"
+    try:
+        report_paths = sorted(reports_dir.glob("*.json"))
+    except OSError:
+        report_paths = []
+    for report_path in report_paths:
+        try:
+            value = json.loads(report_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            continue
+        if isinstance(value, dict):
+            parsed_reports.append((f"reports/{report_path.name}", value))
+
+    entries: list[dict[str, Any]] = []
+    for issue in issue_numbers:
+        matching = [
+            (report_path, value)
+            for report_path, value in parsed_reports
+            if issue in value.get("issueNumbers", [])
+        ]
+        blockers: list[dict[str, str]] = []
+        if not matching:
+            blockers.append({"code": "ISSUE_EVIDENCE_MISSING", "detail": f"issue #{issue} has no report bound by issueNumbers"})
+
+        evidence_ids: list[str] = []
+        report_paths: list[str] = []
+        output_paths: list[str] = []
+        report_records: list[dict[str, Any]] = []
+        source_shas: set[str] = set()
+        assertion_count = 0
+        test_case_count = 0
+        for report_path, value in matching:
+            report_paths.append(report_path)
+            evidence_id = value.get("evidenceId")
+            if isinstance(evidence_id, str) and evidence_id:
+                evidence_ids.append(evidence_id)
+            source_sha = value.get("sourceSha")
+            if isinstance(source_sha, str) and source_sha:
+                source_shas.add(source_sha)
+            outputs = value.get("outputs", [])
+            report_output_paths: list[str] = []
+            if isinstance(outputs, list):
+                for output in outputs:
+                    if not isinstance(output, dict):
+                        continue
+                    output_path = output.get("path")
+                    if isinstance(output_path, str) and output_path:
+                        report_output_paths.append(output_path)
+                        output_paths.append(output_path)
+            status = value.get("status")
+            failure_count = value.get("failureCount")
+            if status != "passed" or failure_count != 0:
+                blockers.append({"code": "ISSUE_EVIDENCE_NOT_PASSED", "detail": f"{report_path} is {status!r} with failureCount={failure_count!r}"})
+            report_assertions = value.get("assertions", [])
+            report_cases = value.get("cases", [])
+            assertion_count += len(report_assertions) if isinstance(report_assertions, list) else 0
+            test_case_count += len(report_cases) if isinstance(report_cases, list) else 0
+            report_records.append({
+                "evidenceId": evidence_id,
+                "reportPath": report_path,
+                "status": status,
+                "failureCount": failure_count,
+                "sourceSha": source_sha,
+                "assertionCount": len(report_assertions) if isinstance(report_assertions, list) else 0,
+                "testCaseCount": len(report_cases) if isinstance(report_cases, list) else 0,
+                "outputPaths": sorted(set(report_output_paths)),
+            })
+
+        entries.append({
+            "issueNumber": issue,
+            "status": "passed" if matching and not blockers else "blocked",
+            "evidenceIds": sorted(set(evidence_ids)),
+            "reportPaths": sorted(set(report_paths)),
+            "reports": report_records,
+            "outputPaths": sorted(set(output_paths)),
+            "assertionCount": assertion_count,
+            "testCaseCount": test_case_count,
+            "sourceSha": next(iter(source_shas)) if len(source_shas) == 1 else None,
+            "blockers": blockers,
+            "liveState": "pending-final-attestation",
+        })
+    return entries
+
+
 def _check_source_closure(report: dict[str, Any], label: str, blockers: list[dict[str, str]]) -> None:
     cases = list(report.get("cases", []))
     cases.extend(item for item in report.get("negativeChecks", []) if isinstance(item, dict))
@@ -213,6 +330,7 @@ def run_bundle(manifest: Path, *, allow_dirty: bool = False) -> dict[str, Any]:
         "issues": issues,
         "blockers": blockers,
         "reportsChecked": ["qualification-bundle", *[f"issue-{issue}" for issue in issues]],
+        "issueReports": _bundle_issue_reports(manifest),
         "bundleValidation": validation,
         "bundleChecks": bundle_checks,
     }
@@ -246,6 +364,7 @@ def run_attestation(attestation: Path, *, bundle: Path | None = None) -> dict[st
             "issues": list(range(88, 106)),
             "blockers": [{"code": getattr(exc, "code", "ATTESTATION_INVALID"), "detail": str(exc)}],
             "reportsChecked": ["final-attestation"],
+            "issueReports": _bundle_issue_reports(bundle) if bundle is not None else [],
         }
     return {
         "schema": "fdir/strict-completion-gate-report",
@@ -256,6 +375,7 @@ def run_attestation(attestation: Path, *, bundle: Path | None = None) -> dict[st
         "issues": list(range(88, 106)),
         "blockers": [],
         "reportsChecked": ["qualification-bundle", "final-attestation", *[f"issue-{issue}" for issue in range(88, 106)]],
+        "issueReports": _bundle_issue_reports(bundle) if bundle is not None else [],
         "attestation": result,
     }
 
@@ -275,6 +395,7 @@ def _legacy_path_report(mode: str = "smoke") -> dict[str, Any]:
             "detail": "strict completion release qualification requires --bundle or --attestation; the legacy report path is development-only",
         }],
         "reportsChecked": [],
+        "issueReports": [],
     }
 
 

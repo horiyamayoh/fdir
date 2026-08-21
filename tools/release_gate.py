@@ -1118,11 +1118,9 @@ def check_qualification_bundle(bundle_manifest: Path) -> dict[str, int]:
 
     require(set(reports) == required_ids, "qualification bundle Evidence IDs do not exactly match #88-#105")
 
-    # The contract still contains a #105 output for compatibility with the
-    # existing bundle builder.  It is only a Phase-A blocked receipt.  A
-    # report that claims a bundle-less release result is the old circular
-    # self-qualification path and is rejected before any release claim is
-    # considered.
+    # #105 is a Phase-A behavioral candidate only.  The separate final
+    # attestation is the release authority; a report that invokes a release
+    # gate from inside the bundle is the old circular self-qualification path.
     try:
         try:
             from release_attestation import _candidate_105_receipt
