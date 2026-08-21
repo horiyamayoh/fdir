@@ -90,7 +90,7 @@ class QualificationIssue94Tests(unittest.TestCase):
                     (report["counts"]["adapterCases"], report["counts"]["adapterMutations"], report["counts"]["unmetCoverageCount"]),
                     expected_adapter_cases[name],
                 )
-                self.assertEqual(report["counts"]["adapterUnmetCoverageCount"], 6)
+                self.assertEqual(report["counts"]["adapterUnmetCoverageCount"], 8)
                 self.assertEqual(
                     report["failure"]["unmetCoverageCount"],
                     report["counts"]["unmetCoverageCount"] + report["counts"]["adapterUnmetCoverageCount"],

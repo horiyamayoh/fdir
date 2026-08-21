@@ -1351,7 +1351,9 @@
       "XLSX chart, drawing, merged-cell, and renderer geometry round-trips",
       "PDF graphics-state clip-stack replay from real content operators",
       "independent renderer, raster, and multi-producer differential oracle",
-      "script- and locale-specific reading-order corpus"
+      "script- and locale-specific reading-order corpus",
+      "#91 occurrence accounting binding for every geometry and order occurrence",
+      "#88 evidence bundle publication with exact SHA and CI run"
     ]
   }
 }
