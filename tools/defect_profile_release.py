@@ -61,6 +61,12 @@ def _orchestration_probe(failing_command: str) -> int:
     original_runtime = release_gate.check_runtime_evidence
     original_audit = getattr(release_gate, "check_audit_recovery_release_boundary", None)
     original_clean_room = getattr(release_gate, "check_clean_room_replay", None)
+    original_bundle_check = release_gate.check_qualification_bundle
+    try:
+        import validate_qualification_bundle as bundle_validator  # type: ignore
+    except ImportError:  # pragma: no cover
+        from tools import validate_qualification_bundle as bundle_validator  # type: ignore
+    original_bundle_validator = bundle_validator.validate_bundle
     directory = _probe_directory("release-orchestration-")
 
     def fake_run_command(name: str, display_command: str, argv: list[str]) -> dict[str, Any]:
@@ -86,6 +92,8 @@ def _orchestration_probe(failing_command: str) -> int:
 
     release_gate.run_command = fake_run_command  # type: ignore[assignment]
     release_gate.check_runtime_evidence = fake_runtime  # type: ignore[assignment]
+    release_gate.check_qualification_bundle = lambda _: {"bundle_evidence": 1, "bundle_named_reports": 1, "bundle_semantic_assertions": 1}  # type: ignore[assignment]
+    bundle_validator.validate_bundle = lambda *_, **__: {"status": "passed"}  # type: ignore[assignment]
     if original_audit is not None:
         release_gate.check_audit_recovery_release_boundary = lambda **_: {"recovery_children": 18, "umbrella_issue": 87}  # type: ignore[assignment]
     if original_clean_room is not None:
@@ -104,6 +112,8 @@ def _orchestration_probe(failing_command: str) -> int:
     finally:
         release_gate.run_command = original_run_command  # type: ignore[assignment]
         release_gate.check_runtime_evidence = original_runtime  # type: ignore[assignment]
+        release_gate.check_qualification_bundle = original_bundle_check  # type: ignore[assignment]
+        bundle_validator.validate_bundle = original_bundle_validator  # type: ignore[assignment]
         if original_audit is not None:
             release_gate.check_audit_recovery_release_boundary = original_audit  # type: ignore[assignment]
         if original_clean_room is not None:

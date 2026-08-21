@@ -709,7 +709,7 @@
         "changes": [
           {
             "count": 1,
-            "new": "            elif False and item_local == \"hyperlink\":",
+            "new": "        elif False and item_local == \"hyperlink\":",
             "old": "        elif item_local == \"hyperlink\":",
             "path": "tools/adapter_docx.py"
           }
@@ -747,7 +747,7 @@
         "changes": [
           {
             "count": 1,
-            "new": "            elif item_local == \"hyperlink\" and False:",
+            "new": "        elif item_local == \"hyperlink\" and False:",
             "old": "        elif item_local == \"hyperlink\":",
             "path": "tools/adapter_docx.py"
           }
@@ -786,7 +786,7 @@
         "changes": [
           {
             "count": 1,
-            "new": "            elif item_local == \"hyperlink\" and 0:",
+            "new": "        elif item_local == \"hyperlink\" and 0:",
             "old": "        elif item_local == \"hyperlink\":",
             "path": "tools/adapter_docx.py"
           }
@@ -825,7 +825,7 @@
         "changes": [
           {
             "count": 1,
-            "new": "            elif item_local == \"hyperlink\" and item_local != \"hyperlink\":",
+            "new": "        elif item_local == \"hyperlink\" and item_local != \"hyperlink\":",
             "old": "        elif item_local == \"hyperlink\":",
             "path": "tools/adapter_docx.py"
           }
@@ -1024,7 +1024,7 @@
         "changes": [
           {
             "count": 1,
-            "new": "                    pass  # defect injection skips header/footer stories",
+            "new": "                pass  # defect injection skips header/footer stories",
             "old": "                _parse_story_part(\n                    builder,\n                    archive,\n                    str(package_part[\"name\"]),\n                    str(package_part[\"partId\"]),\n                    story_node_id,\n                    story_type,\n                    story_id,\n                    styles,\n                    limits,\n                    owner_surface_id=story_surface_id,\n                    relationships=story_relationships,\n                )",
             "path": "tools/adapter_docx.py"
           }
@@ -2421,7 +2421,7 @@
         "changes": [
           {
             "count": 1,
-            "new": "            for ordinal, event in enumerate(sorted(content_paint_events, key=lambda item: item.get(\"kind\", \"\"))):",
+            "new": "            for ordinal, event in enumerate(sorted(content_paint_events, key=lambda item: item.get(\"kind\", \"\"), reverse=True)):",
             "old": "            for ordinal, event in enumerate(content_paint_events):",
             "path": "tools/adapter_pdf.py"
           }
@@ -2498,7 +2498,7 @@
         "changes": [
           {
             "count": 1,
-            "new": "            for ordinal, event in enumerate(sorted(content_paint_events, key=lambda item: item.get(\"operatorIndex\", 0))):",
+            "new": "            for ordinal, event in enumerate(sorted(content_paint_events, key=lambda item: item.get(\"operatorIndex\", 0), reverse=True)):",
             "old": "            for ordinal, event in enumerate(content_paint_events):",
             "path": "tools/adapter_pdf.py"
           }
@@ -2537,7 +2537,7 @@
         "changes": [
           {
             "count": 1,
-            "new": "            for ordinal, event in enumerate(sorted(content_paint_events, key=lambda item: item.get(\"page\", 0))):",
+            "new": "            for ordinal, event in enumerate(list(reversed(content_paint_events))):",
             "old": "            for ordinal, event in enumerate(content_paint_events):",
             "path": "tools/adapter_pdf.py"
           }
