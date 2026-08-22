@@ -6,10 +6,7 @@ __pycache__/
 .venv/
 dist/
 build/
-reports/
 tmp/
-e2e/.run/
-e2e/run-debug/
 e2e/fixtures/sample.docx
 e2e/fixtures/sample.xlsx
 e2e/fixtures/sample.pdf
@@ -22,10 +19,4 @@ e2e/fixtures/unsupported.docx
 e2e/fixtures/unsupported.xlsx
 e2e/fixtures/unsupported.pdf
 e2e/fixtures/unsupported.md
-# Local qualification scratch outputs and temporary inspection workspaces.
-.qualification-issue-*/
-.qualification-issue*-debug/
-.qualification-xlsx-debug/
-.query-qualification-*/
-.style-provenance-*/
 .DS_Store

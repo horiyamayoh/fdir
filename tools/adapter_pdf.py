@@ -974,7 +974,7 @@ def _pdf_source_occurrence_id(
     """Name the authored indirect-reference occurrence in the bounded corpus.
 
     PDF indirect references do not carry relationship IDs like OPC packages do.
-    The qualification corpus therefore identifies the source occurrence from
+    The regression inputs therefore identify the source occurrence from
     the object role and referenced object.  Keep those identities attached to
     the emitted relation instead of making the independent oracle infer them
     from generated IDs.

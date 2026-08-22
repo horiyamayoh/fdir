@@ -1,108 +1,73 @@
-# 6. 問い合わせ、実装境界、API
+# Interfaces and implementation boundaries
 
-## 6.0 実装と qualification の境界
+This chapter describes the product interfaces implemented by FDIR. The local
+unit, acceptance, E2E, and regression test command is the development and
+release decision point.
 
-The interfaces in this chapter describe the intended typed contract and the
-bounded reference paths currently present in the repository. They do not turn
-an available adapter, query operation, or example into qualified evidence.
-Release remains blocked under
-[`machine/audit-recovery-plan.json`](../machine/audit-recovery-plan.json); the
-commit-bound recovery evidence for Issues #88–#105 is still required.
+## Typed query surface
 
-## 6.1 代表的な問い合わせ
+The query layer works on the validated Document Form IR and exposes these
+operations:
 
-問い合わせは entity kind、typed field、relation、status を使います。意味解釈の predicate を追加しません。
-
-| 問い合わせ | 主な条件 |
-| --- | --- |
-| すべての段落 | Node.kind = paragraph |
-| すべてのセルと数式 | Node.kind = cell、FormulaField.kind = spreadsheetFormula |
-| 赤字になっている文字列 | Text の対象 Node と Style.resolved.foreground の color |
-| 特定ページ上の図形 | Surface.partId と Node.kind in shape/textBox/connector |
-| ある要素を指すコネクター | Relation.kind = connectorTarget、toId = target |
-| 非表示要素 | Style.visibility または Layout.visibility = hidden |
-| 未対応・近似要素 | status in unsupported/approximated/ambiguous |
-| 特定形式の拡張を持つ要素 | Extension.namespace/type と targetId |
-| PDF glyph と OCR の不一致 | source Text/glyph と Observation.kind = ocrToken の relation |
-| Word style 継承元 | Style.basedOn を辿る |
-| Excel 表示値と格納値 | FormulaField.values.raw と values.displayed を別々に取得 |
-
-例として、red text query は Text -> Node -> Style(resolved.foreground) の参照を使います。「red means warning」は query に入りません。
-
-## 6.2 Query API の概念
-
-~~~text
+```text
 list_nodes(document_id, kind?, part_id?, status?) -> Node[]
 get_text(node_id, representation: source|normalized|displayed) -> Text
 get_styles(node_id, stage: authored|inherited|theme|direct|resolved) -> StyleView
 find_relations(kind, from_id?, to_id?) -> Relation[]
 find_extensions(namespace?, type?, target_id?) -> Extension[]
 find_observation_differences(target_id?, observation_kind?) -> Difference[]
-~~~
+```
 
-Query は index が利用できる場合でも canonical IR の entity と一致することを検証します。index は semantic interpretation を保存する場所ではありません。
+The index is rebuildable from the IR. Tests compare direct collection access
+with the rebuilt index so a query result never becomes a second authority.
 
-## 6.3 推奨 module / crate / package boundaries
+## Module boundaries
 
-実装開始時の境界は次のとおりです。名前は実装言語に拘束されず、責務だけを凍結します。
+| module | responsibility | should not own |
+| --- | --- | --- |
+| `form-schema` | JSON Schema and generated contracts | parser behavior |
+| `form-core` | typed entities, IDs, status, invariants | raw package bytes |
+| `form-canonical` | canonical JSON and digest | semantic comparison |
+| `adapter-contract` | inspect/convert protocol and capabilities | format-specific parsing |
+| `adapter-docx` | DOCX parsing and mapping | business meaning |
+| `adapter-xlsx` | XLSX parsing and mapping | recalculation authority |
+| `adapter-pdf` | PDF parsing and mapping | OCR inference as source fact |
+| `adapter-markdown` | Markdown parsing and mapping | business meaning |
+| `observation-worker` | renderer/OCR observations | source fact mutation |
+| `form-validation` | schema, invariant, and compatibility checks | workflow state |
+| `form-index` | rebuildable query projection | canonical authority mutation |
+| `form-cli` | `inspect`, `convert`, and `validate` entry points | vendor-specific bypass |
+| `test-support` | fixtures and malformed-input harnesses | hidden source-byte oracle |
 
-| module | 責務 | 依存してよいもの | 依存してはいけないもの |
-| --- | --- | --- | --- |
-| form-schema | JSON Schema、registry、generated types | schema generator | parser vendor、Semantic IR |
-| form-core | typed entities、IDs、status、invariants | form-schema | raw byte store、business ontology |
-| form-canonical | canonical JSON、digest、version | form-core | source archive、semantic comparator |
-| adapter-contract | inspect/convert wire protocol、capability | form-core | format implementation |
-| adapter-docx | DOCX parser と mapping | adapter-contract、docx extension schema | semantic assertion engine |
-| adapter-xlsx | XLSX parser と mapping | adapter-contract、xlsx extension schema | recalculation authority |
-| adapter-pdf | PDF parser と mapping | adapter-contract、pdf extension schema | OCR inference as source fact |
-| adapter-markdown | Markdown parser と mapping | adapter-contract、markdown extension schema | business meaning |
-| observation-worker | renderer/OCR observation | adapter-contract | source fact mutation |
-| form-validation | schema/invariant/compatibility checks | form-core、form-canonical | qualification bureaucracy as product model |
-| form-index | rebuildable query projection | form-core | canonical authority mutation |
-| form-cli | inspect/convert/validate の bounded entry point | public modules | direct vendor-specific bypass |
-| test-support | fixtures、golden IR、malformed input harness | public contracts | hidden source-byte oracle |
+## Parser boundary
 
-## 6.4 Parser dependency boundary
+Adapters preserve source-declared facts and identify library-derived
+normalization. Parser failures become `unsupported`, `partial`, or `failed`
+conversion results with diagnostics; parser output alone is not promoted to
+semantic business meaning.
 
-高水準 library の clean text、cell、paragraph、AST は convenience output です。adapter は:
+## Renderer and OCR boundary
 
-- parser dependency/version/config を capability metadata に記録する。
-- source-declared facts と library-derived normalization を分ける。
-- parser の失敗・unsupported を黙って空配列へしない。
-- parser output だけで semantic assertion、equivalence、production claim を生成しない。
+Renderer and OCR output is represented as `Observation` data linked to the
+source page, surface, or node. Engine, method, settings, resource, status,
+and precision remain explicit so an observation cannot silently replace source
+text or geometry.
 
-## 6.5 Renderer / OCR boundary
+## CLI boundary
 
-Renderer/OCR は source-declared structure と同格の権威ではありません。結果は Observation として対象 page/surface/node に関連づけ、engine、version、settings、resource、method、status、precision を記録します。複数 engine の不一致は一つの真値へ平均せず、複数 observation と Diagnostic にします。
+The public entry point is `tools/convert_document.py`:
 
-## 6.6 現在の実行可能 CLI
-
-リポジトリで現在実行できる bounded CLI entry point は `tools/convert_document.py` の次の command に限定されます。`--format` を省略した場合は入力拡張子から推定し、指定する場合は `docx`、`xlsx`、`pdf`、`markdown` のいずれかです。
-
-~~~text
+```text
 python tools/convert_document.py inspect <input> [--format <kind>] [--profile <id>]
 python tools/convert_document.py convert <input> --out <document-form.json> [--format <kind>] [--profile <id>] [--evidence <execution.json>]
 python tools/convert_document.py validate <document-form.json>
-~~~
+```
 
-`convert` の wrapper 出力は `status` に `success` または `failed` を使います。生成された IR の `conversion.status` は complete、complete-with-warnings、partial、failed、`validate` の出力 status は valid です。これらは entity/feature の status vocabulary とは別です。
+The optional `--evidence` file is product conversion metadata. It reports the
+input consumed and the conversion outcome and is not a development completion
+record.
 
-## 6.7 Executable adapter entry point
-
-The repository contains a bounded reference entry point at
-`tools/convert_document.py`. It has paths for DOCX, XLSX, PDF, and Markdown
-inputs, emits Document Form IR and can emit an external execution-evidence
-sidecar when requested, and is intended to fail closed on malformed input or
-configured resource limits:
-
-The exact command forms are listed in 6.6; this section describes their
-bounded adapter boundary and output semantics.
-
-`tools/run_e2e.py --all` generates bounded real-input cases, invokes that
-public entry point in child processes, and checks source-derived content,
-diagnostics, malformed-input handling, and configured limits across the four
-format paths. This is an implementation/regression path, not proof of complete
-format coverage or release qualification. It does not promote renderer/OCR
-observations or parser output into business meaning.
-
-compare、equivalence、lineage、assert、knowledge graph は FDIR CLI の command にしません。構造差・表示差を比較する補助 command を将来追加する場合も、semantic equivalence とは別 namespace と型で設計します。
+`tools/run_e2e.py --all` runs transient four-format cases through this public
+boundary, including malformed, unsupported, and resource-limit inputs. It is
+also invoked by the standard unittest discovery command and leaves no generated
+files in the repository.

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 
 try:
@@ -17,16 +18,15 @@ except ModuleNotFoundError:  # direct ``python tools/test_adapter_markdown.py`` 
 
 
 ROOT = Path(__file__).resolve().parents[1]
-RUN_ROOT = ROOT / "e2e" / ".run" / "markdown-regression"
 
 
 class MarkdownAdapterRegressionTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls) -> None:
-        RUN_ROOT.mkdir(parents=True, exist_ok=True)
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory(prefix="fdir-markdown-regression-")
+        self.addCleanup(self._tmp.cleanup)
 
     def _convert(self, name: str, source: bytes, *, profile: str | None = None) -> dict:
-        path = RUN_ROOT / name
+        path = Path(self._tmp.name) / name
         path.write_bytes(source)
         document = convert(path, profile=profile)
         validate_document(document)

@@ -1,28 +1,23 @@
-## Owning issue
-
-Closes/relates to: <!-- DFIR-I-xxx -->
-
 ## Scope
 
-- Requirements:
-- Acceptance families:
+- Product behavior:
+- Affected formats or commands:
 - Changed paths:
-- Explicit exclusions:
 
 ## Boundary review
 
-- [ ] No semantic interpretation, business rule, truth, causality, or semantic equivalence was added.
-- [ ] No source-byte archive, content-addressed source store, byte census, or accounting closure was added.
-- [ ] Core fields remain typed; no free property bag or predicate/value field was added.
+- [ ] No business meaning or semantic equivalence was added to the IR.
+- [ ] Core fields remain typed and closed.
 - [ ] Source, normalized, stored, cached, computed, displayed, rendered, and observed facts remain distinct.
-- [ ] Style, layout, geometry, relation, and order changes include invariants or examples.
-- [ ] Unknown, unsupported, approximate, ambiguous, unavailable, and failed outcomes remain explicit.
+- [ ] Unsupported, partial, ambiguous, unavailable, and failed outcomes remain explicit.
 - [ ] Query indexes and renderer outputs remain non-authoritative.
 
 ## Verification
 
-Commands:
+Command:
 
-Results:
+```powershell
+python -m unittest discover -s tests -p "test_*.py"
+```
 
-Known loss or limitation:
+Result and known limitation:

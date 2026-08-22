@@ -14,7 +14,7 @@
         "profileBound": true,
         "completeEligibleDispositions": ["preserved", "normalized"],
         "unknownConstructDisposition": "failed",
-        "requiredOccurrenceFields": ["sourceOccurrenceId", "formatProfileId", "sourceLocator", "constructId", "parentOccurrenceId", "sourceDigest", "tokenDigest", "policyRuleId", "evidenceCaseId"],
+        "requiredOccurrenceFields": ["sourceOccurrenceId", "formatProfileId", "sourceLocator", "constructId", "parentOccurrenceId", "sourceDigest", "tokenDigest", "policyRuleId"],
         "requiredTestVectors": ["positive-supported", "unknown-construct", "handler-omission", "duplicate-accounting", "locator-identity", "missing-resource"],
         "rules": [
           {"id":"docx-occurrence-opc-content-type-declaration","constructId":"opc.content-type-declaration","support":"diagnosed","allowedDispositions":["preserved","normalized","omitted-by-policy","unsupported","failed"],"targetRequired":false,"diagnosticRequired":false,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
@@ -45,7 +45,7 @@
         "profileBound": true,
         "completeEligibleDispositions": ["preserved", "normalized"],
         "unknownConstructDisposition": "failed",
-        "requiredOccurrenceFields": ["sourceOccurrenceId", "formatProfileId", "sourceLocator", "constructId", "parentOccurrenceId", "sourceDigest", "tokenDigest", "policyRuleId", "evidenceCaseId"],
+        "requiredOccurrenceFields": ["sourceOccurrenceId", "formatProfileId", "sourceLocator", "constructId", "parentOccurrenceId", "sourceDigest", "tokenDigest", "policyRuleId"],
         "requiredTestVectors": ["positive-supported", "unknown-construct", "handler-omission", "duplicate-accounting", "locator-identity", "missing-resource"],
         "rules": [
           {"id":"xlsx-occurrence-opc-content-type-declaration","constructId":"opc.content-type-declaration","support":"diagnosed","allowedDispositions":["preserved","normalized","omitted-by-policy","unsupported","failed"],"targetRequired":false,"diagnosticRequired":false,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
@@ -76,7 +76,7 @@
         "profileBound": true,
         "completeEligibleDispositions": ["preserved", "normalized"],
         "unknownConstructDisposition": "failed",
-        "requiredOccurrenceFields": ["sourceOccurrenceId", "formatProfileId", "sourceLocator", "constructId", "parentOccurrenceId", "sourceDigest", "tokenDigest", "policyRuleId", "evidenceCaseId"],
+        "requiredOccurrenceFields": ["sourceOccurrenceId", "formatProfileId", "sourceLocator", "constructId", "parentOccurrenceId", "sourceDigest", "tokenDigest", "policyRuleId"],
         "requiredTestVectors": ["positive-supported", "unknown-construct", "handler-omission", "duplicate-accounting", "locator-identity", "missing-resource"],
         "rules": [
           {"id":"pdf-occurrence-pdf-annotation-action","constructId":"pdf.annotation-action","support":"diagnosed","allowedDispositions":["preserved","normalized","unsupported","ambiguous","failed"],"targetRequired":true,"diagnosticRequired":true,"requiredDiagnosticCode":"DFIR-SOURCE-OCCURRENCE-DISPOSITION"},
@@ -129,7 +129,7 @@
         "profileBound": true,
         "completeEligibleDispositions": ["preserved", "normalized"],
         "unknownConstructDisposition": "failed",
-        "requiredOccurrenceFields": ["sourceOccurrenceId", "formatProfileId", "sourceLocator", "constructId", "parentOccurrenceId", "sourceDigest", "tokenDigest", "policyRuleId", "evidenceCaseId"],
+        "requiredOccurrenceFields": ["sourceOccurrenceId", "formatProfileId", "sourceLocator", "constructId", "parentOccurrenceId", "sourceDigest", "tokenDigest", "policyRuleId"],
         "requiredTestVectors": ["positive-supported", "unknown-construct", "handler-omission", "duplicate-accounting", "locator-identity", "missing-resource"],
         "rules": [
           {"id":"markdown-occurrence-markdown-block","constructId":"markdown.block","support":"supported","allowedDispositions":["preserved","normalized"],"targetRequired":true,"diagnosticRequired":false,"requiredDiagnosticCode":null},

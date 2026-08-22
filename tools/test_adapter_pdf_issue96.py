@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
+import tempfile
 import unittest
 
 try:
@@ -16,20 +16,79 @@ except ImportError:  # pragma: no cover - package-style test execution.
 
 ROOT = Path(__file__).resolve().parents[1]
 
+PDF_FIXTURES = {
+    "pdf-rich-annotations": r"""%PDF-1.7
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> /XObject << /Im1 99 0 R >> >> /Contents 6 0 R /Annots [7 0 R 8 0 R 9 0 R 10 0 R 11 0 R 13 0 R] >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+6 0 obj
+<< /Length 39 >>
+stream
+BT /F1 12 Tf 72 720 Td (PDF closure) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 20 100 40] /A 12 0 R >>
+endobj
+8 0 obj
+<< /Type /Annot /Subtype /Text /Rect [110 20 150 50] /Contents (A comment) >>
+endobj
+9 0 obj
+<< /Type /Annot /Subtype /Widget /Rect [160 20 240 50] /T (CustomerName) /FT /Tx >>
+endobj
+10 0 obj
+<< /Type /Annot /Subtype /FreeText /Rect [250 20 350 50] /Contents (Free text) >>
+endobj
+11 0 obj
+<< /Type /Annot /Subtype /Highlight /Rect [20 60 120 80] /QuadPoints [20 80 120 80 20 60 120 60] >>
+endobj
+12 0 obj
+<< /Type /Action /S /URI /URI (https://example.invalid/pdf) >>
+endobj
+13 0 obj
+<< /Type /Annot /Subtype /Link /Rect [360 20 500 50] /A 14 0 R >>
+endobj
+14 0 obj
+<< /Type /Action /S /JavaScript /JS (app.alert) >>
+endobj
+%%EOF
+""",
+    "pdf-marker-only": r"""%PDF-1.7
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Annots marker >>
+endobj
+%%EOF
+""",
+}
 
-def _fixture(fixture_id: str) -> dict:
-    corpus = json.loads((ROOT / "machine" / "qualification-issue-96-corpus.json").read_text(encoding="utf-8"))
-    return next(item for item in corpus["fixtures"] if item["fixtureId"] == fixture_id)
+
+def _fixture(fixture_id: str) -> str:
+    return PDF_FIXTURES[fixture_id]
 
 
 class PDFIssue96Tests(unittest.TestCase):
     def setUp(self) -> None:
-        scratch = ROOT / "e2e" / ".run" / "qualification-issue-96-pdf-fixtures"
-        scratch.mkdir(parents=True, exist_ok=True)
-        self.path = scratch / f"{self._testMethodName}.pdf"
+        self._tmp = tempfile.TemporaryDirectory(prefix="fdir-pdf-annotations-")
+        self.addCleanup(self._tmp.cleanup)
+        self.path = Path(self._tmp.name) / f"{self._testMethodName}.pdf"
 
     def _convert(self, fixture_id: str) -> dict:
-        self.path.write_bytes(_fixture(fixture_id)["value"].encode("latin-1"))
+        self.path.write_bytes(_fixture(fixture_id).encode("latin-1"))
         document, evidence = convert_path(self.path, "pdf")
         self.assertEqual(evidence["outcome"], "success")
         validate_document(document)

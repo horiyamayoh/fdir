@@ -5,6 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 import re
 from pathlib import Path
+import tempfile
 import unittest
 import zipfile
 
@@ -42,9 +43,6 @@ def _provenance_is_coherent(style: dict, style_ids: set[str]) -> bool:
         return False
     provenance = _provenance(style)
     return set(resolved) == set(provenance) and all(source in style_ids for source in provenance.values())
-
-
-_TEST_TEMP_ROOT = Path(__file__).resolve().parents[1] / "e2e" / ".run"
 
 
 def _docx_parts(*, missing_parent: bool = False) -> dict[str, str]:
@@ -166,8 +164,12 @@ def _xlsx_parts() -> dict[str, str]:
 
 
 class AdapterStyleProvenanceTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory(prefix="fdir-style-provenance-")
+        self.addCleanup(self._tmp.cleanup)
+
     def _convert(self, suffix: str, parts: dict[str, str]) -> dict:
-        path = _TEST_TEMP_ROOT / f"style-provenance-fixture.{suffix}"
+        path = Path(self._tmp.name) / f"style-provenance-fixture.{suffix}"
         try:
             _write_package(path, parts)
             document, evidence = convert_path(path, suffix)

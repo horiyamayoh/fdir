@@ -1,45 +1,36 @@
-name: Document Form IR design or implementation
-description: Propose bounded work against the new Document Form IR plan.
-title: "[DFIR] "
+name: FDIR product change or bug
+description: Propose a change within the Document Form IR product boundary.
+title: "[FDIR] "
 body:
-  - type: input
-    id: issue-key
-    attributes:
-      label: Issue plan key
-      description: Use a key from machine/issue-plan.json, for example DFIR-I-007.
-    validations:
-      required: true
   - type: textarea
-    id: requirements
+    id: behavior
     attributes:
-      label: Owned requirements
-      description: List exact DFIR-* requirement IDs and acceptance families.
+      label: Product behavior
+      description: Describe the observed behavior, expected behavior, and affected format or command.
     validations:
       required: true
   - type: textarea
     id: scope
     attributes:
-      label: Scope and exclusions
-      description: Describe paths, dependencies, and explicit exclusions.
+      label: Scope and reproduction
+      description: Include inputs, commands, diagnostics, and relevant schema or adapter paths.
     validations:
       required: true
   - type: textarea
     id: acceptance
     attributes:
       label: Acceptance
-      description: State executable expected outputs, invariants, or stable diagnostics.
+      description: State the product assertions and regression cases that should pass.
     validations:
       required: true
   - type: checkboxes
     id: boundary
     attributes:
-      label: Boundary checklist
+      label: Product boundary
       options:
-        - label: No semantic interpretation or semantic equivalence.
+        - label: No business meaning or semantic equivalence is added to the IR.
           required: true
-        - label: No source-byte archive or content-addressed source store.
+        - label: Unsupported and partial conversion states remain explicit diagnostics.
           required: true
-        - label: No free property bag or untyped predicate/value field.
-          required: true
-        - label: Non-success conversion states remain explicit.
+        - label: The standard unittest discovery command covers the change.
           required: true

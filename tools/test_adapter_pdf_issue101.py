@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from pathlib import Path
+import tempfile
 import unittest
 
 try:
@@ -22,7 +23,7 @@ try:
     )
     from convert_document import convert_path
     from ir_validation import validate_document
-    from qualification_evidence import case_evidence, validate_source_feature_closure
+    from regression_helpers import case_evidence, validate_source_feature_closure
 except ImportError:  # pragma: no cover - package-style test execution.
     from tools.adapter_pdf import (
         _page_content_sources,
@@ -39,7 +40,7 @@ except ImportError:  # pragma: no cover - package-style test execution.
     )
     from tools.convert_document import convert_path
     from tools.ir_validation import validate_document
-    from tools.qualification_evidence import case_evidence, validate_source_feature_closure
+    from tools.regression_helpers import case_evidence, validate_source_feature_closure
 
 
 def _dictionary(value: str) -> bytes:
@@ -139,9 +140,9 @@ def _write_object_stream_pdf(path: Path) -> None:
 
 class PDFIssue101Tests(unittest.TestCase):
     def setUp(self) -> None:
-        self.scratch = Path(__file__).resolve().parents[1] / "e2e" / ".run" / "qualification-issue-101-pdf-fixtures"
-        self.scratch.mkdir(parents=True, exist_ok=True)
-        self.path = self.scratch / f"{self._testMethodName}.pdf"
+        self._tmp = tempfile.TemporaryDirectory(prefix="fdir-pdf-regression-")
+        self.addCleanup(self._tmp.cleanup)
+        self.path = Path(self._tmp.name) / f"{self._testMethodName}.pdf"
 
     def test_page_tree_and_contents_are_byte_aware_and_authored_ordered(self) -> None:
         _write_pdf(self.path)

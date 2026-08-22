@@ -1326,7 +1326,7 @@ def convert(path: Path, *, limits: AdapterLimits | None = None, profile: str | N
     )
     # Relationship reciprocity is owned by a part in the shared IR contract.
     # Keep the inline source symbol stable for the bounded Markdown
-    # qualification lane while the annotations and nodes retain their exact
+    # regression path while the annotations and nodes retain their exact
     # token-level targets.
     relationship_owner_id = safe_id("part", "markdown-inline-links")
     builder.add_item(
@@ -1374,7 +1374,7 @@ def convert(path: Path, *, limits: AdapterLimits | None = None, profile: str | N
         nul_line, nul_column = source_index.locate(nul_offset)
         nul_map = _source_map(builder, builder.root_id, nul_line, nul_column, nul_line, nul_column + 1, token_start=nul_column - 1, token_end=nul_column)
         # Keep the exact NUL source map while targeting the emitted document
-        # root.  Qualification requires parser diagnostics to point at an
+        # root. Parser diagnostics point at an
         # emitted entity; the source-map locator remains the byte-accurate
         # line/column authority for this diagnostic.
         diagnostic = _diagnostic(builder, "DFIR-MD-NUL-CHARACTER", "NUL characters are not valid authored Markdown text.", target_id=builder.root_id, source_map_id=nul_map["sourceMapId"], severity="error", phase="parse")

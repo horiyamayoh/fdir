@@ -1,29 +1,28 @@
-"""Run the real-input FDIR adapter end-to-end qualification.
+"""Run the transient real-input FDIR adapter regression.
 
 The runner deliberately invokes the public ``convert_document.py`` process
-for every case.  A hand-authored IR fixture, a missing adapter, or an adapter
-that ignores its input cannot satisfy the evidence and source-derived content
-checks.
+for every case. A hand-authored IR fixture, a missing adapter, or an adapter
+that ignores its input cannot satisfy the source-derived content checks.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 from typing import Any
 
 try:
     from generate_e2e_fixtures import write_fixtures
     from ir_validation import validate_document
-    from qualification_evidence import case_evidence, validate_source_feature_closure
+    from regression_helpers import case_evidence, validate_source_feature_closure
 except ImportError:  # pragma: no cover
     from tools.generate_e2e_fixtures import write_fixtures
     from tools.ir_validation import validate_document
-    from tools.qualification_evidence import case_evidence, validate_source_feature_closure
+    from tools.regression_helpers import case_evidence, validate_source_feature_closure
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,7 +37,7 @@ class E2EFailure(RuntimeError):
 
 
 def require_source_closure(document: dict[str, Any], evidence: dict[str, Any], label: str) -> dict[str, Any]:
-    """Run the shared source occurrence closure check and fail closed."""
+    """Run the shared source occurrence closure check."""
 
     closure = validate_source_feature_closure(document, evidence)
     evidence["sourceClosure"] = closure
@@ -276,17 +275,7 @@ def check_unsupported(format_name: str, input_path: Path, work: Path) -> dict[st
     }
 
 
-def run_all(keep: Path | None = None) -> dict[str, Any]:
-    if keep is None:
-        # Some managed Windows workstations deny chmod/rmtree in generated
-        # temporary directories.  Use an ignored, per-process workspace so
-        # concurrent acceptance/release commands cannot race while writing
-        # fixtures, and a failed gate leaves inspectable evidence behind.
-        work = ROOT / "e2e" / ".run" / f"run-{os.getpid()}"
-        work.mkdir(parents=True, exist_ok=True)
-    else:
-        work = Path(keep).resolve()
-        work.mkdir(parents=True, exist_ok=True)
+def _run_all_at(work: Path) -> dict[str, Any]:
     fixture_dir = work / "fixtures"
     paths = write_fixtures(fixture_dir)
     cases: list[dict[str, Any]] = []
@@ -313,27 +302,27 @@ def run_all(keep: Path | None = None) -> dict[str, Any]:
         "cases": cases,
         "workdir": str(work),
     }
-    if keep is not None:
-        (work / "e2e-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return report
+
+
+def run_all() -> dict[str, Any]:
+    """Run every real-input case without retaining generated files."""
+
+    with tempfile.TemporaryDirectory(prefix="fdir-e2e-") as directory:
+        return _run_all_at(Path(directory))
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--all", action="store_true", required=True)
-    parser.add_argument("--keep", type=Path)
-    parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     try:
-        report = run_all(args.keep)
+        report = run_all()
     except Exception as exc:
         payload = {"schema": "fdir/e2e-report", "version": "1.0.0", "status": "failed", "error": str(exc)}
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 1
-    if args.json:
-        print(json.dumps(report, ensure_ascii=False, indent=2))
-    else:
-        print(f"e2e valid: {len(report['cases'])} real-input cases across {len(report['formats'])} formats")
+    print(f"e2e valid: {len(report['cases'])} real-input cases across {len(report['formats'])} formats")
     return 0
 
 

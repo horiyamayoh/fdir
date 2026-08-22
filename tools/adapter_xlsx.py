@@ -226,7 +226,7 @@ def _relationship_target(source_name: str, raw_target: str, target_mode: str) ->
 
 
 def _xlsx_source_occurrence(source_name: str, relationship_id: str) -> str:
-    """Stable source occurrence names used by the independent qualification corpus."""
+    """Stable source occurrence names used by product relationship mappings."""
 
     exact = {
         ("[package]", "rIdWorkbook"): "xlsx-package-workbook",

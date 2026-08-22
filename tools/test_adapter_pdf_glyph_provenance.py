@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
+import tempfile
 import unittest
 
 try:
@@ -19,7 +20,7 @@ def _cmap_target(value: str) -> str:
 
 
 def _write_pdf(path: Path, text_hex: str, mappings: list[tuple[str, str]] | None = None) -> None:
-    """Write a tiny authored PDF without importing the qualification helper."""
+    """Write a tiny authored PDF without importing production adapters."""
 
     stream = f"BT /F1 12 Tf 72 720 Td <{text_hex}> Tj ET".encode("ascii")
     objects = [
@@ -64,10 +65,12 @@ def _write_identity_h_pdf(path: Path) -> None:
 
 
 class PDFGlyphProvenanceTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory(prefix="fdir-pdf-glyph-")
+        self.addCleanup(self._tmp.cleanup)
+
     def _convert(self, text_hex: str, mappings: list[tuple[str, str]] | None) -> dict:
-        scratch = Path(__file__).resolve().parents[1] / "e2e" / ".run" / "qualification-issue-92-glyph-fixtures"
-        scratch.mkdir(parents=True, exist_ok=True)
-        path = scratch / f"{self._testMethodName}.pdf"
+        path = Path(self._tmp.name) / f"{self._testMethodName}.pdf"
         _write_pdf(path, text_hex, mappings)
         document, evidence = convert_path(path, "pdf")
         self.assertEqual(evidence["outcome"], "success")
@@ -133,9 +136,7 @@ class PDFGlyphProvenanceTests(unittest.TestCase):
         self.assertIn("DFIR-PDF-GLYPH-CMAP-PARTIAL", self._diagnostic_codes(document))
 
     def test_identity_h_without_tounicode_preserves_two_byte_codes_only(self) -> None:
-        scratch = Path(__file__).resolve().parents[1] / "e2e" / ".run" / "qualification-issue-92-glyph-fixtures"
-        scratch.mkdir(parents=True, exist_ok=True)
-        path = scratch / f"{self._testMethodName}.pdf"
+        path = Path(self._tmp.name) / f"{self._testMethodName}.pdf"
         _write_identity_h_pdf(path)
         document, evidence = convert_path(path, "pdf")
         self.assertEqual(evidence["outcome"], "success")

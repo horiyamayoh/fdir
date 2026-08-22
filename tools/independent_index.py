@@ -1,7 +1,7 @@
-"""Standalone, persistent SQLite index for a bounded #103 query slice.
+"""Standalone, persistent SQLite index for the product query surface.
 
-This module intentionally does not import :mod:`query_ir` or
-:mod:`query_qualification`.  It rebuilds a projection from the validated IR
+This module intentionally does not import :mod:`query_ir`. It rebuilds a
+projection from the validated IR
 file, stores every entity field at a JSON-pointer path, and binds the SQLite
 file to the source and contract files that were used to build it.
 
@@ -12,10 +12,9 @@ not agree) instead of accepting a partially replaced index.  Readers keep a
 read-only SQLite connection and re-check the database digest before each
 operation; a caller may retry after a concurrent replacement.
 
-This is a bounded slice of Issue #103.  It provides persistent full-field
-storage, exact typed field lookup, entity listing, and reverse-reference
-lookup.  It does not claim to implement the complete query surface or the
-issue's full independent qualification reports.
+It provides persistent full-field storage, exact typed field lookup, entity
+listing, and reverse-reference lookup for callers that need a durable local
+projection. The canonical IR remains the authority.
 """
 
 from __future__ import annotations

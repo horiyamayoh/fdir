@@ -379,8 +379,8 @@ class _ValidatedDocument:
     """One authority validation bound to an immutable document snapshot.
 
     Public query functions continue to call :func:`_ensure_document` on every
-    invocation.  Qualification can use this private path when it deliberately
-    performs a batch of read-only queries over one document.  The canonical
+    invocation.  Regression tests can use this private path when they perform
+    a batch of read-only queries over one document.  The canonical
     digest is checked after the batch, so an in-flight mutation cannot turn a
     validated snapshot into an accepted stale result.
     """
@@ -644,8 +644,8 @@ def get_field(document: dict[str, Any], collection: str, identifier: str, pointe
 
     Entity lookup alone is not a field-level query contract: callers could
     receive the full object while the index omitted a nested value.  This
-    operation makes every serialized field addressable and gives the
-    qualification layer a concrete operation to exercise.
+    operation makes every serialized field addressable for the product query
+    surface.
     """
 
     return _get_field_validated(_ensure_document(document), collection, identifier, pointer)

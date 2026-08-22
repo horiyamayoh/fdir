@@ -1,4 +1,4 @@
-"""Generate small real document fixtures used by the FDIR E2E gate.
+"""Generate small real document fixtures used by the FDIR E2E regression.
 
 The fixtures are intentionally constructed from the public container formats,
 not from pre-authored IR.  The adapter must open the generated DOCX/XLSX/PDF

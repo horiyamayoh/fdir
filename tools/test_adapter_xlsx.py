@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import tempfile
 import unittest
 import zipfile
 import xml.etree.ElementTree as ET
@@ -13,9 +14,6 @@ try:
 except ImportError:  # pragma: no cover
     from tools.convert_document import convert_path
     from tools.adapter_xlsx import _xlsx_condition_matches
-
-
-_TEST_TEMP_ROOT = Path(__file__).resolve().parents[1] / "e2e" / ".run"
 
 
 def _write_package(path: Path, parts: dict[str, str]) -> None:
@@ -105,8 +103,12 @@ def _text(document: dict, cell: dict, representation: str) -> dict:
 
 
 class AdapterXlsxFailClosedTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory(prefix="fdir-xlsx-regression-")
+        self.addCleanup(self._tmp.cleanup)
+
     def _convert(self, name: str, parts: dict[str, str]) -> dict:
-        path = _TEST_TEMP_ROOT / f"adapter-xlsx-{name}.xlsx"
+        path = Path(self._tmp.name) / f"adapter-xlsx-{name}.xlsx"
         try:
             _write_package(path, parts)
             document, evidence = convert_path(path, "xlsx")
@@ -183,7 +185,7 @@ class AdapterXlsxFailClosedTests(unittest.TestCase):
             worksheet = parts["xl/worksheets/sheet1.xml"]
             conditional = f'<conditionalFormatting sqref="B2"><cfRule type="expression" priority="1"{operator_attribute}><formula>B2&gt;0</formula></cfRule></conditionalFormatting>'
             parts["xl/worksheets/sheet1.xml"] = worksheet.replace("</worksheet>", f"{conditional}</worksheet>")
-            path = _TEST_TEMP_ROOT / f"adapter-xlsx-conditional-operator-{suffix}.xlsx"
+            path = Path(self._tmp.name) / f"adapter-xlsx-conditional-operator-{suffix}.xlsx"
             try:
                 _write_package(path, parts)
                 document, evidence = convert_path(path, "xlsx")
@@ -200,7 +202,7 @@ class AdapterXlsxFailClosedTests(unittest.TestCase):
         worksheet = parts["xl/worksheets/sheet1.xml"]
         conditional = '<conditionalFormatting sqref="B2"><cfRule type="colorScale" priority="1"><colorScale><cfvo type="min"/></colorScale></cfRule></conditionalFormatting>'
         parts["xl/worksheets/sheet1.xml"] = worksheet.replace("</worksheet>", f"{conditional}</worksheet>")
-        path = _TEST_TEMP_ROOT / "adapter-xlsx-conditional-no-formula.xlsx"
+        path = Path(self._tmp.name) / "adapter-xlsx-conditional-no-formula.xlsx"
         try:
             _write_package(path, parts)
             document, evidence = convert_path(path, "xlsx")
