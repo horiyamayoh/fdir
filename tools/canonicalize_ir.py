@@ -95,7 +95,13 @@ def _validate_authority(document: dict[str, Any]) -> None:
     try:
         from ir_validation import validate_document  # type: ignore
     except ImportError:  # pragma: no cover - package-style import
-        from tools.ir_validation import validate_document  # type: ignore
+        try:
+            from tools.ir_validation import validate_document  # type: ignore
+        except ImportError:  # pragma: no cover - isolated script execution
+            tools_root = Path(__file__).resolve().parent
+            if str(tools_root) not in sys.path:
+                sys.path.insert(0, str(tools_root))
+            from ir_validation import validate_document  # type: ignore
     validate_document(document)
 
 

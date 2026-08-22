@@ -8,3 +8,4 @@
 *.cddl text eol=lf
 *.mmd text eol=lf
 *.csv text eol=lf
+*.zip binary

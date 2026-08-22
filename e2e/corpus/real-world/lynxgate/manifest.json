@@ -1,0 +1,1356 @@
+{
+    "schema":  "fdir/real-input-corpus-manifest",
+    "version":  "1.0.0",
+    "id":  "lynxgate",
+    "sourceOfTruth":  "committed input archives; document digests are over uncompressed archive entries",
+    "archives":  [
+                     {
+                         "id":  "field-reality",
+                         "path":  "archives/LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel_Revised_UTF8.zip",
+                         "bytes":  3893526,
+                         "sha256":  "fc3e5a0a63db9ee9ce7c795f9804d1162bc7c85b3a625da779d9e7e5c93104ff",
+                         "documentCount":  66,
+                         "formats":  {
+                                         "docx":  19,
+                                         "xlsx":  47
+                                     }
+                     },
+                     {
+                         "id":  "practical",
+                         "path":  "archives/LynxGate_Enterprise_Practical_Benchmark_Word_Excel_UTF8_Fixed.zip",
+                         "bytes":  2873271,
+                         "sha256":  "b063b43613d84ea185e075ab2c84de9f89809fe4705d1b3fcc59b90f48174480",
+                         "documentCount":  62,
+                         "formats":  {
+                                         "docx":  16,
+                                         "xlsx":  46
+                                     }
+                     },
+                     {
+                         "id":  "sample-word-only",
+                         "path":  "archives/LynxGate_SampleProject_WordOnly.zip",
+                         "bytes":  1346879,
+                         "sha256":  "da6e637dc4b21923e0549505a7c60fb5431741031c75cc8587c8c7e74942b82e",
+                         "documentCount":  13,
+                         "formats":  {
+                                         "docx":  13,
+                                         "xlsx":  0
+                                     }
+                     },
+                     {
+                         "id":  "sample-word-excel",
+                         "path":  "archives/LynxGate_SampleProject_Word_Excel.zip",
+                         "bytes":  1416743,
+                         "sha256":  "88a26ac63b8c2d4382779c0863a94d6bb01f69fc1bfc103106308a7e0951f631",
+                         "documentCount":  20,
+                         "formats":  {
+                                         "docx":  12,
+                                         "xlsx":  8
+                                     }
+                     }
+                 ],
+    "documents":  [
+                      {
+                          "id":  "lynxgate-001",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/00_利用ガイド/LGX-EVL-001_文書解析評価パッケージ利用ガイド.docx",
+                          "format":  "docx",
+                          "bytes":  48457,
+                          "sha256":  "56d5fdda401d23d6175c3ff11a4db25698326da7be40c39e5a0aba9f4981d096"
+                      },
+                      {
+                          "id":  "lynxgate-002",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/00_利用ガイド/LGX-GLS-001_用語・略語・ID規約.docx",
+                          "format":  "docx",
+                          "bytes":  42288,
+                          "sha256":  "9892dd5c3c49b9bdf05c46021e7e099dd671c4869d9337c4a81ac4007b0e93a8"
+                      },
+                      {
+                          "id":  "lynxgate-003",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/00_利用ガイド/LGX-MAN-001_文書台帳・解析対象一覧.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  35930,
+                          "sha256":  "ed6cf80c56c3ace166c6db4e68a248570c39c29fc4037b42848fbe2edfd57b8c"
+                      },
+                      {
+                          "id":  "lynxgate-004",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/00_利用ガイド/LGX-MAP-001_文書構成・権威順位.docx",
+                          "format":  "docx",
+                          "bytes":  88344,
+                          "sha256":  "a7995509b67b5580bfff99a707359eb1485cabd6d2fcaf0d8debfe53e40ab4ee"
+                      },
+                      {
+                          "id":  "lynxgate-005",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/00_利用ガイド/LGX-PRJ-001_プロジェクト利用ガイド.docx",
+                          "format":  "docx",
+                          "bytes":  218869,
+                          "sha256":  "83974975b52b31fe7e4da8aa39843e7ede4ad92642f11f81bc867c41eef3455c"
+                      },
+                      {
+                          "id":  "lynxgate-006",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/01_要求仕様書/LGX-REQ-001_要求仕様書.docx",
+                          "format":  "docx",
+                          "bytes":  263548,
+                          "sha256":  "2e2cb9ac0606ccba366b3b0505dd4285ddf2a293a5c7ff619e3f22c8ddb8fc03"
+                      },
+                      {
+                          "id":  "lynxgate-007",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/01_要求仕様書/LGX-REQ-S01_機能要求カタログ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  51188,
+                          "sha256":  "dff8974893f11c8b87564f9ee27ef4c11e763458abce8f661d1c5109eccad652"
+                      },
+                      {
+                          "id":  "lynxgate-008",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/01_要求仕様書/LGX-REQ-S02_非機能・SLA・容量.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  36960,
+                          "sha256":  "f4c3fc0c1838b1c50fdc76874c1723b8d58e3fa6aa71281073274e8af27d36e1"
+                      },
+                      {
+                          "id":  "lynxgate-009",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/01_要求仕様書/LGX-REQ-S03_業務規則・状態モデル.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  47738,
+                          "sha256":  "e42e0b9945de478ecc030e7dda4582bfce58888506bc2588edea4fe0257410b3"
+                      },
+                      {
+                          "id":  "lynxgate-010",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/01_要求仕様書/LGX-REQ-S04_ロール権限・データ分類.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  35372,
+                          "sha256":  "103ed9bfd1a4a68de49cce341c1a001210248a614de526085bf22bd26e7f2d57"
+                      },
+                      {
+                          "id":  "lynxgate-011",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/01_要求仕様書/LGX-REQ-S05_要求トレーサ・改定・QA.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  44718,
+                          "sha256":  "ecbdb13e1c52fcfcbf7666fc701e27052b72c4f30c8324427d6dcfc4ee762bcd"
+                      },
+                      {
+                          "id":  "lynxgate-012",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/02_インタフェース仕様書/LGX-IFS-001_インタフェース仕様書.docx",
+                          "format":  "docx",
+                          "bytes":  138606,
+                          "sha256":  "510c32cee7cdb1562bfa6691a8915ad40b96e34f9a06dc084dc0e0beeb05dc19"
+                      },
+                      {
+                          "id":  "lynxgate-013",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/02_インタフェース仕様書/LGX-IFS-S01_APIエンドポイント・スキーマ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  38077,
+                          "sha256":  "4b50dd5bdfe31be9abe60be0a346a47dcfd6e2e672c17afb2767ce8e63b1f8df"
+                      },
+                      {
+                          "id":  "lynxgate-014",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/02_インタフェース仕様書/LGX-IFS-S02_イベント・メッセージカタログ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  43186,
+                          "sha256":  "81a86dd8288badadec4fa354c20132a680472b6cb11e2d2dce087062244fce50"
+                      },
+                      {
+                          "id":  "lynxgate-015",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/02_インタフェース仕様書/LGX-IFS-S03_デバイス・設備プロトコル.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  42993,
+                          "sha256":  "da4a80aff0fd85677d0a1fe0701f4d7c98faa459c473c147d2d0af2c2a57fbae"
+                      },
+                      {
+                          "id":  "lynxgate-016",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/02_インタフェース仕様書/LGX-IFS-S04_ファイル連携・レイアウト.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  41792,
+                          "sha256":  "8984ccfc604a2e0cf2934931948a6d1cea0cabb7b24ff4d795fc59345b6a224e"
+                      },
+                      {
+                          "id":  "lynxgate-017",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/02_インタフェース仕様書/LGX-IFS-S05_エラー・再試行・冪等性.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  44761,
+                          "sha256":  "6305a2762f4db30bf1bbc2c3628d3235a18aeb59770723ace37b1359094df4b4"
+                      },
+                      {
+                          "id":  "lynxgate-018",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/02_インタフェース仕様書/LGX-IFS-S06_ネットワーク・接続先・互換性.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  36877,
+                          "sha256":  "fa3eb5b6f5a6627c55889cf7162ed82ce20f6ab904ec2df718912d0c65b5399e"
+                      },
+                      {
+                          "id":  "lynxgate-019",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/03_外部設計書/LGX-EXT-001_外部設計書.docx",
+                          "format":  "docx",
+                          "bytes":  121238,
+                          "sha256":  "fbcc9c1eb5440773840d095857b004a9bc1dd401d4bead0e2344ee42475300aa"
+                      },
+                      {
+                          "id":  "lynxgate-020",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/03_外部設計書/LGX-EXT-S01_画面・画面遷移.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  46200,
+                          "sha256":  "7c6ba2f0e4b57d6a445e098ea54534f4499564ed33ff2950e5f7cbb43fb83d4e"
+                      },
+                      {
+                          "id":  "lynxgate-021",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/03_外部設計書/LGX-EXT-S02_ユースケース・業務フロー.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  44301,
+                          "sha256":  "ee9b11bfb6c09a5c7965cc43ce5313f0dab44bf31521f0dd7e20e92244c76282"
+                      },
+                      {
+                          "id":  "lynxgate-022",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/03_外部設計書/LGX-EXT-S03_状態遷移・時刻規則.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  44272,
+                          "sha256":  "5dd0528ff7d2174e6af0be0ed7e4dedf3a7d3590a638662bf1afa9d0d9a6a3d6"
+                      },
+                      {
+                          "id":  "lynxgate-023",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/03_外部設計書/LGX-EXT-S04_入力検証・メッセージ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  38681,
+                          "sha256":  "be9b89ad9c65df6bc2ab75327cd5cad60deb282cb7511fd4633edb0b7b705d64"
+                      },
+                      {
+                          "id":  "lynxgate-024",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/03_外部設計書/LGX-EXT-S05_通知・帳票・バッチ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  39348,
+                          "sha256":  "37964ce593e11bd028f8da461975a1a7d471de5ca2d8b0891b4f38022787164d"
+                      },
+                      {
+                          "id":  "lynxgate-025",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/03_外部設計書/LGX-EXT-S06_例外運用・手動介入.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  45984,
+                          "sha256":  "4c8ded39ece29c30ea861ce6b30b85c6d39ca696600ff474de6e63a7eb00e9d7"
+                      },
+                      {
+                          "id":  "lynxgate-026",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/03_外部設計書/LGX-EXT-S07_外部設計トレーサビリティ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  47872,
+                          "sha256":  "8bc06a74fb254e44e46366aa16156d81ffbdfe328caa101f5f60a94b670c50df"
+                      },
+                      {
+                          "id":  "lynxgate-027",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/04_内部設計書/LGX-INT-001_内部設計書.docx",
+                          "format":  "docx",
+                          "bytes":  216274,
+                          "sha256":  "d64671995c97f3d4db39f241583bee98ebb57eb75938f4eb90a12beaa683e5be"
+                      },
+                      {
+                          "id":  "lynxgate-028",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/04_内部設計書/LGX-INT-S01_コンポーネント・依存関係.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  40411,
+                          "sha256":  "dbff860ce814f5c307407d816488e7cbec4a9ecd4ad05939088c507b425aae12"
+                      },
+                      {
+                          "id":  "lynxgate-029",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/04_内部設計書/LGX-INT-S02_DBテーブル・項目・索引.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  49239,
+                          "sha256":  "33a3c3c6073845d588f178bdbc60b8bbf7fc783621a296244bd69d8e66ec821f"
+                      },
+                      {
+                          "id":  "lynxgate-030",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/04_内部設計書/LGX-INT-S03_CRUD・トランザクション.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  51175,
+                          "sha256":  "968d15a7dfd5dd00ea0187e77778012e2a5ed014c4a07a5336472a8fd8680227"
+                      },
+                      {
+                          "id":  "lynxgate-031",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/04_内部設計書/LGX-INT-S04_シーケンス・排他・整合性.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  57729,
+                          "sha256":  "f918746c6d99a0526494c44085c9ed2ef73b5810a1576d0569ed62a066459af6"
+                      },
+                      {
+                          "id":  "lynxgate-032",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/04_内部設計書/LGX-INT-S05_ジョブ・設定・FeatureFlag.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  40621,
+                          "sha256":  "cf421a97f425fa5612be160f32a26e835bb5e33db5c4f1c47ced93b9288f738a"
+                      },
+                      {
+                          "id":  "lynxgate-033",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/04_内部設計書/LGX-INT-S06_ログ・監視・障害復旧.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  47829,
+                          "sha256":  "652f35caa61053a1186a8f88125926380bef1342b0d2f6d1b2520297e10ac5a5"
+                      },
+                      {
+                          "id":  "lynxgate-034",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/04_内部設計書/LGX-INT-S07_内部設計トレーサビリティ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  45902,
+                          "sha256":  "a280f6e2d819fb67d273e4d9baa1b8165a9486dfa0e3c7ec3cf1284ccc5dd2cd"
+                      },
+                      {
+                          "id":  "lynxgate-035",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/05_単体試験仕様書/LGX-UTS-001_単体試験仕様書.docx",
+                          "format":  "docx",
+                          "bytes":  121244,
+                          "sha256":  "0c4da574a328f08f5a3b9b56858f68abe4c9c6e13f9eef646bbbf6b0c7c9ec6b"
+                      },
+                      {
+                          "id":  "lynxgate-036",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/05_単体試験仕様書/LGX-UTS-S01_単体試験ケース.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  51557,
+                          "sha256":  "ad80de69900897a89d91d2d6486aa4020d1671f256310e339e9207a08bb2e9f2"
+                      },
+                      {
+                          "id":  "lynxgate-037",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/05_単体試験仕様書/LGX-UTS-S02_境界値・組合せ・テストデータ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  40045,
+                          "sha256":  "4a2b0af5d186d316c36e936c2038921c21bdd3149eb6995185e76d2d88f227c2"
+                      },
+                      {
+                          "id":  "lynxgate-038",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/05_単体試験仕様書/LGX-UTS-S03_スタブ・モック・故障注入.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  40611,
+                          "sha256":  "6c11ad7c028cb8cf6bf7bd00514969263f201f35d0e08320237425d8e3c63340"
+                      },
+                      {
+                          "id":  "lynxgate-039",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/05_単体試験仕様書/LGX-UTS-S04_単体カバレッジ・トレーサ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  45096,
+                          "sha256":  "d13b237f50c4e2ef4ce9be631561fc464ea599b22f0bc69895af8a2e7fd6420e"
+                      },
+                      {
+                          "id":  "lynxgate-040",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/06_結合試験仕様書/LGX-ITS-001_結合試験仕様書.docx",
+                          "format":  "docx",
+                          "bytes":  123536,
+                          "sha256":  "f57f1a064fc0a252b2a11332e9dff1ed7224c3f48dbc35e5322865b9ac60f4cd"
+                      },
+                      {
+                          "id":  "lynxgate-041",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/06_結合試験仕様書/LGX-ITS-S01_結合試験シナリオ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  52259,
+                          "sha256":  "1ce7a6d888dd9f2ca093ca3c80487f7c8b85c4cc4b5850c668c19a39094f521a"
+                      },
+                      {
+                          "id":  "lynxgate-042",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/06_結合試験仕様書/LGX-ITS-S02_試験環境・接続・スタブ構成.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  33875,
+                          "sha256":  "6d2172e2512b0785970be5926f2e1866513a7d69122ad4a887c8a1b9dd98983a"
+                      },
+                      {
+                          "id":  "lynxgate-043",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/06_結合試験仕様書/LGX-ITS-S03_データ検証・証跡.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  46324,
+                          "sha256":  "dc0936136be3572a540a1c683e78ae66d06740278be8de2a97b16f4f6bafa9ec"
+                      },
+                      {
+                          "id":  "lynxgate-044",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/06_結合試験仕様書/LGX-ITS-S04_障害復旧・カバレッジ・トレーサ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  50310,
+                          "sha256":  "793bed8c23f98e875bba0309c9f7b692b219a316152c1531263f857f3f94371c"
+                      },
+                      {
+                          "id":  "lynxgate-045",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/07_E2E試験仕様書/LGX-E2E-001_E2E試験仕様書.docx",
+                          "format":  "docx",
+                          "bytes":  107997,
+                          "sha256":  "2946beccb7ee0efc6152dd6546034b56726c37f9e1d4c2dae5289abcc37a0c11"
+                      },
+                      {
+                          "id":  "lynxgate-046",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/07_E2E試験仕様書/LGX-E2E-S01_E2Eシナリオ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  50550,
+                          "sha256":  "f89d1507a814c77559313af4cbab146f3362574796d53f8e79300f9e9dab030b"
+                      },
+                      {
+                          "id":  "lynxgate-047",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/07_E2E試験仕様書/LGX-E2E-S02_ペルソナ・テストデータセット.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  39455,
+                          "sha256":  "e9c4e69c933a034ed34ee36ca24afa05248482ccbae8dcaa495360449c3b8ce0"
+                      },
+                      {
+                          "id":  "lynxgate-048",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/07_E2E試験仕様書/LGX-E2E-S03_受入判定・証跡・可観測性.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  46984,
+                          "sha256":  "cc71472b91448143bba1cba5b433ddc7cd30b3ecea72919c2eb1b2e8af514ec4"
+                      },
+                      {
+                          "id":  "lynxgate-049",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/07_E2E試験仕様書/LGX-E2E-S04_E2Eカバレッジ・トレーサ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  45182,
+                          "sha256":  "569f9a31efedcb572a44c84bedb58a73ced6bc126c63f21b7b16c0879222509a"
+                      },
+                      {
+                          "id":  "lynxgate-050",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/08_ベンチマーク/LGX-BMK-001_評価観点・実施要領.docx",
+                          "format":  "docx",
+                          "bytes":  94623,
+                          "sha256":  "3f5ab6b55ea44036ecca0c39e44f26fe570b05088c722b30ecd94501463cd623"
+                      },
+                      {
+                          "id":  "lynxgate-051",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/08_ベンチマーク/LGX-BMK-002_演習問題.docx",
+                          "format":  "docx",
+                          "bytes":  46056,
+                          "sha256":  "20c1bc9889fb4bcf01c79ade828ac43697298ebf7690590dbff5580eeee3ae9b"
+                      },
+                      {
+                          "id":  "lynxgate-052",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/08_ベンチマーク/LGX-BMK-003_模範解答・採点基準_解析対象外.docx",
+                          "format":  "docx",
+                          "bytes":  49776,
+                          "sha256":  "e547a66a21f31971a0d7ce0248dc9de85a9a3d9c48f8b0485082df3dbc31d9c4"
+                      },
+                      {
+                          "id":  "lynxgate-053",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/08_ベンチマーク/LGX-BMK-004_既知ノイズ・正解判断規則_解析対象外.docx",
+                          "format":  "docx",
+                          "bytes":  93905,
+                          "sha256":  "04fa90cd44ed72d0019ec1157083c49684e90f0d81f4fe5a524768c3428f49c2"
+                      },
+                      {
+                          "id":  "lynxgate-054",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/08_ベンチマーク/LGX-BMK-005_実務複雑文書版演習問題.docx",
+                          "format":  "docx",
+                          "bytes":  45040,
+                          "sha256":  "ad2af34e3ade8dc36fdc2776cb313fa18bb9575c3ecf4522bc1170438ff09e6c"
+                      },
+                      {
+                          "id":  "lynxgate-055",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/08_ベンチマーク/LGX-BMK-006_実務複雑文書版模範解答・採点基準_解析対象外.docx",
+                          "format":  "docx",
+                          "bytes":  51175,
+                          "sha256":  "61b1cf00b6414d63cc1f79b06a81bedbc31be5a9aa58ebb3e3f1715358d1e5f2"
+                      },
+                      {
+                          "id":  "lynxgate-056",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/08_ベンチマーク/LGX-BMK-S01_設問バンク.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  33313,
+                          "sha256":  "f8a15074a39fd4a390d2438976658f7408475a70836cd9ef6e43d5f5906d7e68"
+                      },
+                      {
+                          "id":  "lynxgate-057",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/08_ベンチマーク/LGX-BMK-S02_正解成果物・関係グラフ_解析対象外.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  73230,
+                          "sha256":  "eaffe79465adaa41225e7115becad9ad0d0b23de433db9ebbeee45d65030795a"
+                      },
+                      {
+                          "id":  "lynxgate-058",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/08_ベンチマーク/LGX-BMK-S03_位置メモ・改定マーカー正解_解析対象外.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  31576,
+                          "sha256":  "3f1285329eaa198bf27c30ccdac403a2c953ef4216cc94bdece52eac081ad74e"
+                      },
+                      {
+                          "id":  "lynxgate-059",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/08_ベンチマーク/LGX-BMK-S04_既知ノイズ・Q\u0026A権威順位_解析対象外.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  33390,
+                          "sha256":  "d17418f43b89939e56a1c5ca2629db7dcc639dcca23a2bbae0107e4e89f25048"
+                      },
+                      {
+                          "id":  "lynxgate-060",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/08_ベンチマーク/LGX-BMK-S05_採点・変更影響正解_解析対象外.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  84593,
+                          "sha256":  "6034c0838dd2715716c69fd6a40b07208810bbff2266ef5085224ecd6b1797e6"
+                      },
+                      {
+                          "id":  "lynxgate-061",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/08_ベンチマーク/LGX-BMK-S06_実務複雑文書構造・図形正解_解析対象外.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  60640,
+                          "sha256":  "c456cfacd2ba8f50911f6ae08becc953c347afb177c3acfc66b9456a04a2f3d1"
+                      },
+                      {
+                          "id":  "lynxgate-062",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/09_横断管理/LGX-CHG-001_変更管理・リリース判定.docx",
+                          "format":  "docx",
+                          "bytes":  85012,
+                          "sha256":  "add3ffdb9a8dd59b2fe6fa33fb4fb14a6dd293d9bbc5968b239851b705126031"
+                      },
+                      {
+                          "id":  "lynxgate-063",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/09_横断管理/LGX-CHG-DB-001_変更要求・影響一次評価.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  32099,
+                          "sha256":  "19d86f8c3a75c14f0df1e890a9045e5433a886fc3bb04c96952c2346cece948b"
+                      },
+                      {
+                          "id":  "lynxgate-064",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/09_横断管理/LGX-QA-001_QA票運用説明.docx",
+                          "format":  "docx",
+                          "bytes":  79856,
+                          "sha256":  "54888bb3b232efb2e44636eb7cc59665a09607db2e37f8946c0f2bed81b6b2e5"
+                      },
+                      {
+                          "id":  "lynxgate-065",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/09_横断管理/LGX-QA-DB-001_QA票.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  30455,
+                          "sha256":  "16eb77662275b38f38f819ae0a932d71b4562f4ac31da8632916ddb23db7964a"
+                      },
+                      {
+                          "id":  "lynxgate-066",
+                          "archiveId":  "field-reality",
+                          "path":  "LynxGate_Enterprise_FieldReality_Benchmark_Word_Excel/09_横断管理/LGX-REV-DB-001_改定履歴・レビュー指摘.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  24463,
+                          "sha256":  "2ba75343eda9863b5e66581933df8eebcc4237c16e47ee0d5d4fb01a1ec3184a"
+                      },
+                      {
+                          "id":  "lynxgate-067",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/00_利用ガイド/LGX-GLS-001_用語・略語・ID規約.docx",
+                          "format":  "docx",
+                          "bytes":  42283,
+                          "sha256":  "921586d9f30e918b3163744ab84c2e2268c4d39511ba42668fc2a081f86bbeee"
+                      },
+                      {
+                          "id":  "lynxgate-068",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/00_利用ガイド/LGX-MAN-001_文書台帳・解析対象一覧.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  28357,
+                          "sha256":  "5d0f8ddc07da1fbf60820029a638e6d6d5c97527ecab0edf258059cf827449fe"
+                      },
+                      {
+                          "id":  "lynxgate-069",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/00_利用ガイド/LGX-MAP-001_文書構成・権威順位.docx",
+                          "format":  "docx",
+                          "bytes":  88360,
+                          "sha256":  "13dc68255df7dd05c8b921b5d2ab87ffcd898842ee68dad8b19b4e9de6539aff"
+                      },
+                      {
+                          "id":  "lynxgate-070",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/00_利用ガイド/LGX-PRJ-001_プロジェクト利用ガイド.docx",
+                          "format":  "docx",
+                          "bytes":  218867,
+                          "sha256":  "7618c7deb78aa02a7d5296394413b8a5b9bb80875cbe5591ae3eec215463ed9f"
+                      },
+                      {
+                          "id":  "lynxgate-071",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/01_要求仕様書/LGX-REQ-001_要求仕様書.docx",
+                          "format":  "docx",
+                          "bytes":  233325,
+                          "sha256":  "91ef06d5d0314e66adc515e4f000db3a5c6a074328415e421b9f9cf0d4657c1a"
+                      },
+                      {
+                          "id":  "lynxgate-072",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/01_要求仕様書/LGX-REQ-S01_機能要求カタログ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  34223,
+                          "sha256":  "d0393197ab0c8517075622929ed3a16482586979b82aa75f8e8870eaa0440aba"
+                      },
+                      {
+                          "id":  "lynxgate-073",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/01_要求仕様書/LGX-REQ-S02_非機能・SLA・容量.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  26129,
+                          "sha256":  "8c43990a0036ac2230b3e0c9e54d5b7c2fbe16f7e3a3fc9aef8ff55475ffdbe4"
+                      },
+                      {
+                          "id":  "lynxgate-074",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/01_要求仕様書/LGX-REQ-S03_業務規則・状態モデル.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  27290,
+                          "sha256":  "88c65389dd8ad6c6652dceb46868caa2c6fbb884646b5e8f7df57778a4e1833f"
+                      },
+                      {
+                          "id":  "lynxgate-075",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/01_要求仕様書/LGX-REQ-S04_ロール権限・データ分類.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  24489,
+                          "sha256":  "ad6fc5f029ba0223fe2a38aee779e69932c2ba3b335db7510b84917e45ee1d26"
+                      },
+                      {
+                          "id":  "lynxgate-076",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/01_要求仕様書/LGX-REQ-S05_要求トレーサ・改定・QA.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  29310,
+                          "sha256":  "c31854b8c47d159d981061a3b862eda04c69b73ee693231c9b1f91b7016009ed"
+                      },
+                      {
+                          "id":  "lynxgate-077",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/02_インタフェース仕様書/LGX-IFS-001_インタフェース仕様書.docx",
+                          "format":  "docx",
+                          "bytes":  110589,
+                          "sha256":  "36692e5e27f67dff73013bdb98d4e8a1f611f701fdc7706b472e6114fd2e0642"
+                      },
+                      {
+                          "id":  "lynxgate-078",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/02_インタフェース仕様書/LGX-IFS-S01_APIエンドポイント・スキーマ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  23060,
+                          "sha256":  "dbd8cf44e66b7e863cedf51e489c5d576e197aab2bcc38a9fc89b5f59511d0bf"
+                      },
+                      {
+                          "id":  "lynxgate-079",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/02_インタフェース仕様書/LGX-IFS-S02_イベント・メッセージカタログ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  28043,
+                          "sha256":  "3b9feb081b537289e8da978c35c27185be2e674ab5275a7efd0e122ac88888f0"
+                      },
+                      {
+                          "id":  "lynxgate-080",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/02_インタフェース仕様書/LGX-IFS-S03_デバイス・設備プロトコル.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  24121,
+                          "sha256":  "d304ede64f1667f53c5d24a72c07450062c611b245042d19bb169c717e649612"
+                      },
+                      {
+                          "id":  "lynxgate-081",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/02_インタフェース仕様書/LGX-IFS-S04_ファイル連携・レイアウト.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  25000,
+                          "sha256":  "21e4d69a2080728f987e3afacc4b4803c6eb0ea06370f7e255bc39d1164bac6d"
+                      },
+                      {
+                          "id":  "lynxgate-082",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/02_インタフェース仕様書/LGX-IFS-S05_エラー・再試行・冪等性.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  23882,
+                          "sha256":  "f24ec9d14e6810445fd268595137db22e2ff84c2dbccd5c4350d16f7532e50a3"
+                      },
+                      {
+                          "id":  "lynxgate-083",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/02_インタフェース仕様書/LGX-IFS-S06_ネットワーク・接続先・互換性.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  26025,
+                          "sha256":  "ae08df0cfe34f4ba255de851e86954ec60d93ea5429ca3e31cba08f806872cb0"
+                      },
+                      {
+                          "id":  "lynxgate-084",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/03_外部設計書/LGX-EXT-001_外部設計書.docx",
+                          "format":  "docx",
+                          "bytes":  90843,
+                          "sha256":  "4dadacbcb5d3d4496441e89cfad4c5aa4d562b664c7263b4e63e63e12894a4e9"
+                      },
+                      {
+                          "id":  "lynxgate-085",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/03_外部設計書/LGX-EXT-S01_画面・画面遷移.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  29354,
+                          "sha256":  "9dda72b20b1cde31024795ed920a01537f904289f3cdc145dd31ea26618d269c"
+                      },
+                      {
+                          "id":  "lynxgate-086",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/03_外部設計書/LGX-EXT-S02_ユースケース・業務フロー.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  29183,
+                          "sha256":  "27da21d93e11fbe238c62d2f266615bbd3bb0bfcfae17e664c8cab7441e233b3"
+                      },
+                      {
+                          "id":  "lynxgate-087",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/03_外部設計書/LGX-EXT-S03_状態遷移・時刻規則.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  23959,
+                          "sha256":  "97c9163b9e9ee2bc4207725033cc3ae5ad495a0230f6a8d460aa3f6a2bc9dbc0"
+                      },
+                      {
+                          "id":  "lynxgate-088",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/03_外部設計書/LGX-EXT-S04_入力検証・メッセージ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  27930,
+                          "sha256":  "24d4c23e56e0857e751b722e41b67339c1b227bcf031afcffeeb9032fb54c07c"
+                      },
+                      {
+                          "id":  "lynxgate-089",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/03_外部設計書/LGX-EXT-S05_通知・帳票・バッチ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  24536,
+                          "sha256":  "881851e5108f8d7a1d13ed939a81ccbd09696e650dac59aa056d7e583a61e9c4"
+                      },
+                      {
+                          "id":  "lynxgate-090",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/03_外部設計書/LGX-EXT-S06_例外運用・手動介入.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  24707,
+                          "sha256":  "bcdc809b16b186aac40d7cb159e5948ce841f9f6888c285f082e57b9b46c931b"
+                      },
+                      {
+                          "id":  "lynxgate-091",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/03_外部設計書/LGX-EXT-S07_外部設計トレーサビリティ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  30907,
+                          "sha256":  "66d3dee650182bd9db6b01049cadcf34f88c6770d3157c4a490e928d511965b9"
+                      },
+                      {
+                          "id":  "lynxgate-092",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/04_内部設計書/LGX-INT-001_内部設計書.docx",
+                          "format":  "docx",
+                          "bytes":  174450,
+                          "sha256":  "f436197ef1ad96d30a54ab636fddb887f6a5a0978a6e42b74a8cf92668cc360e"
+                      },
+                      {
+                          "id":  "lynxgate-093",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/04_内部設計書/LGX-INT-S01_コンポーネント・依存関係.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  29455,
+                          "sha256":  "a3ca29b69f78af734f4831c95c228c5f7ccd998153849cc6dea41a0560619933"
+                      },
+                      {
+                          "id":  "lynxgate-094",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/04_内部設計書/LGX-INT-S02_DBテーブル・項目・索引.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  32150,
+                          "sha256":  "6196f9c89fd1d5c89a81c3ab0a1f7aa211dd3f17f777c8215e158c3400da437c"
+                      },
+                      {
+                          "id":  "lynxgate-095",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/04_内部設計書/LGX-INT-S03_CRUD・トランザクション.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  29874,
+                          "sha256":  "e579bd96f435f8c6165766d9f0ab8bb38354a5352ad6e0b081193a1a55879447"
+                      },
+                      {
+                          "id":  "lynxgate-096",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/04_内部設計書/LGX-INT-S04_シーケンス・排他・整合性.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  28539,
+                          "sha256":  "5aa8fd8c200a2c2f290e7c191dbd8eec232b786af2cbe0fbfa167d01e44824c7"
+                      },
+                      {
+                          "id":  "lynxgate-097",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/04_内部設計書/LGX-INT-S05_ジョブ・設定・FeatureFlag.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  25524,
+                          "sha256":  "8fcbf8a79b91c12dd8ae22b1a0c69b2a5528d155fb67ef8f0645e7dc9819454b"
+                      },
+                      {
+                          "id":  "lynxgate-098",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/04_内部設計書/LGX-INT-S06_ログ・監視・障害復旧.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  27960,
+                          "sha256":  "c61d69225544b3255a51901c27e80ccaae3bb22932d42f6bff22255516fa4584"
+                      },
+                      {
+                          "id":  "lynxgate-099",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/04_内部設計書/LGX-INT-S07_内部設計トレーサビリティ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  28817,
+                          "sha256":  "5963197371c5bd4404a677c91a412109c5c8ce5806861969c5b40f1b696e0b5f"
+                      },
+                      {
+                          "id":  "lynxgate-100",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/05_単体試験仕様書/LGX-UTS-001_単体試験仕様書.docx",
+                          "format":  "docx",
+                          "bytes":  98074,
+                          "sha256":  "c78a9247fa8871019173ac264a1662286ac97fc11875511e7680742f0c194f52"
+                      },
+                      {
+                          "id":  "lynxgate-101",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/05_単体試験仕様書/LGX-UTS-S01_単体試験ケース.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  30536,
+                          "sha256":  "96f4aa714987c1cbe66eff61ab015ba0673d0ab9d737ff019ec6ce155c798234"
+                      },
+                      {
+                          "id":  "lynxgate-102",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/05_単体試験仕様書/LGX-UTS-S02_境界値・組合せ・テストデータ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  23657,
+                          "sha256":  "e1118c4979f53e3648fa7973d3d8ac6adf7d3367c838ad0e4d77c5ac9928d190"
+                      },
+                      {
+                          "id":  "lynxgate-103",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/05_単体試験仕様書/LGX-UTS-S03_スタブ・モック・故障注入.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  26347,
+                          "sha256":  "37d6077a264345e912ec330ce0e66824c4d634ddd747d79be753187a6ee0bdbf"
+                      },
+                      {
+                          "id":  "lynxgate-104",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/05_単体試験仕様書/LGX-UTS-S04_単体カバレッジ・トレーサ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  28505,
+                          "sha256":  "b4bac73aad733e8f80bb7c1959e645eb86b5241d29c95830c9328a43bf1c5eca"
+                      },
+                      {
+                          "id":  "lynxgate-105",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/06_結合試験仕様書/LGX-ITS-001_結合試験仕様書.docx",
+                          "format":  "docx",
+                          "bytes":  93129,
+                          "sha256":  "4568cfde574af81efedb650fbd2169d8ac1d2ed5d8b39c7d453a265749a21e44"
+                      },
+                      {
+                          "id":  "lynxgate-106",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/06_結合試験仕様書/LGX-ITS-S01_結合試験シナリオ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  29287,
+                          "sha256":  "3bf73cb2aa23351edc744773f4fdc564c32072f79f2690671355d539769bbc31"
+                      },
+                      {
+                          "id":  "lynxgate-107",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/06_結合試験仕様書/LGX-ITS-S02_試験環境・接続・スタブ構成.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  23364,
+                          "sha256":  "c82fad453ad819b752be996d12deb97ad988c73f2cc38e781c15dacc82f0909f"
+                      },
+                      {
+                          "id":  "lynxgate-108",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/06_結合試験仕様書/LGX-ITS-S03_データ検証・証跡.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  26209,
+                          "sha256":  "f7b421f4bfcaa449f70b390d5af2caddd12329a6a1afddccd24772c7a1e1a8e1"
+                      },
+                      {
+                          "id":  "lynxgate-109",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/06_結合試験仕様書/LGX-ITS-S04_障害復旧・カバレッジ・トレーサ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  29025,
+                          "sha256":  "9e6d6a93f5f53f2569017636d83c6c89dca6ffae9a79efe5fb55933a40ebeb08"
+                      },
+                      {
+                          "id":  "lynxgate-110",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/07_E2E試験仕様書/LGX-E2E-001_E2E試験仕様書.docx",
+                          "format":  "docx",
+                          "bytes":  74279,
+                          "sha256":  "edb55e11a0baf9becc424d441de59775aab38c313ea115951fb4f8daa918a682"
+                      },
+                      {
+                          "id":  "lynxgate-111",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/07_E2E試験仕様書/LGX-E2E-S01_E2Eシナリオ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  28510,
+                          "sha256":  "2f7df1e6b9d3d4c195b7950a7fa577061bdb8771021adbba2618c4268a88e28d"
+                      },
+                      {
+                          "id":  "lynxgate-112",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/07_E2E試験仕様書/LGX-E2E-S02_ペルソナ・テストデータセット.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  23014,
+                          "sha256":  "eb34d820da34cac812f81260ab1b24866d48e3aecc0a1a98b5712158059d97c7"
+                      },
+                      {
+                          "id":  "lynxgate-113",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/07_E2E試験仕様書/LGX-E2E-S03_受入判定・証跡・可観測性.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  23504,
+                          "sha256":  "90ecc7273a744dd21547693dc856936f14cd4f83e17ebd4ed37501f24e9b09eb"
+                      },
+                      {
+                          "id":  "lynxgate-114",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/07_E2E試験仕様書/LGX-E2E-S04_E2Eカバレッジ・トレーサ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  28602,
+                          "sha256":  "68c91ca066b37c36a57a2700e00588b84a47584f109dbf6e6dbb1f7fc8bfd968"
+                      },
+                      {
+                          "id":  "lynxgate-115",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/08_ベンチマーク/LGX-BMK-001_評価観点・実施要領.docx",
+                          "format":  "docx",
+                          "bytes":  94612,
+                          "sha256":  "ad4391c3ee88107475c5c0fe95377b0c771959d2808b200b945a13bb638ed305"
+                      },
+                      {
+                          "id":  "lynxgate-116",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/08_ベンチマーク/LGX-BMK-002_演習問題.docx",
+                          "format":  "docx",
+                          "bytes":  46053,
+                          "sha256":  "199f6be456b71fbaee928a6cd12b5d8253552c42a40ac1a0fa2d8571ef6d36c8"
+                      },
+                      {
+                          "id":  "lynxgate-117",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/08_ベンチマーク/LGX-BMK-003_模範解答・採点基準_解析対象外.docx",
+                          "format":  "docx",
+                          "bytes":  49758,
+                          "sha256":  "a0d3e655446a3efa3b2a9ae44be8fd7924564acd3078afc8b9439040654e1d78"
+                      },
+                      {
+                          "id":  "lynxgate-118",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/08_ベンチマーク/LGX-BMK-004_既知ノイズ・正解判断規則_解析対象外.docx",
+                          "format":  "docx",
+                          "bytes":  93861,
+                          "sha256":  "fd5c18dae9e37ac3b7f6ca8297d9bb4d9a7d31cb985ea248a11cacaa823f2ad7"
+                      },
+                      {
+                          "id":  "lynxgate-119",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/08_ベンチマーク/LGX-BMK-S01_設問バンク.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  32782,
+                          "sha256":  "c3fb219f3c4a2086e125202676a7c0536ec2e2e20dab78c43706bb4430f2f8ae"
+                      },
+                      {
+                          "id":  "lynxgate-120",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/08_ベンチマーク/LGX-BMK-S02_正解成果物・関係グラフ_解析対象外.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  71739,
+                          "sha256":  "e33720c24d04adac6903b3142fd4e205c770978c2e8aa3245fe50901fddda7de"
+                      },
+                      {
+                          "id":  "lynxgate-121",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/08_ベンチマーク/LGX-BMK-S03_位置メモ・改定マーカー正解_解析対象外.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  31024,
+                          "sha256":  "6d7eae7ee16e778cc83c2b3d01e2758f502d7c90d7d497e361326bad589e31ef"
+                      },
+                      {
+                          "id":  "lynxgate-122",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/08_ベンチマーク/LGX-BMK-S04_既知ノイズ・Q\u0026A権威順位_解析対象外.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  33021,
+                          "sha256":  "928be3cba0fdcc5276f485ffbab7de923bff274bb88a45d78e9b25d2147098d9"
+                      },
+                      {
+                          "id":  "lynxgate-123",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/08_ベンチマーク/LGX-BMK-S05_採点・変更影響正解_解析対象外.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  81724,
+                          "sha256":  "88256e91f00a1b67a9061480169792c959a7a941a5e1f7f2f4a1a1071d512960"
+                      },
+                      {
+                          "id":  "lynxgate-124",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/09_横断管理/LGX-CHG-001_変更管理・リリース判定.docx",
+                          "format":  "docx",
+                          "bytes":  85026,
+                          "sha256":  "daf4bfa243e793f926405f726f0734301b4837f3c80c8909c5b158fd56e90a4b"
+                      },
+                      {
+                          "id":  "lynxgate-125",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/09_横断管理/LGX-CHG-DB-001_変更要求・影響一次評価.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  31666,
+                          "sha256":  "29c148825e6fcec86064a1c16f29231db54cbca5855b64ba05d9435f7f467fce"
+                      },
+                      {
+                          "id":  "lynxgate-126",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/09_横断管理/LGX-QA-001_QA票運用説明.docx",
+                          "format":  "docx",
+                          "bytes":  79860,
+                          "sha256":  "2a1783b070d3a98819310cd9f113e6c35bd597d7b721fd19e5898b216e35c9d6"
+                      },
+                      {
+                          "id":  "lynxgate-127",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/09_横断管理/LGX-QA-DB-001_QA票.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  30022,
+                          "sha256":  "0a621fb17921488d5f9dc39229f6565adc3c5f0ec3906cb3d58761cea975c77a"
+                      },
+                      {
+                          "id":  "lynxgate-128",
+                          "archiveId":  "practical",
+                          "path":  "LynxGate_Enterprise_Practical_Benchmark_Word_Excel/09_横断管理/LGX-REV-DB-001_改定履歴・レビュー指摘.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  24111,
+                          "sha256":  "36228d3fcd624b5fb12f18267008a7d1bc4a72b059aa5fbc646e9a886d36e677"
+                      },
+                      {
+                          "id":  "lynxgate-129",
+                          "archiveId":  "sample-word-only",
+                          "path":  "LynxGate_SampleProject_WordOnly/00_利用ガイド/LG-GLS-001_用語集・ID規約.docx",
+                          "format":  "docx",
+                          "bytes":  42660,
+                          "sha256":  "5bf1d5470b482c88add07fd4ae773d15feaa7c93c7f1e92aba712a0955bdf584"
+                      },
+                      {
+                          "id":  "lynxgate-130",
+                          "archiveId":  "sample-word-only",
+                          "path":  "LynxGate_SampleProject_WordOnly/00_利用ガイド/LG-PRJ-001_サンプルプロジェクト利用ガイド.docx",
+                          "format":  "docx",
+                          "bytes":  176748,
+                          "sha256":  "e960c6668169a87008ffc72d761a01d33ca1260a9adb7e5773aa7eb7d1b69545"
+                      },
+                      {
+                          "id":  "lynxgate-131",
+                          "archiveId":  "sample-word-only",
+                          "path":  "LynxGate_SampleProject_WordOnly/01_要求仕様書/LG-REQ-001_要求仕様書.docx",
+                          "format":  "docx",
+                          "bytes":  180485,
+                          "sha256":  "a56ccc747310dfddb464e82e253ba97fdc02e26f37806dbed62cd9079a9d6e89"
+                      },
+                      {
+                          "id":  "lynxgate-132",
+                          "archiveId":  "sample-word-only",
+                          "path":  "LynxGate_SampleProject_WordOnly/02_インタフェース仕様書/LG-IFS-001_インタフェース仕様書.docx",
+                          "format":  "docx",
+                          "bytes":  45549,
+                          "sha256":  "5e15b64d56c8a335c5df27add40acf6540f3e519efeb2cde1f66fe12e5fb6916"
+                      },
+                      {
+                          "id":  "lynxgate-133",
+                          "archiveId":  "sample-word-only",
+                          "path":  "LynxGate_SampleProject_WordOnly/03_外部設計書/LG-EXT-001_外部設計書.docx",
+                          "format":  "docx",
+                          "bytes":  180426,
+                          "sha256":  "86ce3b01be49dbfad4786df799c572b3b30bab2fe003078378c08ee62ca7918b"
+                      },
+                      {
+                          "id":  "lynxgate-134",
+                          "archiveId":  "sample-word-only",
+                          "path":  "LynxGate_SampleProject_WordOnly/04_内部設計書/LG-INT-001_内部設計書.docx",
+                          "format":  "docx",
+                          "bytes":  287987,
+                          "sha256":  "e4ba6924522947ab5af3cc51ad79619cbd60347e6a656bac40a3e8219a95505c"
+                      },
+                      {
+                          "id":  "lynxgate-135",
+                          "archiveId":  "sample-word-only",
+                          "path":  "LynxGate_SampleProject_WordOnly/05_単体試験仕様書/LG-UTS-001_単体試験仕様書.docx",
+                          "format":  "docx",
+                          "bytes":  87697,
+                          "sha256":  "ad085d2be0881b1b0364bd156c37fcad74e9fee10958729f0f3c41a86c666688"
+                      },
+                      {
+                          "id":  "lynxgate-136",
+                          "archiveId":  "sample-word-only",
+                          "path":  "LynxGate_SampleProject_WordOnly/06_結合試験仕様書/LG-ITS-001_結合試験仕様書.docx",
+                          "format":  "docx",
+                          "bytes":  84959,
+                          "sha256":  "1312765a9ed8e1c581fe4f205abf958b6e7facb1f0ba32365207af60dd5642b4"
+                      },
+                      {
+                          "id":  "lynxgate-137",
+                          "archiveId":  "sample-word-only",
+                          "path":  "LynxGate_SampleProject_WordOnly/07_E2E試験仕様書/LG-E2E-001_E2E試験仕様書.docx",
+                          "format":  "docx",
+                          "bytes":  85247,
+                          "sha256":  "56ee2bbadc5ed9984c4736c6e4fe067db2c61c510c89489cb2467ead84fb35a9"
+                      },
+                      {
+                          "id":  "lynxgate-138",
+                          "archiveId":  "sample-word-only",
+                          "path":  "LynxGate_SampleProject_WordOnly/08_ベンチマーク/LG-BMK-001_評価観点・実施要領.docx",
+                          "format":  "docx",
+                          "bytes":  43145,
+                          "sha256":  "ece99d5d2a226afdef8c642b46e9dc8365d328480403ac434f5006911dcb68e3"
+                      },
+                      {
+                          "id":  "lynxgate-139",
+                          "archiveId":  "sample-word-only",
+                          "path":  "LynxGate_SampleProject_WordOnly/08_ベンチマーク/LG-BMK-002_演習問題.docx",
+                          "format":  "docx",
+                          "bytes":  43263,
+                          "sha256":  "77fef739aaff266298b3d613c3e2093a4cf1e76e8c59eb8ac0a14538945d2442"
+                      },
+                      {
+                          "id":  "lynxgate-140",
+                          "archiveId":  "sample-word-only",
+                          "path":  "LynxGate_SampleProject_WordOnly/08_ベンチマーク/LG-BMK-003_模範解答・採点基準_解析対象外.docx",
+                          "format":  "docx",
+                          "bytes":  49087,
+                          "sha256":  "584fd0c97376e51ed981fc6bfaf648963234463921ae87c1704765be76a3fe82"
+                      },
+                      {
+                          "id":  "lynxgate-141",
+                          "archiveId":  "sample-word-only",
+                          "path":  "LynxGate_SampleProject_WordOnly/08_ベンチマーク/LG-BMK-004_正解要素・関係一覧_解析対象外.docx",
+                          "format":  "docx",
+                          "bytes":  72295,
+                          "sha256":  "ff0af8df497bd837c9aac82068359b23e00a64dc5706c78775871467b91274d3"
+                      },
+                      {
+                          "id":  "lynxgate-142",
+                          "archiveId":  "sample-word-excel",
+                          "path":  "LynxGate_SampleProject_Word_Excel/00_利用ガイド/LG-GLS-001_用語集・ID規約.docx",
+                          "format":  "docx",
+                          "bytes":  42664,
+                          "sha256":  "ab481d7b01b20f2136cb5f674debe3fbc808fa7e0c35aaed8b782a1d65266289"
+                      },
+                      {
+                          "id":  "lynxgate-143",
+                          "archiveId":  "sample-word-excel",
+                          "path":  "LynxGate_SampleProject_Word_Excel/00_利用ガイド/LG-PRJ-001_サンプルプロジェクト利用ガイド.docx",
+                          "format":  "docx",
+                          "bytes":  176962,
+                          "sha256":  "6ac6cab2b674dd3dac2edd2f95587ef504fc2da04773d38db4583490b6b79242"
+                      },
+                      {
+                          "id":  "lynxgate-144",
+                          "archiveId":  "sample-word-excel",
+                          "path":  "LynxGate_SampleProject_Word_Excel/01_要求仕様書/LG-REQ-001_要求仕様書.docx",
+                          "format":  "docx",
+                          "bytes":  178132,
+                          "sha256":  "2b8d1e30faf3eed77f08c570bb60d09d541d883ea2b3dedf4d9cc556a83cc99a"
+                      },
+                      {
+                          "id":  "lynxgate-145",
+                          "archiveId":  "sample-word-excel",
+                          "path":  "LynxGate_SampleProject_Word_Excel/01_要求仕様書/LG-REQ-DB-001_要求一覧.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  18548,
+                          "sha256":  "24115b1eedff1cfa6289f3437aa54997c157849e6079d76fc9a3b2b0217eea07"
+                      },
+                      {
+                          "id":  "lynxgate-146",
+                          "archiveId":  "sample-word-excel",
+                          "path":  "LynxGate_SampleProject_Word_Excel/02_インタフェース仕様書/LG-IFS-001_インタフェース仕様書.docx",
+                          "format":  "docx",
+                          "bytes":  44992,
+                          "sha256":  "25dd7dd6d80a4e849c9d360a4b168049ae06e351024e7030878aa1fefff53b82"
+                      },
+                      {
+                          "id":  "lynxgate-147",
+                          "archiveId":  "sample-word-excel",
+                          "path":  "LynxGate_SampleProject_Word_Excel/02_インタフェース仕様書/LG-IFS-DB-001_インタフェース一覧.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  13295,
+                          "sha256":  "30a417bc1f3adae2c38e35cc866ab65a06e5e4c22c0a5dcc16ccf7872be07e51"
+                      },
+                      {
+                          "id":  "lynxgate-148",
+                          "archiveId":  "sample-word-excel",
+                          "path":  "LynxGate_SampleProject_Word_Excel/03_外部設計書/LG-EXT-001_外部設計書.docx",
+                          "format":  "docx",
+                          "bytes":  173884,
+                          "sha256":  "a83091f33b95d41cd98450856f0664ec6b328c12bca932c18e4d2625bc2ad58a"
+                      },
+                      {
+                          "id":  "lynxgate-149",
+                          "archiveId":  "sample-word-excel",
+                          "path":  "LynxGate_SampleProject_Word_Excel/03_外部設計書/LG-EXT-TRC-001_トレーサビリティ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  20054,
+                          "sha256":  "fe5032d559bb508276a8669464edd790983f128a688b0b8b73d98fdcc7192331"
+                      },
+                      {
+                          "id":  "lynxgate-150",
+                          "archiveId":  "sample-word-excel",
+                          "path":  "LynxGate_SampleProject_Word_Excel/04_内部設計書/LG-INT-001_内部設計書.docx",
+                          "format":  "docx",
+                          "bytes":  281761,
+                          "sha256":  "a8c2d70f65897151d2ba2db57e618554026ab95539c594809febf9d9d02a43d3"
+                      },
+                      {
+                          "id":  "lynxgate-151",
+                          "archiveId":  "sample-word-excel",
+                          "path":  "LynxGate_SampleProject_Word_Excel/04_内部設計書/LG-INT-TRC-001_内部設計データ・トレーサビリティ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  22848,
+                          "sha256":  "4a74bf9a2a2a447fd448a69b3396a6d21c13c3d1c3e3e35f93922c02eea626ae"
+                      },
+                      {
+                          "id":  "lynxgate-152",
+                          "archiveId":  "sample-word-excel",
+                          "path":  "LynxGate_SampleProject_Word_Excel/05_単体試験仕様書/LG-UTS-001_単体試験仕様書.docx",
+                          "format":  "docx",
+                          "bytes":  81297,
+                          "sha256":  "afa45e48c9eca4ebd0b64bb2c74d947ffdfd9ab201f6d978c29a0f0607091c11"
+                      },
+                      {
+                          "id":  "lynxgate-153",
+                          "archiveId":  "sample-word-excel",
+                          "path":  "LynxGate_SampleProject_Word_Excel/05_単体試験仕様書/LG-UTS-DB-001_単体試験ケース・トレーサビリティ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  18405,
+                          "sha256":  "84bb2f94a994d247b7a2f0f85296f745ba81db22a5a966aa022f0971505e6817"
+                      },
+                      {
+                          "id":  "lynxgate-154",
+                          "archiveId":  "sample-word-excel",
+                          "path":  "LynxGate_SampleProject_Word_Excel/06_結合試験仕様書/LG-ITS-001_結合試験仕様書.docx",
+                          "format":  "docx",
+                          "bytes":  81244,
+                          "sha256":  "57c806ebba02c540689f9b78ee8954257047760af22f3fb8d3a905dfd039e49f"
+                      },
+                      {
+                          "id":  "lynxgate-155",
+                          "archiveId":  "sample-word-excel",
+                          "path":  "LynxGate_SampleProject_Word_Excel/06_結合試験仕様書/LG-ITS-DB-001_結合試験ケース・トレーサビリティ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  15422,
+                          "sha256":  "78c3f65680a670e5eacfd26861bf451c48d37e33254082284322f4efa5e00e50"
+                      },
+                      {
+                          "id":  "lynxgate-156",
+                          "archiveId":  "sample-word-excel",
+                          "path":  "LynxGate_SampleProject_Word_Excel/07_E2E試験仕様書/LG-E2E-001_E2E試験仕様書.docx",
+                          "format":  "docx",
+                          "bytes":  81165,
+                          "sha256":  "5d236eee0ff182ff76427f24f1c52569992925fb5897e02f5b4ba4045acfba6c"
+                      },
+                      {
+                          "id":  "lynxgate-157",
+                          "archiveId":  "sample-word-excel",
+                          "path":  "LynxGate_SampleProject_Word_Excel/07_E2E試験仕様書/LG-E2E-DB-001_E2E試験ケース・トレーサビリティ.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  15601,
+                          "sha256":  "d4d9981c5435e58794af6220a9c57a567dc50cd16a077771bc48eabef81a8e12"
+                      },
+                      {
+                          "id":  "lynxgate-158",
+                          "archiveId":  "sample-word-excel",
+                          "path":  "LynxGate_SampleProject_Word_Excel/08_ベンチマーク/LG-BMK-001_評価観点・実施要領.docx",
+                          "format":  "docx",
+                          "bytes":  43189,
+                          "sha256":  "79648e7d286d832290d14f860fff18d9ec71e7ae33f7a44fff8fbb82829ae89c"
+                      },
+                      {
+                          "id":  "lynxgate-159",
+                          "archiveId":  "sample-word-excel",
+                          "path":  "LynxGate_SampleProject_Word_Excel/08_ベンチマーク/LG-BMK-002_演習問題.docx",
+                          "format":  "docx",
+                          "bytes":  43267,
+                          "sha256":  "bd587d5229ef31df5c47aa737772eac2547b8971d3856a14a092e968cbe49b08"
+                      },
+                      {
+                          "id":  "lynxgate-160",
+                          "archiveId":  "sample-word-excel",
+                          "path":  "LynxGate_SampleProject_Word_Excel/08_ベンチマーク/LG-BMK-003_模範解答・採点基準_解析対象外.docx",
+                          "format":  "docx",
+                          "bytes":  49092,
+                          "sha256":  "de3a95335aae3fb2d228aa6dc67a91dc43ea88a1537180f91bf0641af67d1383"
+                      },
+                      {
+                          "id":  "lynxgate-161",
+                          "archiveId":  "sample-word-excel",
+                          "path":  "LynxGate_SampleProject_Word_Excel/08_ベンチマーク/LG-BMK-DB-001_ベンチマーク正解データ_解析対象外.xlsx",
+                          "format":  "xlsx",
+                          "bytes":  56817,
+                          "sha256":  "52889e7288ec6aecc75ed4ac37d3b070bd26b742618103529bcc86bb4f722498"
+                      }
+                  ],
+    "expected":  {
+                     "documents":  161,
+                     "formats":  {
+                                     "docx":  60,
+                                     "xlsx":  101
+                                 },
+                     "expectedLimitDiagnostics":  [
+                                                      {
+                                                          "format":  "docx",
+                                                          "code":  "DFIR-DOCX-PARSE-FAILED",
+                                                          "messageContains":  "XML text budget exceeded"
+                                                      }
+                                                  ]
+                 }
+}
