@@ -1209,7 +1209,11 @@ def _xlsx_condition_matches(rule: ET.Element, raw_value: str | None) -> bool:
         right = Decimal(formula.lstrip("="))
     except (InvalidOperation, ValueError):
         return False
-    operator = _attr(rule, "operator", "equal")
+    # OOXML treats an omitted operator as ``equal`` for cellIs rules.  Some
+    # producers emit the attribute with an empty value; treat that the same
+    # way for matching while retaining the absent/empty authored value as
+    # unavailable in the generic extension payload below.
+    operator = _attr(rule, "operator") or "equal"
     return {
         "equal": left == right,
         "notEqual": left != right,
@@ -2060,7 +2064,7 @@ def convert(path: Path, *, limits: AdapterLimits | None = None) -> dict[str, Any
                     builder.add_item("tables", structured_table, "tableId")
                     _extension(builder, section_id, "table-definition", {"path": table_name, "name": _attr(table_root, "name"), "range": _attr(table_root, "ref")})
                 for cf in _children(sheet_root, "conditionalFormatting"):
-                    _extension(builder, section_id, "conditional-formatting", {"range": _attr(cf, "sqref"), "rules": [{"type": _attr(rule, "type"), "operator": _attr(rule, "operator"), "priority": _attr(rule, "priority"), "formula": [child.text or "" for child in rule if _local(child.tag) == "formula"]} for rule in _children(cf, "cfRule")]})
+                    _extension(builder, section_id, "conditional-formatting", {"range": _attr(cf, "sqref"), "rules": [{"type": _attr(rule, "type"), "operator": (_attr(rule, "operator") or None), "priority": _attr(rule, "priority"), "formula": [child.text or "" for child in rule if _local(child.tag) == "formula"]} for rule in _children(cf, "cfRule")]})
                 _apply_xlsx_conditionals(archive, builder, sheet_root, style_ids, conditional_cells, section_id, target, sheet_name, limits)
                 builder.add_item("orders", {"orderId": safe_id("order", f"xlsx-grid-{sheet_ordinal}"), "kind": "grid", "ownerId": section_id, "items": [{"id": item, "ordinal": index} for index, item in enumerate(cell_ids)], "ordinalBase": 0, "status": "preserved"}, "orderId")
                 builder.add_feature("worksheet", "preserved", target_id=section_id)

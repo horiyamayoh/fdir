@@ -5,11 +5,14 @@ from __future__ import annotations
 from pathlib import Path
 import unittest
 import zipfile
+import xml.etree.ElementTree as ET
 
 try:
     from convert_document import convert_path
+    from adapter_xlsx import _xlsx_condition_matches
 except ImportError:  # pragma: no cover
     from tools.convert_document import convert_path
+    from tools.adapter_xlsx import _xlsx_condition_matches
 
 
 _TEST_TEMP_ROOT = Path(__file__).resolve().parents[1] / "e2e" / ".run"
@@ -173,6 +176,39 @@ class AdapterXlsxFailClosedTests(unittest.TestCase):
         self.assertEqual(part["status"], "unsupported")
         diagnostic = next(item for item in document["diagnostics"] if item.get("code") == "DFIR-XLSX-FEATURE-UNSUPPORTED" and "calcChain.xml" in item.get("message", ""))
         self.assertEqual(diagnostic["targetId"], part["partId"])
+
+    def test_empty_or_missing_conditional_operator_is_schema_valid_and_defaults_for_cell_is(self) -> None:
+        for suffix, operator_attribute in (("missing", ""), ("empty", ' operator=""')):
+            parts = _parts()
+            worksheet = parts["xl/worksheets/sheet1.xml"]
+            conditional = f'<conditionalFormatting sqref="B2"><cfRule type="expression" priority="1"{operator_attribute}><formula>B2&gt;0</formula></cfRule></conditionalFormatting>'
+            parts["xl/worksheets/sheet1.xml"] = worksheet.replace("</worksheet>", f"{conditional}</worksheet>")
+            path = _TEST_TEMP_ROOT / f"adapter-xlsx-conditional-operator-{suffix}.xlsx"
+            try:
+                _write_package(path, parts)
+                document, evidence = convert_path(path, "xlsx")
+                self.assertEqual(evidence["outcome"], "success", document.get("diagnostics"))
+                extension = next(item for item in document["extensions"] if item.get("type") == "conditional-formatting")
+                self.assertIsNone(extension["payload"]["rules"][0]["operator"])
+            finally:
+                path.unlink(missing_ok=True)
+        rule = ET.fromstring('<cfRule xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" type="cellIs" operator=""><formula>1</formula></cfRule>')
+        self.assertTrue(_xlsx_condition_matches(rule, "1"))
+
+    def test_conditional_format_without_formula_is_schema_valid(self) -> None:
+        parts = _parts()
+        worksheet = parts["xl/worksheets/sheet1.xml"]
+        conditional = '<conditionalFormatting sqref="B2"><cfRule type="colorScale" priority="1"><colorScale><cfvo type="min"/></colorScale></cfRule></conditionalFormatting>'
+        parts["xl/worksheets/sheet1.xml"] = worksheet.replace("</worksheet>", f"{conditional}</worksheet>")
+        path = _TEST_TEMP_ROOT / "adapter-xlsx-conditional-no-formula.xlsx"
+        try:
+            _write_package(path, parts)
+            document, evidence = convert_path(path, "xlsx")
+            self.assertEqual(evidence["outcome"], "success", document.get("diagnostics"))
+            extension = next(item for item in document["extensions"] if item.get("type") == "conditional-formatting")
+            self.assertEqual(extension["payload"]["rules"][0]["formula"], [])
+        finally:
+            path.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

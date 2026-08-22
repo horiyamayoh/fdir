@@ -20,7 +20,7 @@
                                                        "numId",
                                                        "ilvl"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -81,7 +81,7 @@
                                                        "extentEmu",
                                                        "transform"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -136,7 +136,7 @@
                                                        "endpoint",
                                                        "sourceId"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -210,7 +210,7 @@
                                                        "revisionId",
                                                        "range"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -268,7 +268,7 @@
                                                        "status",
                                                        "sourceLocator"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -323,7 +323,7 @@
                                                        "depth",
                                                        "events"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -378,7 +378,7 @@
                         "semanticRequiredFields":  [
                                                        "pageProperties"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -433,7 +433,7 @@
                         "semanticRequiredFields":  [
                                                        "presetGeometry"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "readOnly":  true,
                         "readOnlyReason":  "example and legacy fixture fact; the bounded DOCX adapter has no callout emission site",
                         "versionRange":  {
@@ -491,7 +491,7 @@
                                                        "name",
                                                        "range"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -546,7 +546,7 @@
                                                        "range",
                                                        "rules"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -600,7 +600,7 @@
                         "semanticRequiredFields":  [
                                                        "runs"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -656,7 +656,7 @@
                                                        "pane",
                                                        "selection"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -713,7 +713,7 @@
                                                        "operator",
                                                        "formulas"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -770,7 +770,7 @@
                                                        "hidden",
                                                        "formula"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -834,7 +834,7 @@
                                                        "sourceLocatorStatus",
                                                        "provenance"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -892,7 +892,7 @@
                                                        "sourceLocator",
                                                        "provenance"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -949,7 +949,7 @@
                                                        "operands",
                                                        "state"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -1007,7 +1007,7 @@
                                                        "lineBreak",
                                                        "referenceStyle"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -1061,7 +1061,7 @@
                         "semanticRequiredFields":  [
                                                        "source"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -1115,7 +1115,7 @@
                         "semanticRequiredFields":  [
                                                        "source"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -1170,7 +1170,7 @@
                                                        "delimiter",
                                                        "alignment"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -1225,7 +1225,7 @@
                                                        "opening",
                                                        "body"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -1281,7 +1281,7 @@
                                                        "language",
                                                        "content"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -1336,7 +1336,7 @@
                                                        "level",
                                                        "marker"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -1392,7 +1392,7 @@
                                                        "count",
                                                        "leadingWhitespace"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -1448,7 +1448,7 @@
                                                        "destination",
                                                        "title"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -1503,7 +1503,7 @@
                                                        "marker",
                                                        "level"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"
@@ -1557,7 +1557,7 @@
                         "semanticRequiredFields":  [
                                                        "marker"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "readOnly":  true,
                         "readOnlyReason":  "the bounded Markdown parser preserves blockquote structure but has no blockquote extension emission site",
                         "versionRange":  {
@@ -1613,7 +1613,7 @@
                         "semanticRequiredFields":  [
                                                        "entries"
                                                    ],
-                        "schemaDigest":  "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad",
+                        "schemaDigest":  "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6",
                         "versionRange":  {
                                              "current":  "1.0.0",
                                              "policy":  "patch-compatible-minor-migratable-major-migration-required"

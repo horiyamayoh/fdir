@@ -1,0 +1,22 @@
+{
+  "schema": "fdir/adapter-execution-evidence",
+  "version": "1.0.0",
+  "input": {
+    "path": "e2e/.run/lynxgate-baseline-dd627f1af214-n7ai7mk3/lynxgate-003/input.xlsx",
+    "format": "xlsx",
+    "bytes": 35930,
+    "sha256": "ed6cf80c56c3ace166c6db4e68a248570c39c29fc4037b42848fbe2edfd57b8c",
+    "parserAttempted": true,
+    "limitRejectedBeforeParse": false,
+    "consumed": true
+  },
+  "adapter": {
+    "module": "adapter_xlsx",
+    "operation": "convert"
+  },
+  "outcome": "failed",
+  "documentId": "doc-x-85d12356d514ed3939211a34eaf5e99bbe81662aad36ac0021acadd26ef4c362",
+  "conversionStatus": "failed",
+  "diagnosticCount": 6,
+  "elapsedMilliseconds": 2507.197
+}

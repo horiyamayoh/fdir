@@ -526,8 +526,8 @@ def run_benchmark(manifest_path: Path, output_dir: Path, label: str, explicit_sh
         representatives.append(
             {
                 "id": case["id"],
-                "document": output_name,
-                "evidence": evidence_name,
+                "document": f"representatives/{output_name}",
+                "evidence": f"representatives/{evidence_name}",
                 "documentSha256": sha256_file(destination_output),
                 "evidenceSha256": sha256_file(destination_evidence),
             }
@@ -652,7 +652,10 @@ def verify_report(report_path: Path) -> dict[str, Any]:
         if representative.get("id") not in seen:
             raise BenchmarkError("representative references an unknown case")
         for key, digest_key in (("document", "documentSha256"), ("evidence", "evidenceSha256")):
-            path = validate_relative_path(report_path.parent, str(representative.get(key, "")), "representative")
+            relative_name = str(representative.get(key, ""))
+            path = validate_relative_path(report_path.parent, relative_name, "representative")
+            if not path.is_file() and "/" not in relative_name and "\\" not in relative_name:
+                path = validate_relative_path(report_path.parent / "representatives", relative_name, "representative")
             if path.parent.resolve() != (report_path.parent / "representatives").resolve() or not is_sha256(representative.get(digest_key)) or not path.is_file() or sha256_file(path) != representative.get(digest_key):
                 raise BenchmarkError(f"representative artifact mismatch: {path.name}")
     return {

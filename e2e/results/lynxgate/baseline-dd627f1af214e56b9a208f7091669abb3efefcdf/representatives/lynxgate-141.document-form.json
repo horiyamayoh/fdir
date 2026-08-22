@@ -1,0 +1,78 @@
+{
+  "schema": {
+    "name": "fdir/document-form",
+    "version": "1.0.0"
+  },
+  "documentId": "doc-x-428376a62eeaa18bd86789a80a2dc8be9855b7a7ae52a3743087f6d2efa74e60",
+  "sourceFormat": {
+    "namespace": "format",
+    "name": "docx",
+    "version": "ECMA-376"
+  },
+  "rootNodeId": "node-docx-document",
+  "parts": [],
+  "surfaces": [],
+  "nodes": [
+    {
+      "nodeId": "node-docx-document",
+      "kind": "document",
+      "childIds": [],
+      "status": "preserved"
+    }
+  ],
+  "texts": [],
+  "tables": [],
+  "styles": [],
+  "layouts": [],
+  "coordinateSpaces": [],
+  "geometries": [],
+  "resources": [],
+  "formulas": [],
+  "fields": [],
+  "annotations": [],
+  "relations": [],
+  "orders": [],
+  "observations": [],
+  "extensions": [],
+  "sourceMaps": [],
+  "diagnostics": [
+    {
+      "diagnosticId": "diagnostic-docx-0-DFIR-DOCX-PARSE-FAILED",
+      "code": "DFIR-DOCX-PARSE-FAILED",
+      "severity": "error",
+      "phase": "parse",
+      "message": "XML text budget exceeded: 2000091 > 2000000",
+      "action": "review",
+      "targetId": "node-docx-document"
+    }
+  ],
+  "conversion": {
+    "status": "failed",
+    "capabilityProfile": "format:docx:ECMA-376:1",
+    "features": [
+      {
+        "feature": "document",
+        "status": "failed",
+        "targetId": "node-docx-document",
+        "diagnosticIds": [
+          "diagnostic-docx-0-DFIR-DOCX-PARSE-FAILED"
+        ]
+      }
+    ],
+    "featureInventory": [
+      {
+        "feature": "document",
+        "occurrences": 1,
+        "disposition": "non-preserved",
+        "status": "failed",
+        "diagnosticIds": [
+          "diagnostic-docx-0-DFIR-DOCX-PARSE-FAILED"
+        ]
+      }
+    ],
+    "warnings": [],
+    "diagnostics": [
+      "diagnostic-docx-0-DFIR-DOCX-PARSE-FAILED"
+    ]
+  }
+}
