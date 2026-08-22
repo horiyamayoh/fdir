@@ -1,0 +1,22 @@
+{
+  "schema": "fdir/adapter-execution-evidence",
+  "version": "1.0.0",
+  "input": {
+    "path": "e2e/.run/lynxgate-final-fcb08bcf5c78-g6715not/lynxgate-141/input.docx",
+    "format": "docx",
+    "bytes": 72295,
+    "sha256": "ff0af8df497bd837c9aac82068359b23e00a64dc5706c78775871467b91274d3",
+    "parserAttempted": true,
+    "limitRejectedBeforeParse": false,
+    "consumed": true
+  },
+  "adapter": {
+    "module": "adapter_docx",
+    "operation": "convert"
+  },
+  "outcome": "failed",
+  "documentId": "doc-x-428376a62eeaa18bd86789a80a2dc8be9855b7a7ae52a3743087f6d2efa74e60",
+  "conversionStatus": "failed",
+  "diagnosticCount": 1,
+  "elapsedMilliseconds": 125.267
+}

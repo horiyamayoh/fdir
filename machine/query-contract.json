@@ -8,7 +8,7 @@
       "version": "1.1.0"
     },
     "sourceDigestAlgorithm": "sha256(canonical-json(sources))",
-    "sourceDigest": "09a960e047bb7429cce0b1c38ef9f187f1c5f336811afa358fa13441eb48e36b",
+    "sourceDigest": "14fffcae709eae4f5e1487eef6d38a98dff965892d06d639413709ff6b0048f1",
     "sources": [
       {
         "role": "ir-schema",
@@ -28,12 +28,12 @@
       {
         "role": "extension-registry",
         "path": "machine/extension-registry.json",
-        "sha256": "5d2f07b925ddaca92c3b8dc06907f0c7756e8758e67e21b8b1be01f9d4030961"
+        "sha256": "b18a751059f14eb53dbb361f8c502b31e20ab9616e40274ed1ef4a0b1b23d602"
       },
       {
         "role": "extension-schema",
         "path": "schemas/extensions/format-extensions.schema.json",
-        "sha256": "59102cfd628d7c9d54c2fd98eecb21183483f8fb2c042d754496d80fe8f68cad"
+        "sha256": "e73da06b367720c96c7eb081195c660996ba58d98a45355863b668b241cdbdc6"
       },
       {
         "role": "generator",
